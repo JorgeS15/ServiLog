@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#e8a020">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Tracker Máquina</title>
+  <link rel="manifest" href="/manifest.json">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Header -->
+    <header>
+      <div class="header-inner">
+        <div class="brand">
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+            <rect x="2" y="16" width="24" height="8" rx="2" fill="#e8a020"/>
+            <rect x="6" y="10" width="16" height="7" rx="1" fill="#c47a10"/>
+            <rect x="10" y="6" width="8" height="5" rx="1" fill="#e8a020"/>
+            <rect x="2" y="20" width="4" height="4" rx="2" fill="#0f1117"/>
+            <rect x="22" y="20" width="4" height="4" rx="2" fill="#0f1117"/>
+            <rect x="1" y="18" width="3" height="2" rx="1" fill="#888" transform="rotate(-15 1 18)"/>
+          </svg>
+          <span>TRACKER</span>
+        </div>
+        <nav>
+          <button class="nav-btn active" data-view="dashboard">
+            <svg viewBox="0 0 20 20"><rect x="2" y="2" width="7" height="7" rx="1"/><rect x="11" y="2" width="7" height="7" rx="1"/><rect x="2" y="11" width="7" height="7" rx="1"/><rect x="11" y="11" width="7" height="7" rx="1"/></svg>
+            <span>Resumo</span>
+          </button>
+          <button class="nav-btn" data-view="lista">
+            <svg viewBox="0 0 20 20"><line x1="3" y1="5" x2="17" y2="5" stroke-width="2" stroke-linecap="round"/><line x1="3" y1="10" x2="17" y2="10" stroke-width="2" stroke-linecap="round"/><line x1="3" y1="15" x2="17" y2="15" stroke-width="2" stroke-linecap="round"/></svg>
+            <span>Serviços</span>
+          </button>
+          <button class="nav-btn" data-view="clientes">
+            <svg viewBox="0 0 20 20"><circle cx="10" cy="7" r="4"/><path d="M3 17c0-3.866 3.134-7 7-7s7 3.134 7 7" stroke-linecap="round"/></svg>
+            <span>Clientes</span>
+          </button>
+        </nav>
+      </div>
+    </header>
+
+    <!-- Views -->
+    <main>
+      <div id="view-dashboard" class="view active"></div>
+      <div id="view-lista" class="view"></div>
+      <div id="view-clientes" class="view"></div>
+    </main>
+
+    <!-- FAB -->
+    <button id="fab" title="Novo serviço">
+      <svg viewBox="0 0 24 24" width="28" height="28"><line x1="12" y1="5" x2="12" y2="19" stroke-width="2.5" stroke-linecap="round"/><line x1="5" y1="12" x2="19" y2="12" stroke-width="2.5" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+
+  <!-- Modal -->
+  <div id="modal-overlay" class="hidden">
+    <div id="modal">
+      <div class="modal-header">
+        <h2 id="modal-title">Novo Serviço</h2>
+        <button id="modal-close">✕</button>
+      </div>
+      <div id="modal-body"></div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast"></div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
