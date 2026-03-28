@@ -1,19 +1,19 @@
 services:
-  maquina-tracker:
+  servilog:
     build: .
-    # ou usa a imagem pré-construída:
-    # image: ghcr.io/teu-user/maquina-tracker:latest
-    container_name: maquina-tracker
+    # or use the pre-built image:
+    # image: ghcr.io/jorges15/servilog:latest
+    container_name: servilog
     restart: unless-stopped
     volumes:
       - ./data:/data
     environment:
       - DB_PATH=/data/tracker.db
       - PORT=3000
-    # Expõe só localmente — o Caddy faz o reverse proxy
+    # Exposed locally only — Caddy handles reverse proxy
     expose:
       - "3000"
-    # Para acesso directo sem Caddy (opcional, remove se usares Caddy):
+    # For direct access without Caddy (optional, remove if using Caddy):
     # ports:
     #   - "3000:3000"
     networks:
