@@ -478,6 +478,12 @@ async function init() {
   }
 
   navigate('dashboard');
+
+  // Version footer
+  api.get('/api/version').then(v => {
+    const el = document.getElementById('app-footer');
+    if (el) el.textContent = `ServiLog v${v.version}`;
+  });
 }
 
 document.addEventListener('DOMContentLoaded', init);
