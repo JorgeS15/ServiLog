@@ -2,6 +2,7 @@ const express = require('express');
 const Database = require('better-sqlite3');
 const path = require('path');
 const fs = require('fs');
+const pkg = require('./package.json');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -46,6 +47,9 @@ try { db.exec(`ALTER TABLE servicos ADD COLUMN horas_desconto REAL DEFAULT 0`); 
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
+
+// ── Version ───────────────────────────────────────────────
+app.get('/api/version', (req, res) => res.json({ version: pkg.version }));
 
 // ── Clientes ──────────────────────────────────────────────
 app.get('/api/clientes', (req, res) => {
