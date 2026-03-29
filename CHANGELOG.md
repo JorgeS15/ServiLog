@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.3.0] - 2026-03-29
+
+### Added
+- Inline client creation from the service form dropdown (select "✚ Novo cliente...")
+- "Horas a descontar" field per service (lunch break, etc.) — deducted from auto-calculated duration
+- Duration field renamed to "Duração líquida" to reflect the net value after deduction
+- Service card now shows deduction in the time chip (e.g. 08:00–17:00 -1h · 8h)
+
+### Changed
+- `server.js`: extracted `calcDuracao()` helper; `horas_desconto` stored in DB and applied to duration
+- CSV export includes `Desconto(h)` column
+
 ## [0.2.0] - 2026-03-28
 
 ### Changed
