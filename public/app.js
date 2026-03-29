@@ -174,8 +174,9 @@ async function renderLista() {
 
 function servicoCard(s) {
   const chips = [];
+  const desconto = s.horas_desconto > 0 ? ` -${s.horas_desconto}h` : '';
   if (s.hora_inicio || s.hora_fim) {
-    chips.push(`<span class="chip hora">🕐 ${s.hora_inicio || '?'}–${s.hora_fim || '?'}${s.duracao_horas != null ? ' · ' + s.duracao_horas + 'h' : ''}</span>`);
+    chips.push(`<span class="chip hora">🕐 ${s.hora_inicio || '?'}–${s.hora_fim || '?'}${desconto}${s.duracao_horas != null ? ' · ' + s.duracao_horas + 'h' : ''}</span>`);
   } else if (s.duracao_horas != null) {
     chips.push(`<span class="chip hora">⏱ ${s.duracao_horas}h</span>`);
   }
@@ -224,27 +225,35 @@ function servicoFormHtml(s = {}) {
         </div>
         <div class="form-group">
           <label class="form-label">Cliente</label>
-          <select class="form-control" id="f-cliente">
+          <select class="form-control" id="f-cliente" onchange="onClienteChange()">
             <option value="">— nenhum —</option>
             ${clienteOptions}
+            <option value="__novo__">✚ Novo cliente...</option>
           </select>
+          <input type="text" class="form-control" id="f-cliente-novo" placeholder="Nome do novo cliente" style="margin-top:6px;display:none">
         </div>
       </div>
 
       <div class="form-row">
         <div class="form-group">
           <label class="form-label">Hora início</label>
-          <input type="time" class="form-control" id="f-hinicio" value="${s.hora_inicio || ''}">
+          <input type="time" class="form-control" id="f-hinicio" value="${s.hora_inicio || ''}" oninput="calcDuracao()">
         </div>
         <div class="form-group">
           <label class="form-label">Hora fim</label>
-          <input type="time" class="form-control" id="f-hfim" value="${s.hora_fim || ''}">
+          <input type="time" class="form-control" id="f-hfim" value="${s.hora_fim || ''}" oninput="calcDuracao()">
         </div>
       </div>
 
-      <div class="form-group">
-        <label class="form-label">Duração (horas) <span class="form-hint" style="display:inline">— calculado automaticamente se tiveres hora início/fim</span></label>
-        <input type="number" class="form-control" id="f-duracao" step="0.25" min="0" placeholder="ex: 3.5" value="${s.duracao_horas ?? ''}">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Horas a descontar</label>
+          <input type="number" class="form-control" id="f-desconto" step="0.25" min="0" placeholder="ex: 1" value="${s.horas_desconto || ''}" oninput="calcDuracao()">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Duração líquida (horas)</label>
+          <input type="number" class="form-control" id="f-duracao" step="0.25" min="0" placeholder="calculado auto." value="${s.duracao_horas ?? ''}">
+        </div>
       </div>
 
       <hr class="divider">
@@ -286,6 +295,26 @@ function servicoFormHtml(s = {}) {
   `;
 }
 
+window.onClienteChange = function() {
+  const sel = document.getElementById('f-cliente');
+  const novoInput = document.getElementById('f-cliente-novo');
+  novoInput.style.display = sel.value === '__novo__' ? 'block' : 'none';
+  if (sel.value === '__novo__') novoInput.focus();
+};
+
+window.calcDuracao = function() {
+  const ini = document.getElementById('f-hinicio')?.value;
+  const fim = document.getElementById('f-hfim')?.value;
+  if (!ini || !fim) return;
+  const [h1, m1] = ini.split(':').map(Number);
+  const [h2, m2] = fim.split(':').map(Number);
+  let dur = ((h2 * 60 + m2) - (h1 * 60 + m1)) / 60;
+  if (dur < 0) dur += 24;
+  const desconto = parseFloat(document.getElementById('f-desconto')?.value) || 0;
+  const net = Math.max(0, dur - desconto);
+  document.getElementById('f-duracao').value = net.toFixed(2);
+};
+
 window.calcHorim = function() {
   const ini = parseFloat(document.getElementById('f-horim-in')?.value);
   const fim = parseFloat(document.getElementById('f-horim-out')?.value);
@@ -300,12 +329,14 @@ window.calcHorim = function() {
 };
 
 function getFormData() {
+  const clienteVal = document.getElementById('f-cliente').value;
   return {
     data: document.getElementById('f-data').value,
     hora_inicio: document.getElementById('f-hinicio').value || null,
     hora_fim: document.getElementById('f-hfim').value || null,
+    horas_desconto: document.getElementById('f-desconto').value || null,
     duracao_horas: document.getElementById('f-duracao').value || null,
-    cliente_id: document.getElementById('f-cliente').value || null,
+    cliente_id: (clienteVal && clienteVal !== '__novo__') ? clienteVal : null,
     descricao: document.getElementById('f-desc').value || null,
     valor: document.getElementById('f-valor').value || null,
     horimetro_inicio: document.getElementById('f-horim-in').value || null,
@@ -316,6 +347,16 @@ function getFormData() {
 window.saveServico = async function(id) {
   const body = getFormData();
   if (!body.data) { toast('Data obrigatória', 'error'); return; }
+
+  // Handle new client creation inline
+  if (document.getElementById('f-cliente').value === '__novo__') {
+    const novoNome = document.getElementById('f-cliente-novo').value.trim();
+    if (!novoNome) { toast('Escreve o nome do cliente', 'error'); return; }
+    const result = await api.post('/api/clientes', { nome: novoNome });
+    if (result.error) { toast(result.error, 'error'); return; }
+    body.cliente_id = result.id;
+    state.clientes = await api.get('/api/clientes');
+  }
 
   try {
     if (id) {
@@ -344,6 +385,7 @@ async function editServico(id) {
   const s = await api.get(`/api/servicos/${id}`);
   openModal('Editar Serviço', servicoFormHtml(s));
   calcHorim();
+  // Don't auto-recalc duration on edit — keep stored value
 }
 
 function novoServico() {
