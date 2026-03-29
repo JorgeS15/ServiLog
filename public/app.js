@@ -86,15 +86,26 @@ async function renderDashboard() {
         <div class="stat-value">${s.total_servicos || 0}</div>
       </div>
       <div class="stat-block">
-        <div class="stat-label">Valor Total</div>
-        <div class="stat-value accent">${s.total_valor ? s.total_valor.toFixed(2) + ' €' : '—'}</div>
+        <div class="stat-label">Horas Trab.</div>
+        <div class="stat-value">${s.total_horas != null ? s.total_horas + ' h' : '—'}</div>
+      </div>
+    </div>
+
+    <div class="card-row" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+      <div class="stat-block">
+        <div class="stat-label">Recebido</div>
+        <div class="stat-value accent">${s.total_recebido ? s.total_recebido.toFixed(2) + ' €' : '—'}</div>
+      </div>
+      <div class="stat-block">
+        <div class="stat-label">Pendente</div>
+        <div class="stat-value${s.total_pendente > 0 ? ' warn' : ''}">${s.total_pendente ? s.total_pendente.toFixed(2) + ' €' : '—'}</div>
       </div>
     </div>
 
     <div class="card-row" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
       <div class="stat-block">
-        <div class="stat-label">Horas Trab.</div>
-        <div class="stat-value">${s.total_horas != null ? s.total_horas + ' h' : '—'}</div>
+        <div class="stat-label">Total Faturado</div>
+        <div class="stat-value">${s.total_valor ? s.total_valor.toFixed(2) + ' €' : '—'}</div>
       </div>
       <div class="stat-block">
         <div class="stat-label">Horímetro</div>
@@ -174,15 +185,25 @@ async function renderLista() {
 
 function servicoCard(s) {
   const chips = [];
-  const desconto = s.horas_desconto > 0 ? ` -${s.horas_desconto}h` : '';
+  const descontoH = s.horas_desconto > 0 ? ` -${s.horas_desconto}h` : '';
   if (s.hora_inicio || s.hora_fim) {
-    chips.push(`<span class="chip hora">🕐 ${s.hora_inicio || '?'}–${s.hora_fim || '?'}${desconto}${s.duracao_horas != null ? ' · ' + s.duracao_horas + 'h' : ''}</span>`);
+    chips.push(`<span class="chip hora">🕐 ${s.hora_inicio || '?'}–${s.hora_fim || '?'}${descontoH}${s.duracao_horas != null ? ' · ' + s.duracao_horas + 'h' : ''}</span>`);
   } else if (s.duracao_horas != null) {
     chips.push(`<span class="chip hora">⏱ ${s.duracao_horas}h</span>`);
   }
   if (s.horimetro_inicio != null || s.horimetro_fim != null) {
     chips.push(`<span class="chip horim">⚙️ ${s.horimetro_inicio ?? '?'} → ${s.horimetro_fim ?? '?'} h${s.horimetro_delta != null ? ' (Δ' + s.horimetro_delta + ')' : ''}</span>`);
   }
+  if (s.preco_hora != null) {
+    let billing = `${s.preco_hora}€/h`;
+    if (s.preco_deslocacao) billing += ` +${s.preco_deslocacao}€`;
+    if (s.desconto) billing += ` -${s.desconto}€ desc.`;
+    chips.push(`<span class="chip billing">💶 ${billing}</span>`);
+  }
+
+  const pagoTag = s.valor != null
+    ? `<div class="pago-tag ${s.pago ? 'pago' : 'pendente'}">${s.pago ? 'Pago' : 'Pendente'}</div>`
+    : '';
 
   return `
     <div class="servico-item" data-id="${s.id}">
@@ -192,7 +213,10 @@ function servicoCard(s) {
           <div class="servico-cliente">${s.cliente_nome || '—'}</div>
           ${s.descricao ? `<div class="servico-desc">${escapeHtml(s.descricao)}</div>` : ''}
         </div>
-        ${s.valor != null ? `<div class="servico-valor">${parseFloat(s.valor).toFixed(2)} €</div>` : ''}
+        <div style="text-align:right;flex-shrink:0">
+          ${s.valor != null ? `<div class="servico-valor">${parseFloat(s.valor).toFixed(2)} €</div>` : ''}
+          ${pagoTag}
+        </div>
       </div>
       ${chips.length ? `<div class="servico-chips">${chips.join('')}</div>` : ''}
     </div>
@@ -272,10 +296,36 @@ function servicoFormHtml(s = {}) {
       <div id="horim-delta-hint"></div>
 
       <hr class="divider">
+      <div class="section-title">Faturação</div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Preço/hora (€)</label>
+          <input type="number" class="form-control" id="f-preco-hora" step="0.5" min="0" placeholder="ex: 25.00" value="${s.preco_hora ?? ''}" oninput="calcValor()">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Deslocação (€)</label>
+          <input type="number" class="form-control" id="f-deslocacao" step="0.5" min="0" placeholder="ex: 10.00" value="${s.preco_deslocacao ?? ''}" oninput="calcValor()">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Desconto (€)</label>
+          <input type="number" class="form-control" id="f-desconto-valor" step="0.5" min="0" placeholder="ex: 5.00" value="${s.desconto ?? ''}" oninput="calcValor()">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Estado pagamento</label>
+          <select class="form-control" id="f-pago">
+            <option value="0" ${!s.pago ? 'selected' : ''}>Pendente</option>
+            <option value="1" ${s.pago ? 'selected' : ''}>Pago</option>
+          </select>
+        </div>
+      </div>
 
       <div class="form-group">
-        <label class="form-label">Valor cobrado (€)</label>
-        <input type="number" class="form-control" id="f-valor" step="0.01" min="0" placeholder="ex: 150.00" value="${s.valor ?? ''}">
+        <label class="form-label">Valor total (€)</label>
+        <input type="number" class="form-control" id="f-valor" step="0.01" min="0" placeholder="calculado auto. ou manual" value="${s.valor ?? ''}" oninput="calcValor.manual=true">
       </div>
 
       <div class="form-group">
@@ -313,6 +363,17 @@ window.calcDuracao = function() {
   const desconto = parseFloat(document.getElementById('f-desconto')?.value) || 0;
   const net = Math.max(0, dur - desconto);
   document.getElementById('f-duracao').value = net.toFixed(2);
+  calcValor();
+};
+
+window.calcValor = function() {
+  const duracao = parseFloat(document.getElementById('f-duracao')?.value) || 0;
+  const precoHora = parseFloat(document.getElementById('f-preco-hora')?.value) || 0;
+  if (!precoHora) return;
+  const deslocacao = parseFloat(document.getElementById('f-deslocacao')?.value) || 0;
+  const desconto = parseFloat(document.getElementById('f-desconto-valor')?.value) || 0;
+  const total = Math.max(0, (duracao * precoHora) + deslocacao - desconto);
+  document.getElementById('f-valor').value = total.toFixed(2);
 };
 
 window.calcHorim = function() {
@@ -341,6 +402,10 @@ function getFormData() {
     valor: document.getElementById('f-valor').value || null,
     horimetro_inicio: document.getElementById('f-horim-in').value || null,
     horimetro_fim: document.getElementById('f-horim-out').value || null,
+    preco_hora: document.getElementById('f-preco-hora').value || null,
+    preco_deslocacao: document.getElementById('f-deslocacao').value || null,
+    desconto: document.getElementById('f-desconto-valor').value || null,
+    pago: document.getElementById('f-pago').value === '1' ? 1 : 0,
   };
 }
 

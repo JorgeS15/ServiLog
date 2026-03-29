@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.4.0] - 2026-03-29
+
+### Fixed
+- Double deduction bug: duration was being reduced by `horas_desconto` twice (once client-side, once server-side)
+
+### Added
+- Billing section in service form: preço/hora, deslocação, desconto (€)
+- Payment status field per service: Pendente / Pago
+- Auto-calculation of total value from `preço/hora × duração + deslocação − desconto`
+- Dashboard now shows Recebido vs Pendente split
+- Service card shows payment badge (Pago/Pendente) and billing chip
+- CSV export includes new billing and payment columns
+
 ## [0.3.0] - 2026-03-29
 
 ### Added
