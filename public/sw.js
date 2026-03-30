@@ -1,4 +1,4 @@
-const CACHE = 'servilog-v2';
+const CACHE = 'servilog-__VERSION__';
 const ASSETS = ['/', '/index.html', '/app.js', '/style.css', '/manifest.json'];
 
 self.addEventListener('install', e => {

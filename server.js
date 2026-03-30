@@ -50,6 +50,15 @@ try { db.exec(`ALTER TABLE servicos ADD COLUMN desconto REAL DEFAULT NULL`); } c
 try { db.exec(`ALTER TABLE servicos ADD COLUMN pago INTEGER DEFAULT 0`); } catch (_) {}
 
 app.use(express.json());
+
+// Serve sw.js dynamically so cache version matches package.json — forces cache bust on every release
+const swTemplate = fs.readFileSync(path.join(__dirname, 'public', 'sw.js'), 'utf8');
+app.get('/sw.js', (req, res) => {
+  res.setHeader('Content-Type', 'application/javascript');
+  res.setHeader('Cache-Control', 'no-store');
+  res.send(swTemplate.replace('__VERSION__', pkg.version));
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ── Version ───────────────────────────────────────────────
