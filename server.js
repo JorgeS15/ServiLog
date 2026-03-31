@@ -2,6 +2,7 @@ const express = require('express');
 const Database = require('better-sqlite3');
 const path = require('path');
 const fs = require('fs');
+const pkg = require('./package.json');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -41,8 +42,27 @@ db.exec(`
     ('Sem cliente');
 `);
 
+// Migrations
+try { db.exec(`ALTER TABLE servicos ADD COLUMN horas_desconto REAL DEFAULT 0`); } catch (_) {}
+try { db.exec(`ALTER TABLE servicos ADD COLUMN preco_hora REAL DEFAULT NULL`); } catch (_) {}
+try { db.exec(`ALTER TABLE servicos ADD COLUMN preco_deslocacao REAL DEFAULT NULL`); } catch (_) {}
+try { db.exec(`ALTER TABLE servicos ADD COLUMN desconto REAL DEFAULT NULL`); } catch (_) {}
+try { db.exec(`ALTER TABLE servicos ADD COLUMN pago INTEGER DEFAULT 0`); } catch (_) {}
+
 app.use(express.json());
+
+// Serve sw.js dynamically so cache version matches package.json — forces cache bust on every release
+const swTemplate = fs.readFileSync(path.join(__dirname, 'public', 'sw.js'), 'utf8');
+app.get('/sw.js', (req, res) => {
+  res.setHeader('Content-Type', 'application/javascript');
+  res.setHeader('Cache-Control', 'no-store');
+  res.send(swTemplate.replace('__VERSION__', pkg.version));
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
+
+// ── Version ───────────────────────────────────────────────
+app.get('/api/version', (req, res) => res.json({ version: pkg.version }));
 
 // ── Clientes ──────────────────────────────────────────────
 app.get('/api/clientes', (req, res) => {
@@ -99,43 +119,64 @@ app.get('/api/servicos/:id', (req, res) => {
   res.json(row);
 });
 
+// Client already sends net duracao_horas (deduction applied) — trust it if provided.
+// Only apply horas_desconto when computing from hora_inicio/hora_fim.
+function calcDuracao(hora_inicio, hora_fim, duracao_horas, horas_desconto) {
+  if (duracao_horas) return parseFloat(duracao_horas);
+  if (!hora_inicio || !hora_fim) return null;
+  const [h1, m1] = hora_inicio.split(':').map(Number);
+  const [h2, m2] = hora_fim.split(':').map(Number);
+  let duracao = ((h2 * 60 + m2) - (h1 * 60 + m1)) / 60;
+  if (duracao < 0) duracao += 24;
+  if (horas_desconto) duracao = Math.max(0, duracao - parseFloat(horas_desconto));
+  return parseFloat(duracao.toFixed(4));
+}
+
+function calcValorAuto(duracao, preco_hora, preco_deslocacao, desconto) {
+  if (!preco_hora || !duracao) return null;
+  let total = parseFloat(preco_hora) * parseFloat(duracao);
+  if (preco_deslocacao) total += parseFloat(preco_deslocacao);
+  if (desconto) total = Math.max(0, total - parseFloat(desconto));
+  return parseFloat(total.toFixed(2));
+}
+
 app.post('/api/servicos', (req, res) => {
   const {
-    data, hora_inicio, hora_fim, duracao_horas,
+    data, hora_inicio, hora_fim, duracao_horas, horas_desconto,
     cliente_id, descricao, valor,
-    horimetro_inicio, horimetro_fim
+    horimetro_inicio, horimetro_fim,
+    preco_hora, preco_deslocacao, desconto, pago
   } = req.body;
 
   if (!data) return res.status(400).json({ error: 'Data obrigatória' });
 
-  // Calculate delta if both provided
   let delta = null;
   if (horimetro_inicio != null && horimetro_fim != null) {
     delta = parseFloat(horimetro_fim) - parseFloat(horimetro_inicio);
   }
 
-  // Auto-calc duration from times if not provided
-  let duracao = duracao_horas;
-  if (!duracao && hora_inicio && hora_fim) {
-    const [h1, m1] = hora_inicio.split(':').map(Number);
-    const [h2, m2] = hora_fim.split(':').map(Number);
-    duracao = ((h2 * 60 + m2) - (h1 * 60 + m1)) / 60;
-    if (duracao < 0) duracao += 24;
-  }
+  const duracao = calcDuracao(hora_inicio, hora_fim, duracao_horas, horas_desconto);
+  const finalValor = valor ? parseFloat(valor) : calcValorAuto(duracao, preco_hora, preco_deslocacao, desconto);
 
   const result = db.prepare(`
     INSERT INTO servicos
-      (data, hora_inicio, hora_fim, duracao_horas, cliente_id, descricao, valor,
-       horimetro_inicio, horimetro_fim, horimetro_delta)
-    VALUES (?,?,?,?,?,?,?,?,?,?)
+      (data, hora_inicio, hora_fim, duracao_horas, horas_desconto, cliente_id, descricao, valor,
+       horimetro_inicio, horimetro_fim, horimetro_delta,
+       preco_hora, preco_deslocacao, desconto, pago)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
   `).run(
     data, hora_inicio || null, hora_fim || null,
-    duracao ? parseFloat(duracao) : null,
+    duracao,
+    horas_desconto ? parseFloat(horas_desconto) : 0,
     cliente_id || null, descricao || null,
-    valor ? parseFloat(valor) : null,
+    finalValor,
     horimetro_inicio != null ? parseFloat(horimetro_inicio) : null,
     horimetro_fim != null ? parseFloat(horimetro_fim) : null,
-    delta
+    delta,
+    preco_hora ? parseFloat(preco_hora) : null,
+    preco_deslocacao ? parseFloat(preco_deslocacao) : null,
+    desconto ? parseFloat(desconto) : null,
+    pago ? 1 : 0
   );
 
   res.json({ id: result.lastInsertRowid });
@@ -143,9 +184,10 @@ app.post('/api/servicos', (req, res) => {
 
 app.put('/api/servicos/:id', (req, res) => {
   const {
-    data, hora_inicio, hora_fim, duracao_horas,
+    data, hora_inicio, hora_fim, duracao_horas, horas_desconto,
     cliente_id, descricao, valor,
-    horimetro_inicio, horimetro_fim
+    horimetro_inicio, horimetro_fim,
+    preco_hora, preco_deslocacao, desconto, pago
   } = req.body;
 
   let delta = null;
@@ -153,28 +195,30 @@ app.put('/api/servicos/:id', (req, res) => {
     delta = parseFloat(horimetro_fim) - parseFloat(horimetro_inicio);
   }
 
-  let duracao = duracao_horas;
-  if (!duracao && hora_inicio && hora_fim) {
-    const [h1, m1] = hora_inicio.split(':').map(Number);
-    const [h2, m2] = hora_fim.split(':').map(Number);
-    duracao = ((h2 * 60 + m2) - (h1 * 60 + m1)) / 60;
-    if (duracao < 0) duracao += 24;
-  }
+  const duracao = calcDuracao(hora_inicio, hora_fim, duracao_horas, horas_desconto);
+  const finalValor = valor ? parseFloat(valor) : calcValorAuto(duracao, preco_hora, preco_deslocacao, desconto);
 
   db.prepare(`
     UPDATE servicos SET
-      data=?, hora_inicio=?, hora_fim=?, duracao_horas=?,
+      data=?, hora_inicio=?, hora_fim=?, duracao_horas=?, horas_desconto=?,
       cliente_id=?, descricao=?, valor=?,
-      horimetro_inicio=?, horimetro_fim=?, horimetro_delta=?
+      horimetro_inicio=?, horimetro_fim=?, horimetro_delta=?,
+      preco_hora=?, preco_deslocacao=?, desconto=?, pago=?
     WHERE id=?
   `).run(
     data, hora_inicio || null, hora_fim || null,
-    duracao ? parseFloat(duracao) : null,
+    duracao,
+    horas_desconto ? parseFloat(horas_desconto) : 0,
     cliente_id || null, descricao || null,
-    valor ? parseFloat(valor) : null,
+    finalValor,
     horimetro_inicio != null ? parseFloat(horimetro_inicio) : null,
     horimetro_fim != null ? parseFloat(horimetro_fim) : null,
-    delta, req.params.id
+    delta,
+    preco_hora ? parseFloat(preco_hora) : null,
+    preco_deslocacao ? parseFloat(preco_deslocacao) : null,
+    desconto ? parseFloat(desconto) : null,
+    pago ? 1 : 0,
+    req.params.id
   );
 
   res.json({ ok: true });
@@ -200,6 +244,8 @@ app.get('/api/resumo', (req, res) => {
       COUNT(*) as total_servicos,
       ROUND(SUM(duracao_horas),2) as total_horas,
       ROUND(SUM(valor),2) as total_valor,
+      ROUND(SUM(CASE WHEN pago=1 THEN valor ELSE 0 END),2) as total_recebido,
+      ROUND(SUM(CASE WHEN (pago=0 OR pago IS NULL) AND valor IS NOT NULL THEN valor ELSE 0 END),2) as total_pendente,
       ROUND(SUM(horimetro_delta),2) as total_horimetro
     FROM servicos WHERE ${where}
   `).get(...params);
@@ -221,10 +267,12 @@ app.get('/api/resumo', (req, res) => {
 app.get('/api/export/csv', (req, res) => {
   const rows = db.prepare(`
     SELECT s.data, s.hora_inicio, s.hora_fim,
+           ROUND(s.horas_desconto,2) as horas_desconto,
            ROUND(s.duracao_horas,2) as duracao_horas,
            c.nome as cliente,
            s.descricao,
-           s.valor,
+           s.preco_hora, s.preco_deslocacao, s.desconto,
+           s.valor, s.pago,
            s.horimetro_inicio, s.horimetro_fim,
            ROUND(s.horimetro_delta,2) as horimetro_delta
     FROM servicos s
@@ -232,11 +280,13 @@ app.get('/api/export/csv', (req, res) => {
     ORDER BY s.data DESC
   `).all();
 
-  const header = 'Data,Inicio,Fim,Duracao(h),Cliente,Descricao,Valor(€),Horim.Inicio,Horim.Fim,Horim.Delta\n';
+  const header = 'Data,Inicio,Fim,Desconto(h),Duracao(h),Cliente,Descricao,Preco/h,Deslocacao,Desconto(€),Valor(€),Pago,Horim.Inicio,Horim.Fim,Horim.Delta\n';
   const csv = header + rows.map(r =>
-    [r.data, r.hora_inicio||'', r.hora_fim||'', r.duracao_horas||'',
+    [r.data, r.hora_inicio||'', r.hora_fim||'', r.horas_desconto||0, r.duracao_horas||'',
      `"${r.cliente||''}"`, `"${r.descricao||''}"`,
-     r.valor||'', r.horimetro_inicio||'', r.horimetro_fim||'', r.horimetro_delta||'']
+     r.preco_hora||'', r.preco_deslocacao||'', r.desconto||'',
+     r.valor||'', r.pago ? 'Sim' : 'Não',
+     r.horimetro_inicio||'', r.horimetro_fim||'', r.horimetro_delta||'']
     .join(',')
   ).join('\n');
 

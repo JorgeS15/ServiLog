@@ -1,7 +1,7 @@
 {
-  "name": "Tracker Máquina",
-  "short_name": "Máquina",
-  "description": "Registo de serviços de máquina",
+  "name": "ServiLog",
+  "short_name": "ServiLog",
+  "description": "Machine service log tracker",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0f1117",

@@ -86,15 +86,26 @@ async function renderDashboard() {
         <div class="stat-value">${s.total_servicos || 0}</div>
       </div>
       <div class="stat-block">
-        <div class="stat-label">Valor Total</div>
-        <div class="stat-value accent">${s.total_valor ? s.total_valor.toFixed(2) + ' €' : '—'}</div>
+        <div class="stat-label">Horas Trab.</div>
+        <div class="stat-value">${s.total_horas != null ? s.total_horas + ' h' : '—'}</div>
+      </div>
+    </div>
+
+    <div class="card-row" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+      <div class="stat-block">
+        <div class="stat-label">Recebido</div>
+        <div class="stat-value accent">${s.total_recebido ? s.total_recebido.toFixed(2) + ' €' : '—'}</div>
+      </div>
+      <div class="stat-block">
+        <div class="stat-label">Pendente</div>
+        <div class="stat-value${s.total_pendente > 0 ? ' warn' : ''}">${s.total_pendente ? s.total_pendente.toFixed(2) + ' €' : '—'}</div>
       </div>
     </div>
 
     <div class="card-row" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
       <div class="stat-block">
-        <div class="stat-label">Horas Trab.</div>
-        <div class="stat-value">${s.total_horas != null ? s.total_horas + ' h' : '—'}</div>
+        <div class="stat-label">Total Faturado</div>
+        <div class="stat-value">${s.total_valor ? s.total_valor.toFixed(2) + ' €' : '—'}</div>
       </div>
       <div class="stat-block">
         <div class="stat-label">Horímetro</div>
@@ -174,14 +185,25 @@ async function renderLista() {
 
 function servicoCard(s) {
   const chips = [];
+  const descontoH = s.horas_desconto > 0 ? ` -${s.horas_desconto}h` : '';
   if (s.hora_inicio || s.hora_fim) {
-    chips.push(`<span class="chip hora">🕐 ${s.hora_inicio || '?'}–${s.hora_fim || '?'}${s.duracao_horas != null ? ' · ' + s.duracao_horas + 'h' : ''}</span>`);
+    chips.push(`<span class="chip hora">🕐 ${s.hora_inicio || '?'}–${s.hora_fim || '?'}${descontoH}${s.duracao_horas != null ? ' · ' + s.duracao_horas + 'h' : ''}</span>`);
   } else if (s.duracao_horas != null) {
     chips.push(`<span class="chip hora">⏱ ${s.duracao_horas}h</span>`);
   }
   if (s.horimetro_inicio != null || s.horimetro_fim != null) {
     chips.push(`<span class="chip horim">⚙️ ${s.horimetro_inicio ?? '?'} → ${s.horimetro_fim ?? '?'} h${s.horimetro_delta != null ? ' (Δ' + s.horimetro_delta + ')' : ''}</span>`);
   }
+  if (s.preco_hora != null) {
+    let billing = `${s.preco_hora}€/h`;
+    if (s.preco_deslocacao) billing += ` +${s.preco_deslocacao}€`;
+    if (s.desconto) billing += ` -${s.desconto}€ desc.`;
+    chips.push(`<span class="chip billing">💶 ${billing}</span>`);
+  }
+
+  const pagoTag = s.valor != null
+    ? `<div class="pago-tag ${s.pago ? 'pago' : 'pendente'}">${s.pago ? 'Pago' : 'Pendente'}</div>`
+    : '';
 
   return `
     <div class="servico-item" data-id="${s.id}">
@@ -191,7 +213,10 @@ function servicoCard(s) {
           <div class="servico-cliente">${s.cliente_nome || '—'}</div>
           ${s.descricao ? `<div class="servico-desc">${escapeHtml(s.descricao)}</div>` : ''}
         </div>
-        ${s.valor != null ? `<div class="servico-valor">${parseFloat(s.valor).toFixed(2)} €</div>` : ''}
+        <div style="text-align:right;flex-shrink:0">
+          ${s.valor != null ? `<div class="servico-valor">${parseFloat(s.valor).toFixed(2)} €</div>` : ''}
+          ${pagoTag}
+        </div>
       </div>
       ${chips.length ? `<div class="servico-chips">${chips.join('')}</div>` : ''}
     </div>
@@ -224,27 +249,35 @@ function servicoFormHtml(s = {}) {
         </div>
         <div class="form-group">
           <label class="form-label">Cliente</label>
-          <select class="form-control" id="f-cliente">
+          <select class="form-control" id="f-cliente" onchange="onClienteChange()">
             <option value="">— nenhum —</option>
             ${clienteOptions}
+            <option value="__novo__">✚ Novo cliente...</option>
           </select>
+          <input type="text" class="form-control" id="f-cliente-novo" placeholder="Nome do novo cliente" style="margin-top:6px;display:none">
         </div>
       </div>
 
       <div class="form-row">
         <div class="form-group">
           <label class="form-label">Hora início</label>
-          <input type="time" class="form-control" id="f-hinicio" value="${s.hora_inicio || ''}">
+          <input type="time" class="form-control" id="f-hinicio" value="${s.hora_inicio || ''}" oninput="calcDuracao()">
         </div>
         <div class="form-group">
           <label class="form-label">Hora fim</label>
-          <input type="time" class="form-control" id="f-hfim" value="${s.hora_fim || ''}">
+          <input type="time" class="form-control" id="f-hfim" value="${s.hora_fim || ''}" oninput="calcDuracao()">
         </div>
       </div>
 
-      <div class="form-group">
-        <label class="form-label">Duração (horas) <span class="form-hint" style="display:inline">— calculado automaticamente se tiveres hora início/fim</span></label>
-        <input type="number" class="form-control" id="f-duracao" step="0.25" min="0" placeholder="ex: 3.5" value="${s.duracao_horas ?? ''}">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Horas a descontar</label>
+          <input type="number" class="form-control" id="f-desconto" step="0.25" min="0" placeholder="ex: 1" value="${s.horas_desconto || ''}" oninput="calcDuracao()">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Duração líquida (horas)</label>
+          <input type="number" class="form-control" id="f-duracao" step="0.25" min="0" placeholder="calculado auto." value="${s.duracao_horas ?? ''}">
+        </div>
       </div>
 
       <hr class="divider">
@@ -263,10 +296,36 @@ function servicoFormHtml(s = {}) {
       <div id="horim-delta-hint"></div>
 
       <hr class="divider">
+      <div class="section-title">Faturação</div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Preço/hora (€)</label>
+          <input type="number" class="form-control" id="f-preco-hora" step="0.5" min="0" placeholder="ex: 25.00" value="${s.preco_hora ?? ''}" oninput="calcValor()">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Deslocação (€)</label>
+          <input type="number" class="form-control" id="f-deslocacao" step="0.5" min="0" placeholder="ex: 10.00" value="${s.preco_deslocacao ?? ''}" oninput="calcValor()">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Desconto (€)</label>
+          <input type="number" class="form-control" id="f-desconto-valor" step="0.5" min="0" placeholder="ex: 5.00" value="${s.desconto ?? ''}" oninput="calcValor()">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Estado pagamento</label>
+          <select class="form-control" id="f-pago">
+            <option value="0" ${!s.pago ? 'selected' : ''}>Pendente</option>
+            <option value="1" ${s.pago ? 'selected' : ''}>Pago</option>
+          </select>
+        </div>
+      </div>
 
       <div class="form-group">
-        <label class="form-label">Valor cobrado (€)</label>
-        <input type="number" class="form-control" id="f-valor" step="0.01" min="0" placeholder="ex: 150.00" value="${s.valor ?? ''}">
+        <label class="form-label">Valor total (€)</label>
+        <input type="number" class="form-control" id="f-valor" step="0.01" min="0" placeholder="calculado auto. ou manual" value="${s.valor ?? ''}" oninput="calcValor.manual=true">
       </div>
 
       <div class="form-group">
@@ -286,6 +345,37 @@ function servicoFormHtml(s = {}) {
   `;
 }
 
+window.onClienteChange = function() {
+  const sel = document.getElementById('f-cliente');
+  const novoInput = document.getElementById('f-cliente-novo');
+  novoInput.style.display = sel.value === '__novo__' ? 'block' : 'none';
+  if (sel.value === '__novo__') novoInput.focus();
+};
+
+window.calcDuracao = function() {
+  const ini = document.getElementById('f-hinicio')?.value;
+  const fim = document.getElementById('f-hfim')?.value;
+  if (!ini || !fim) return;
+  const [h1, m1] = ini.split(':').map(Number);
+  const [h2, m2] = fim.split(':').map(Number);
+  let dur = ((h2 * 60 + m2) - (h1 * 60 + m1)) / 60;
+  if (dur < 0) dur += 24;
+  const desconto = parseFloat(document.getElementById('f-desconto')?.value) || 0;
+  const net = Math.max(0, dur - desconto);
+  document.getElementById('f-duracao').value = net.toFixed(2);
+  calcValor();
+};
+
+window.calcValor = function() {
+  const duracao = parseFloat(document.getElementById('f-duracao')?.value) || 0;
+  const precoHora = parseFloat(document.getElementById('f-preco-hora')?.value) || 0;
+  if (!precoHora) return;
+  const deslocacao = parseFloat(document.getElementById('f-deslocacao')?.value) || 0;
+  const desconto = parseFloat(document.getElementById('f-desconto-valor')?.value) || 0;
+  const total = Math.max(0, (duracao * precoHora) + deslocacao - desconto);
+  document.getElementById('f-valor').value = total.toFixed(2);
+};
+
 window.calcHorim = function() {
   const ini = parseFloat(document.getElementById('f-horim-in')?.value);
   const fim = parseFloat(document.getElementById('f-horim-out')?.value);
@@ -300,22 +390,38 @@ window.calcHorim = function() {
 };
 
 function getFormData() {
+  const clienteVal = document.getElementById('f-cliente').value;
   return {
     data: document.getElementById('f-data').value,
     hora_inicio: document.getElementById('f-hinicio').value || null,
     hora_fim: document.getElementById('f-hfim').value || null,
+    horas_desconto: document.getElementById('f-desconto').value || null,
     duracao_horas: document.getElementById('f-duracao').value || null,
-    cliente_id: document.getElementById('f-cliente').value || null,
+    cliente_id: (clienteVal && clienteVal !== '__novo__') ? clienteVal : null,
     descricao: document.getElementById('f-desc').value || null,
     valor: document.getElementById('f-valor').value || null,
     horimetro_inicio: document.getElementById('f-horim-in').value || null,
     horimetro_fim: document.getElementById('f-horim-out').value || null,
+    preco_hora: document.getElementById('f-preco-hora').value || null,
+    preco_deslocacao: document.getElementById('f-deslocacao').value || null,
+    desconto: document.getElementById('f-desconto-valor').value || null,
+    pago: document.getElementById('f-pago').value === '1' ? 1 : 0,
   };
 }
 
 window.saveServico = async function(id) {
   const body = getFormData();
   if (!body.data) { toast('Data obrigatória', 'error'); return; }
+
+  // Handle new client creation inline
+  if (document.getElementById('f-cliente').value === '__novo__') {
+    const novoNome = document.getElementById('f-cliente-novo').value.trim();
+    if (!novoNome) { toast('Escreve o nome do cliente', 'error'); return; }
+    const result = await api.post('/api/clientes', { nome: novoNome });
+    if (result.error) { toast(result.error, 'error'); return; }
+    body.cliente_id = result.id;
+    state.clientes = await api.get('/api/clientes');
+  }
 
   try {
     if (id) {
@@ -344,6 +450,7 @@ async function editServico(id) {
   const s = await api.get(`/api/servicos/${id}`);
   openModal('Editar Serviço', servicoFormHtml(s));
   calcHorim();
+  // Don't auto-recalc duration on edit — keep stored value
 }
 
 function novoServico() {
@@ -436,6 +543,12 @@ async function init() {
   }
 
   navigate('dashboard');
+
+  // Version footer
+  api.get('/api/version').then(v => {
+    const el = document.getElementById('app-footer');
+    if (el) el.textContent = `ServiLog v${v.version}`;
+  });
 }
 
 document.addEventListener('DOMContentLoaded', init);

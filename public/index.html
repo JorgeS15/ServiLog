@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#e8a020">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>Tracker Máquina</title>
+  <title>ServiLog</title>
   <link rel="manifest" href="/manifest.json">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
@@ -26,7 +26,7 @@
             <rect x="22" y="20" width="4" height="4" rx="2" fill="#0f1117"/>
             <rect x="1" y="18" width="3" height="2" rx="1" fill="#888" transform="rotate(-15 1 18)"/>
           </svg>
-          <span>TRACKER</span>
+          <span>SERVILOG</span>
         </div>
         <nav>
           <button class="nav-btn active" data-view="dashboard">
@@ -41,6 +41,10 @@
             <svg viewBox="0 0 20 20"><circle cx="10" cy="7" r="4"/><path d="M3 17c0-3.866 3.134-7 7-7s7 3.134 7 7" stroke-linecap="round"/></svg>
             <span>Clientes</span>
           </button>
+          <button class="nav-btn" data-view="settings">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="10" cy="10" r="3"/><path d="M10 2v2M10 16v2M2 10h2M16 10h2M4.22 4.22l1.42 1.42M14.36 14.36l1.42 1.42M4.22 15.78l1.42-1.42M14.36 5.64l1.42-1.42"/></svg>
+            <span>Definições</span>
+          </button>
         </nav>
       </div>
     </header>
@@ -50,7 +54,11 @@
       <div id="view-dashboard" class="view active"></div>
       <div id="view-lista" class="view"></div>
       <div id="view-clientes" class="view"></div>
+      <div id="view-settings" class="view"></div>
     </main>
+
+    <!-- Footer -->
+    <footer id="app-footer"></footer>
 
     <!-- FAB -->
     <button id="fab" title="Novo serviço">
@@ -62,7 +70,7 @@
   <div id="modal-overlay" class="hidden">
     <div id="modal">
       <div class="modal-header">
-        <h2 id="modal-title">Novo Serviço</h2>
+        <h2 id="modal-title"></h2>
         <button id="modal-close">✕</button>
       </div>
       <div id="modal-body"></div>
