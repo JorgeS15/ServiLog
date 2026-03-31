@@ -485,6 +485,17 @@ textarea.form-control { resize: vertical; min-height: 72px; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 .servico-item, .cliente-item { animation: fadeIn .2s ease; }
 
+/* ── Light theme override ── */
+[data-theme="light"] {
+  --bg: #f4f5f7;
+  --bg2: #ffffff;
+  --bg3: #ebedf0;
+  --border: #d0d4de;
+  --text: #1a1e2e;
+  --text2: #555c7a;
+  --text3: #9098b0;
+}
+
 /* ── Footer ── */
 #app-footer {
   text-align: center;

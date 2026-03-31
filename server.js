@@ -12,7 +12,8 @@ const DB_PATH = process.env.DB_PATH || '/data/tracker.db';
 const dataDir = path.dirname(DB_PATH);
 if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 
-const db = new Database(DB_PATH);
+// Use let so the restore endpoint can close and reopen the connection
+let db = new Database(DB_PATH);
 
 // Init schema
 db.exec(`
@@ -42,12 +43,16 @@ db.exec(`
     ('Sem cliente');
 `);
 
-// Migrations
-try { db.exec(`ALTER TABLE servicos ADD COLUMN horas_desconto REAL DEFAULT 0`); } catch (_) {}
-try { db.exec(`ALTER TABLE servicos ADD COLUMN preco_hora REAL DEFAULT NULL`); } catch (_) {}
-try { db.exec(`ALTER TABLE servicos ADD COLUMN preco_deslocacao REAL DEFAULT NULL`); } catch (_) {}
-try { db.exec(`ALTER TABLE servicos ADD COLUMN desconto REAL DEFAULT NULL`); } catch (_) {}
-try { db.exec(`ALTER TABLE servicos ADD COLUMN pago INTEGER DEFAULT 0`); } catch (_) {}
+// Run all migrations — safe to call multiple times (errors are silently ignored)
+function runMigrations() {
+  try { db.exec(`ALTER TABLE servicos ADD COLUMN horas_desconto REAL DEFAULT 0`); } catch (_) {}
+  try { db.exec(`ALTER TABLE servicos ADD COLUMN preco_hora REAL DEFAULT NULL`); } catch (_) {}
+  try { db.exec(`ALTER TABLE servicos ADD COLUMN preco_deslocacao REAL DEFAULT NULL`); } catch (_) {}
+  try { db.exec(`ALTER TABLE servicos ADD COLUMN desconto REAL DEFAULT NULL`); } catch (_) {}
+  try { db.exec(`ALTER TABLE servicos ADD COLUMN pago INTEGER DEFAULT 0`); } catch (_) {}
+  try { db.exec(`ALTER TABLE servicos ADD COLUMN gorjeta REAL DEFAULT 0`); } catch (_) {}
+}
+runMigrations();
 
 app.use(express.json());
 
@@ -145,7 +150,7 @@ app.post('/api/servicos', (req, res) => {
     data, hora_inicio, hora_fim, duracao_horas, horas_desconto,
     cliente_id, descricao, valor,
     horimetro_inicio, horimetro_fim,
-    preco_hora, preco_deslocacao, desconto, pago
+    preco_hora, preco_deslocacao, desconto, pago, gorjeta
   } = req.body;
 
   if (!data) return res.status(400).json({ error: 'Data obrigatória' });
@@ -162,8 +167,8 @@ app.post('/api/servicos', (req, res) => {
     INSERT INTO servicos
       (data, hora_inicio, hora_fim, duracao_horas, horas_desconto, cliente_id, descricao, valor,
        horimetro_inicio, horimetro_fim, horimetro_delta,
-       preco_hora, preco_deslocacao, desconto, pago)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+       preco_hora, preco_deslocacao, desconto, pago, gorjeta)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
   `).run(
     data, hora_inicio || null, hora_fim || null,
     duracao,
@@ -176,7 +181,8 @@ app.post('/api/servicos', (req, res) => {
     preco_hora ? parseFloat(preco_hora) : null,
     preco_deslocacao ? parseFloat(preco_deslocacao) : null,
     desconto ? parseFloat(desconto) : null,
-    pago ? 1 : 0
+    pago ? 1 : 0,
+    gorjeta ? parseFloat(gorjeta) : 0
   );
 
   res.json({ id: result.lastInsertRowid });
@@ -187,7 +193,7 @@ app.put('/api/servicos/:id', (req, res) => {
     data, hora_inicio, hora_fim, duracao_horas, horas_desconto,
     cliente_id, descricao, valor,
     horimetro_inicio, horimetro_fim,
-    preco_hora, preco_deslocacao, desconto, pago
+    preco_hora, preco_deslocacao, desconto, pago, gorjeta
   } = req.body;
 
   let delta = null;
@@ -203,7 +209,7 @@ app.put('/api/servicos/:id', (req, res) => {
       data=?, hora_inicio=?, hora_fim=?, duracao_horas=?, horas_desconto=?,
       cliente_id=?, descricao=?, valor=?,
       horimetro_inicio=?, horimetro_fim=?, horimetro_delta=?,
-      preco_hora=?, preco_deslocacao=?, desconto=?, pago=?
+      preco_hora=?, preco_deslocacao=?, desconto=?, pago=?, gorjeta=?
     WHERE id=?
   `).run(
     data, hora_inicio || null, hora_fim || null,
@@ -218,6 +224,7 @@ app.put('/api/servicos/:id', (req, res) => {
     preco_deslocacao ? parseFloat(preco_deslocacao) : null,
     desconto ? parseFloat(desconto) : null,
     pago ? 1 : 0,
+    gorjeta ? parseFloat(gorjeta) : 0,
     req.params.id
   );
 
@@ -230,6 +237,7 @@ app.delete('/api/servicos/:id', (req, res) => {
 });
 
 // ── Resumo / stats ─────────────────────────────────────────
+// When mes+ano are absent, returns all-time totals (global view)
 app.get('/api/resumo', (req, res) => {
   const { mes, ano } = req.query;
   let where = '1=1';
@@ -246,14 +254,16 @@ app.get('/api/resumo', (req, res) => {
       ROUND(SUM(valor),2) as total_valor,
       ROUND(SUM(CASE WHEN pago=1 THEN valor ELSE 0 END),2) as total_recebido,
       ROUND(SUM(CASE WHEN (pago=0 OR pago IS NULL) AND valor IS NOT NULL THEN valor ELSE 0 END),2) as total_pendente,
-      ROUND(SUM(horimetro_delta),2) as total_horimetro
+      ROUND(SUM(horimetro_delta),2) as total_horimetro,
+      ROUND(SUM(COALESCE(gorjeta,0)),2) as total_gorjetas
     FROM servicos WHERE ${where}
   `).get(...params);
 
   const porCliente = db.prepare(`
     SELECT c.nome, COUNT(*) as servicos,
            ROUND(SUM(s.duracao_horas),2) as horas,
-           ROUND(SUM(s.valor),2) as valor
+           ROUND(SUM(s.valor),2) as valor,
+           ROUND(SUM(COALESCE(s.gorjeta,0)),2) as gorjetas
     FROM servicos s
     LEFT JOIN clientes c ON s.cliente_id = c.id
     WHERE ${where}
@@ -273,6 +283,7 @@ app.get('/api/export/csv', (req, res) => {
            s.descricao,
            s.preco_hora, s.preco_deslocacao, s.desconto,
            s.valor, s.pago,
+           ROUND(s.gorjeta,2) as gorjeta,
            s.horimetro_inicio, s.horimetro_fim,
            ROUND(s.horimetro_delta,2) as horimetro_delta
     FROM servicos s
@@ -280,12 +291,13 @@ app.get('/api/export/csv', (req, res) => {
     ORDER BY s.data DESC
   `).all();
 
-  const header = 'Data,Inicio,Fim,Desconto(h),Duracao(h),Cliente,Descricao,Preco/h,Deslocacao,Desconto(€),Valor(€),Pago,Horim.Inicio,Horim.Fim,Horim.Delta\n';
+  const header = 'Data,Inicio,Fim,Desconto(h),Duracao(h),Cliente,Descricao,Preco/h,Deslocacao,Desconto(€),Valor(€),Pago,Gorjeta(€),Horim.Inicio,Horim.Fim,Horim.Delta\n';
   const csv = header + rows.map(r =>
     [r.data, r.hora_inicio||'', r.hora_fim||'', r.horas_desconto||0, r.duracao_horas||'',
      `"${r.cliente||''}"`, `"${r.descricao||''}"`,
      r.preco_hora||'', r.preco_deslocacao||'', r.desconto||'',
      r.valor||'', r.pago ? 'Sim' : 'Não',
+     r.gorjeta||0,
      r.horimetro_inicio||'', r.horimetro_fim||'', r.horimetro_delta||'']
     .join(',')
   ).join('\n');
@@ -295,4 +307,46 @@ app.get('/api/export/csv', (req, res) => {
   res.send(csv);
 });
 
-app.listen(PORT, () => console.log(`Tracker a correr na porta ${PORT}`));
+// ── Backup ────────────────────────────────────────────────
+app.get('/api/backup/download', (req, res) => {
+  res.download(DB_PATH, 'servilog-backup.db');
+});
+
+// Restore: receives raw SQLite binary via application/octet-stream
+app.post('/api/backup/restore',
+  express.raw({ type: 'application/octet-stream', limit: '100mb' }),
+  (req, res) => {
+    const buf = req.body;
+    if (!Buffer.isBuffer(buf) || buf.length < 16) {
+      return res.status(400).json({ error: 'Invalid file' });
+    }
+    // Validate SQLite magic header: "SQLite format 3\0"
+    const magic = 'SQLite format 3\0';
+    for (let i = 0; i < magic.length; i++) {
+      if (buf[i] !== magic.charCodeAt(i)) {
+        return res.status(400).json({ error: 'Not a valid SQLite database' });
+      }
+    }
+    try {
+      db.close();
+      fs.writeFileSync(DB_PATH, buf);
+      db = new Database(DB_PATH);
+      runMigrations();
+      res.json({ ok: true });
+    } catch (e) {
+      res.status(500).json({ error: 'Restore failed: ' + e.message });
+    }
+  }
+);
+
+// ── App stats (for settings page) ────────────────────────
+app.get('/api/stats', (req, res) => {
+  const totalServices = db.prepare('SELECT COUNT(*) as n FROM servicos').get().n;
+  const totalClients = db.prepare('SELECT COUNT(*) as n FROM clientes').get().n;
+  const dateRange = db.prepare('SELECT MIN(data) as first, MAX(data) as last FROM servicos').get();
+  let dbSizeBytes = 0;
+  try { dbSizeBytes = fs.statSync(DB_PATH).size; } catch (_) {}
+  res.json({ totalServices, totalClients, dbSizeBytes, dateRange });
+});
+
+app.listen(PORT, () => console.log(`ServiLog running on port ${PORT}`));
