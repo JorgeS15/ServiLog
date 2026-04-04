@@ -26,7 +26,11 @@ const TRANSLATIONS = {
     form_auto: 'calculado auto.',form_auto_or_manual: 'calculado auto. ou manual',
     horim_delta: 'Delta horímetro',
     clients_title: 'Clientes', client_new_label: 'Novo cliente', client_new_placeholder: 'Nome do cliente',
-    client_add: '✚ Adicionar', client_remove: 'Remover', no_clients: 'Sem clientes',
+    client_add: '✚ Adicionar', client_remove: 'Remover', client_edit: 'Editar', no_clients: 'Sem clientes',
+    client_phone: 'Telefone', client_phone_placeholder: 'Número de telefone',
+    client_address: 'Morada', client_address_placeholder: 'Morada do cliente',
+    client_details_title: 'Editar cliente', client_save: 'Guardar',
+    toast_client_updated: 'actualizado',
     toast_updated: 'Serviço actualizado ✓', toast_registered: 'Serviço registado ✓',
     toast_save_error: 'Erro ao guardar', toast_deleted: 'Eliminado',
     toast_date_required: 'Data obrigatória', toast_client_name_required: 'Escreve o nome do cliente',
@@ -75,7 +79,11 @@ const TRANSLATIONS = {
     form_auto: 'auto-calculated', form_auto_or_manual: 'auto-calculated or manual',
     horim_delta: 'Hourmeter delta',
     clients_title: 'Clients', client_new_label: 'New client', client_new_placeholder: 'Client name',
-    client_add: '✚ Add', client_remove: 'Remove', no_clients: 'No clients',
+    client_add: '✚ Add', client_remove: 'Remove', client_edit: 'Edit', no_clients: 'No clients',
+    client_phone: 'Phone', client_phone_placeholder: 'Phone number',
+    client_address: 'Address', client_address_placeholder: 'Client address',
+    client_details_title: 'Edit client', client_save: 'Save',
+    toast_client_updated: 'updated',
     toast_updated: 'Service updated ✓', toast_registered: 'Service registered ✓',
     toast_save_error: 'Save error', toast_deleted: 'Deleted',
     toast_date_required: 'Date is required', toast_client_name_required: 'Enter the client name',
@@ -623,13 +631,19 @@ async function renderClientes() {
     </div>
 
     <div class="card" style="margin-bottom:16px">
-      <div class="form-group" style="flex-direction:row;gap:8px;align-items:flex-end">
-        <div style="flex:1">
-          <label class="form-label">${t('client_new_label')}</label>
-          <input type="text" class="form-control" id="novo-cliente-input" placeholder="${t('client_new_placeholder')}">
-        </div>
-        <button class="btn btn-primary" onclick="adicionarCliente()" style="flex-shrink:0">${t('client_add')}</button>
+      <div class="form-group">
+        <label class="form-label">${t('client_new_label')} *</label>
+        <input type="text" class="form-control" id="novo-cliente-input" placeholder="${t('client_new_placeholder')}">
       </div>
+      <div class="form-group">
+        <label class="form-label">${t('client_phone')}</label>
+        <input type="text" class="form-control" id="novo-cliente-telefone" placeholder="${t('client_phone_placeholder')}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">${t('client_address')}</label>
+        <input type="text" class="form-control" id="novo-cliente-endereco" placeholder="${t('client_address_placeholder')}">
+      </div>
+      <button class="btn btn-primary" onclick="adicionarCliente()" style="width:100%">${t('client_add')}</button>
     </div>
 
     <div id="clientes-list">
@@ -637,10 +651,15 @@ async function renderClientes() {
         ? `<div class="empty"><div class="empty-icon">👤</div><div class="empty-title">${t('no_clients')}</div></div>`
         : state.clientes.map(c => `
           <div class="cliente-item">
-            <div>
+            <div style="flex:1;min-width:0">
               <div class="cliente-nome">${escapeHtml(c.nome)}</div>
+              ${c.telefone ? `<div class="cliente-detail">📞 ${escapeHtml(c.telefone)}</div>` : ''}
+              ${c.endereco ? `<div class="cliente-detail">📍 ${escapeHtml(c.endereco)}</div>` : ''}
             </div>
-            <button class="btn btn-danger btn-sm" onclick="eliminarCliente(${c.id}, '${escapeHtml(c.nome)}')">${t('client_remove')}</button>
+            <div style="display:flex;gap:6px;flex-shrink:0">
+              <button class="btn btn-secondary btn-sm" onclick="editarCliente(${c.id})">${t('client_edit')}</button>
+              <button class="btn btn-danger btn-sm" onclick="eliminarCliente(${c.id}, '${escapeHtml(c.nome)}')">${t('client_remove')}</button>
+            </div>
           </div>
         `).join('')
       }
@@ -656,10 +675,50 @@ window.adicionarCliente = async function() {
   const input = document.getElementById('novo-cliente-input');
   const nome = input.value.trim();
   if (!nome) return;
-  const result = await api.post('/api/clientes', { nome });
+  const telefone = document.getElementById('novo-cliente-telefone').value.trim();
+  const endereco = document.getElementById('novo-cliente-endereco').value.trim();
+  const result = await api.post('/api/clientes', { nome, telefone, endereco });
   if (result.error) { toast(result.error, 'error'); return; }
   toast(`"${nome}" ${t('toast_client_added')}`);
   input.value = '';
+  document.getElementById('novo-cliente-telefone').value = '';
+  document.getElementById('novo-cliente-endereco').value = '';
+  state.clientes = await api.get('/api/clientes');
+  renderClientes();
+};
+
+window.editarCliente = function(id) {
+  const c = state.clientes.find(x => x.id === id);
+  if (!c) return;
+  openModal(t('client_details_title'), `
+    <div class="form-group">
+      <label class="form-label">${t('client_new_label')} *</label>
+      <input type="text" class="form-control" id="edit-cliente-nome" value="${escapeHtml(c.nome)}">
+    </div>
+    <div class="form-group">
+      <label class="form-label">${t('client_phone')}</label>
+      <input type="text" class="form-control" id="edit-cliente-telefone" value="${escapeHtml(c.telefone || '')}" placeholder="${t('client_phone_placeholder')}">
+    </div>
+    <div class="form-group">
+      <label class="form-label">${t('client_address')}</label>
+      <input type="text" class="form-control" id="edit-cliente-endereco" value="${escapeHtml(c.endereco || '')}" placeholder="${t('client_address_placeholder')}">
+    </div>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button class="btn btn-secondary" style="flex:1" onclick="closeModal()">${t('form_cancel')}</button>
+      <button class="btn btn-primary" style="flex:1" onclick="salvarCliente(${id})">${t('client_save')}</button>
+    </div>
+  `);
+};
+
+window.salvarCliente = async function(id) {
+  const nome = document.getElementById('edit-cliente-nome').value.trim();
+  if (!nome) { toast(t('toast_client_name_required'), 'error'); return; }
+  const telefone = document.getElementById('edit-cliente-telefone').value.trim();
+  const endereco = document.getElementById('edit-cliente-endereco').value.trim();
+  const result = await api.put(`/api/clientes/${id}`, { nome, telefone, endereco });
+  if (result.error) { toast(result.error, 'error'); return; }
+  toast(`"${nome}" ${t('toast_client_updated')}`);
+  closeModal();
   state.clientes = await api.get('/api/clientes');
   renderClientes();
 };

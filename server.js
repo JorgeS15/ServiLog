@@ -51,6 +51,8 @@ function runMigrations() {
   try { db.exec(`ALTER TABLE servicos ADD COLUMN desconto REAL DEFAULT NULL`); } catch (_) {}
   try { db.exec(`ALTER TABLE servicos ADD COLUMN pago INTEGER DEFAULT 0`); } catch (_) {}
   try { db.exec(`ALTER TABLE servicos ADD COLUMN gorjeta REAL DEFAULT 0`); } catch (_) {}
+  try { db.exec(`ALTER TABLE clientes ADD COLUMN telefone TEXT`); } catch (_) {}
+  try { db.exec(`ALTER TABLE clientes ADD COLUMN endereco TEXT`); } catch (_) {}
 }
 runMigrations();
 
@@ -76,11 +78,26 @@ app.get('/api/clientes', (req, res) => {
 });
 
 app.post('/api/clientes', (req, res) => {
-  const { nome } = req.body;
+  const { nome, telefone, endereco } = req.body;
   if (!nome?.trim()) return res.status(400).json({ error: 'Nome obrigatório' });
   try {
-    const result = db.prepare('INSERT INTO clientes (nome) VALUES (?)').run(nome.trim());
-    res.json({ id: result.lastInsertRowid, nome: nome.trim() });
+    const result = db.prepare('INSERT INTO clientes (nome, telefone, endereco) VALUES (?,?,?)').run(
+      nome.trim(), telefone?.trim() || null, endereco?.trim() || null
+    );
+    res.json({ id: result.lastInsertRowid, nome: nome.trim(), telefone: telefone?.trim() || null, endereco: endereco?.trim() || null });
+  } catch (e) {
+    res.status(409).json({ error: 'Cliente já existe' });
+  }
+});
+
+app.put('/api/clientes/:id', (req, res) => {
+  const { nome, telefone, endereco } = req.body;
+  if (!nome?.trim()) return res.status(400).json({ error: 'Nome obrigatório' });
+  try {
+    db.prepare('UPDATE clientes SET nome=?, telefone=?, endereco=? WHERE id=?').run(
+      nome.trim(), telefone?.trim() || null, endereco?.trim() || null, req.params.id
+    );
+    res.json({ ok: true });
   } catch (e) {
     res.status(409).json({ error: 'Cliente já existe' });
   }

@@ -286,6 +286,7 @@ main {
   margin-bottom: 8px;
 }
 .cliente-nome { font-weight: 600; }
+.cliente-detail { font-size: 13px; color: var(--text2); margin-top: 2px; }
 
 /* ── Modal ── */
 .hidden { display: none !important; }
