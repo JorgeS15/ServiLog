@@ -283,23 +283,30 @@ async function renderDashboard() {
 
 window.toggleGlobalView = function() {
   state.globalView = !state.globalView;
-  renderDashboard();
+  renderView(state.view);
 };
 
 // ── Lista de serviços ─────────────────────────────────────
 async function renderLista() {
   const el = document.getElementById('view-lista');
-  const servicos = await api.get(`/api/servicos?mes=${state.mes}&ano=${state.ano}`);
+  const url = state.globalView ? '/api/servicos' : `/api/servicos?mes=${state.mes}&ano=${state.ano}`;
+  const servicos = await api.get(url);
+
+  const monthPicker = state.globalView ? '' : `
+    <div class="month-picker">
+      <button id="lista-mes-prev">‹</button>
+      <span class="month-label" style="min-width:80px">${state.mes.toString().padStart(2,'0')}/${state.ano}</span>
+      <button id="lista-mes-next">›</button>
+    </div>`;
 
   el.innerHTML = `
     <div class="section-header">
-      <span class="section-title">${t('months')[state.mes-1]} ${state.ano}</span>
+      <span class="section-title">${state.globalView ? t('dashboard_alltime') : `${t('months')[state.mes-1]} ${state.ano}`}</span>
       <div style="display:flex;gap:8px;align-items:center">
-        <div class="month-picker">
-          <button id="lista-mes-prev">‹</button>
-          <span class="month-label" style="min-width:80px">${state.mes.toString().padStart(2,'0')}/${state.ano}</span>
-          <button id="lista-mes-next">›</button>
-        </div>
+        <button class="btn btn-sm ${state.globalView ? 'btn-primary' : 'btn-ghost'}" onclick="toggleGlobalView()">
+          ${t('dashboard_alltime')}
+        </button>
+        ${monthPicker}
         <a href="/api/export/csv" class="btn btn-ghost btn-sm" download title="Exportar CSV">
           <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 14v4h14v-4M10 3v10M6 9l4 4 4-4"/></svg>
           CSV
@@ -314,14 +321,16 @@ async function renderLista() {
     </div>
   `;
 
-  document.getElementById('lista-mes-prev').onclick = () => {
-    state.mes--; if (state.mes < 1) { state.mes = 12; state.ano--; }
-    renderLista();
-  };
-  document.getElementById('lista-mes-next').onclick = () => {
-    state.mes++; if (state.mes > 12) { state.mes = 1; state.ano++; }
-    renderLista();
-  };
+  if (!state.globalView) {
+    document.getElementById('lista-mes-prev').onclick = () => {
+      state.mes--; if (state.mes < 1) { state.mes = 12; state.ano--; }
+      renderLista();
+    };
+    document.getElementById('lista-mes-next').onclick = () => {
+      state.mes++; if (state.mes > 12) { state.mes = 1; state.ano++; }
+      renderLista();
+    };
+  }
 
   el.querySelectorAll('.servico-item').forEach(item => {
     item.addEventListener('click', () => editServico(parseInt(item.dataset.id)));
@@ -892,6 +901,11 @@ window.saveSetting = function(key, value) {
 window.setLang = function(lang) {
   state.lang = lang;
   localStorage.setItem('lang', lang);
+  const navKeyMap = { dashboard: 'nav_dashboard', lista: 'nav_lista', clientes: 'nav_clientes', settings: 'nav_settings' };
+  document.querySelectorAll('.nav-btn').forEach(btn => {
+    const key = navKeyMap[btn.dataset.view];
+    if (key) btn.querySelector('span').textContent = t(key);
+  });
   renderSettings();
 };
 

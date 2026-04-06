@@ -1,6 +1,6 @@
 {
   "name": "servilog",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Machine service log tracker",
   "main": "server.js",
   "scripts": {
