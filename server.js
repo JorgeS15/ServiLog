@@ -269,7 +269,7 @@ app.get('/api/resumo', (req, res) => {
       COUNT(*) as total_servicos,
       ROUND(SUM(duracao_horas),2) as total_horas,
       ROUND(SUM(valor),2) as total_valor,
-      ROUND(SUM(CASE WHEN pago=1 THEN valor ELSE 0 END),2) as total_recebido,
+      ROUND(SUM(CASE WHEN pago=1 THEN COALESCE(valor,0) + COALESCE(gorjeta,0) ELSE 0 END),2) as total_recebido,
       ROUND(SUM(CASE WHEN (pago=0 OR pago IS NULL) AND valor IS NOT NULL THEN valor ELSE 0 END),2) as total_pendente,
       ROUND(SUM(horimetro_delta),2) as total_horimetro,
       ROUND(SUM(COALESCE(gorjeta,0)),2) as total_gorjetas
