@@ -52,6 +52,7 @@ const TRANSLATIONS = {
     settings_total_clients: 'Total de clientes', settings_db_size: 'Tamanho da base de dados',
     settings_date_range: 'Período de dados', settings_version: 'Versão',
     tip_badge: 'gorjeta',
+    serv_abbr: 'serv.', discount_abbr: 'desc.',
   },
   en: {
     months: ['January','February','March','April','May','June','July','August','September','October','November','December'],
@@ -105,6 +106,7 @@ const TRANSLATIONS = {
     settings_total_clients: 'Total clients', settings_db_size: 'Database size',
     settings_date_range: 'Data range', settings_version: 'Version',
     tip_badge: 'tip',
+    serv_abbr: 'svc.', discount_abbr: 'disc.',
   },
 };
 
@@ -157,6 +159,7 @@ function toast(msg, type = 'success') {
 
 // ── Modal ─────────────────────────────────────────────────
 function openModal(title, html) {
+  calcValor.manual = false;
   document.getElementById('modal-title').textContent = title;
   document.getElementById('modal-body').innerHTML = html;
   document.getElementById('modal-overlay').classList.remove('hidden');
@@ -258,7 +261,7 @@ async function renderDashboard() {
         <div class="cliente-row">
           <div class="cliente-row-name">${c.nome || '—'}</div>
           <div class="cliente-row-stats">
-            <div class="cliente-row-stat"><strong>${c.servicos}</strong> serv.</div>
+            <div class="cliente-row-stat"><strong>${c.servicos}</strong> ${t('serv_abbr')}</div>
             <div class="cliente-row-stat"><strong>${c.horas || '—'}</strong> h</div>
             <div class="cliente-row-stat"><strong>${c.valor ? c.valor.toFixed(2) + ' ' + cur : '—'}</strong></div>
             ${c.gorjetas > 0 ? `<div class="cliente-row-stat" style="color:var(--accent)"><strong>+${c.gorjetas.toFixed(2)} ${cur}</strong></div>` : ''}
@@ -352,7 +355,7 @@ function servicoCard(s) {
   if (s.preco_hora != null) {
     let billing = `${s.preco_hora}${cur}/h`;
     if (s.preco_deslocacao) billing += ` +${s.preco_deslocacao}${cur}`;
-    if (s.desconto) billing += ` -${s.desconto}${cur} desc.`;
+    if (s.desconto) billing += ` -${s.desconto}${cur} ${t('discount_abbr')}`;
     chips.push(`<span class="chip billing">💶 ${billing}</span>`);
   }
   // Show tip chip when there's an additional value
@@ -538,6 +541,7 @@ window.calcDuracao = function() {
 };
 
 window.calcValor = function() {
+  if (calcValor.manual) return;
   const duracao = parseFloat(document.getElementById('f-duracao')?.value) || 0;
   const precoHora = parseFloat(document.getElementById('f-preco-hora')?.value) || 0;
   if (!precoHora) return;
@@ -748,13 +752,18 @@ async function init() {
   // Load clientes into state
   state.clientes = await api.get('/api/clientes');
 
-  // Nav
+  // Nav — apply translations and attach click handlers
+  const navKeyMap = { dashboard: 'nav_dashboard', lista: 'nav_lista', clientes: 'nav_clientes', settings: 'nav_settings' };
   document.querySelectorAll('.nav-btn').forEach(btn => {
+    const key = navKeyMap[btn.dataset.view];
+    if (key) btn.querySelector('span').textContent = t(key);
     btn.addEventListener('click', () => navigate(btn.dataset.view));
   });
 
   // FAB
-  document.getElementById('fab').addEventListener('click', () => {
+  const fab = document.getElementById('fab');
+  fab.title = t('form_new_service');
+  fab.addEventListener('click', () => {
     openModal(t('form_new_service'), servicoFormHtml());
   });
 
