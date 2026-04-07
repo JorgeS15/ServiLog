@@ -2,6 +2,10 @@
 
 > Self-hosted service log for machines and excavators — v1.0.0
 
+
+<img width="677" height="486" alt="image" src="https://github.com/user-attachments/assets/40974a8e-a146-46a2-940a-817de2516ae3" />
+
+
 Installable PWA with a mobile-first dark UI. Runs entirely in Docker, no cloud required.
 
 ---
