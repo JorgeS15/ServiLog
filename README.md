@@ -1,101 +1,71 @@
 # ServiLog
 
-Minimalist web app to log machine/excavator service records.
-Installable PWA for mobile, self-hosted with Docker + Caddy.
+> Self-hosted service log for machines and excavators — v1.0.0
+
+
+<img width="677" height="486" alt="image" src="https://github.com/user-attachments/assets/40974a8e-a146-46a2-940a-817de2516ae3" />
+
+
+Installable PWA with a mobile-first dark UI. Runs entirely in Docker, no cloud required.
 
 ---
 
 ## Features
 
-- Service records: date, client, hours, hour-meter, value, notes
-- Hour-meter: manual reading (start/end) + automatic delta calculation
-- Client management (predefined list with new-client addition)
-- Monthly summary with totals per client
-- CSV export
-- PWA: installable on Android/iOS
-- Dark theme, mobile-first
+| | |
+|---|---|
+| Service records | Date, client, hours, hour-meter, notes |
+| Hour-meter | Manual start/end with automatic delta |
+| Billing | Hourly rate, travel, discount, auto-total |
+| Payment tracking | Pending / Paid per service |
+| Tips | Counted in received, excluded from billed |
+| Clients | Name, address, phone |
+| Summaries | Monthly and all-time, per client |
+| Dashboard | Billed vs received vs pending |
+| Export | CSV download |
+| Settings | Backup/restore, language, theme, defaults |
+| PWA | Installable on Android & iOS, works offline |
 
 ---
 
-## Deploy
+## Installation
 
-### 1. Prerequisite: shared Docker network with Caddy
-
-If it does not exist yet:
-```bash
-docker network create caddy_net
-```
-
-### 2. Build and start
-
-```bash
-git clone <this-repo> servilog
-cd servilog
-docker compose up -d --build
-```
-
-The SQLite database is stored in `./data/tracker.db` (persistent volume).
-
-### 3. Configure Caddy
-
-In your `Caddyfile`, add:
-
-```caddyfile
-tracker.your-domain.duckdns.org {
-    reverse_proxy servilog:3000
-}
-```
-
-If Caddy runs in the same `docker-compose.yml` or in a separate stack sharing the `caddy_net` network, the name `servilog` resolves automatically.
-
-Then: `docker exec caddy caddy reload --config /etc/caddy/Caddyfile`
-
-### 4. Install as PWA on mobile
-
-- Android (Chrome): open the URL → menu ⋮ → "Add to Home Screen"
-- iOS (Safari): open the URL → share → "Add to Home Screen"
-
----
-
-## Local development (without Docker)
+**Prerequisites:** [Docker](https://docs.docker.com/get-docker/) with the Compose plugin.
 
 ```bash
-npm install
-node server.js
-# Open http://localhost:3000
+mkdir servilog && cd servilog
+curl -O https://raw.githubusercontent.com/JorgeS15/ServiLog/main/docker-compose.yml
+docker compose up -d
 ```
+
+ServiLog is now running at **http://localhost:3000**.
+
+The database is created automatically at `./data/tracker.db`.
 
 ---
 
-## File structure
+## Install as PWA
 
-```
-servilog/
-├── server.js          # Express + SQLite backend
-├── package.json
-├── Dockerfile
-├── docker-compose.yml
-├── data/              # Database (auto-created)
-│   └── tracker.db
-└── public/
-    ├── index.html
-    ├── style.css
-    ├── app.js
-    ├── manifest.json  # PWA manifest
-    └── sw.js          # Service worker (offline cache)
-```
+Once you have a domain pointing to your server, you can install ServiLog as an app:
+
+- **Android** (Chrome) — open the URL → menu ⋮ → "Add to Home Screen"
+- **iOS** (Safari) — open the URL → share icon → "Add to Home Screen"
 
 ---
 
-## Data export
+## Backup
 
-- **CSV**: "CSV" button in the Services view, or access `/api/export/csv`
-- Exported fields: Date, Start, End, Duration, Client, Description, Value, Hour-meter start/end/delta
+- **In-app:** Settings → Backup / Restore
+- **Manual:** copy `./data/tracker.db` — restore by replacing the file and restarting the container
 
 ---
 
-## Notes
+## Security
 
-- The database is SQLite — back it up by copying `data/tracker.db`
-- No authentication by default — use Caddy with `basicauth` if exposing outside your local network
-- PWA icons (icon-192.png, icon-512.png): generate with any PWA icon tool and place in `public/`
+ServiLog has no built-in authentication. If you expose it outside your local network, put a reverse proxy with authentication in front of it (e.g. Caddy `basicauth`, Nginx, Authelia).
+
+---
+
+## License
+
+[MIT](LICENSE)
