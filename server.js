@@ -15,44 +15,95 @@ if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 // Use let so the restore endpoint can close and reopen the connection
 let db = new Database(DB_PATH);
 
-// Init schema
+// Init schema (fresh installs get English names directly)
 db.exec(`
-  CREATE TABLE IF NOT EXISTS clientes (
+  CREATE TABLE IF NOT EXISTS clients (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    nome TEXT NOT NULL UNIQUE,
-    criado_em TEXT DEFAULT (datetime('now','localtime'))
+    name TEXT NOT NULL UNIQUE,
+    phone TEXT,
+    address TEXT,
+    created_at TEXT DEFAULT (datetime('now','localtime'))
   );
 
-  CREATE TABLE IF NOT EXISTS servicos (
+  CREATE TABLE IF NOT EXISTS services (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    data TEXT NOT NULL,
-    hora_inicio TEXT,
-    hora_fim TEXT,
-    duracao_horas REAL,
-    cliente_id INTEGER REFERENCES clientes(id),
-    descricao TEXT,
-    valor REAL,
-    horimetro_inicio REAL,
-    horimetro_fim REAL,
-    horimetro_delta REAL,
-    criado_em TEXT DEFAULT (datetime('now','localtime'))
+    date TEXT NOT NULL,
+    start_time TEXT,
+    end_time TEXT,
+    duration_hours REAL,
+    discount_hours REAL DEFAULT 0,
+    client_id INTEGER REFERENCES clients(id),
+    description TEXT,
+    value REAL,
+    price_per_hour REAL,
+    travel_fee REAL,
+    discount REAL,
+    paid INTEGER DEFAULT 0,
+    tip REAL DEFAULT 0,
+    hourmeter_start REAL,
+    hourmeter_end REAL,
+    hourmeter_delta REAL,
+    created_at TEXT DEFAULT (datetime('now','localtime'))
   );
 
-  INSERT OR IGNORE INTO clientes (nome) VALUES
+  INSERT OR IGNORE INTO clients (name) VALUES
     ('Particular'),
     ('Sem cliente');
 `);
 
-// Run all migrations — safe to call multiple times (errors are silently ignored)
+// Run all migrations — safe to call multiple times
 function runMigrations() {
-  try { db.exec(`ALTER TABLE servicos ADD COLUMN horas_desconto REAL DEFAULT 0`); } catch (_) {}
-  try { db.exec(`ALTER TABLE servicos ADD COLUMN preco_hora REAL DEFAULT NULL`); } catch (_) {}
-  try { db.exec(`ALTER TABLE servicos ADD COLUMN preco_deslocacao REAL DEFAULT NULL`); } catch (_) {}
-  try { db.exec(`ALTER TABLE servicos ADD COLUMN desconto REAL DEFAULT NULL`); } catch (_) {}
-  try { db.exec(`ALTER TABLE servicos ADD COLUMN pago INTEGER DEFAULT 0`); } catch (_) {}
-  try { db.exec(`ALTER TABLE servicos ADD COLUMN gorjeta REAL DEFAULT 0`); } catch (_) {}
-  try { db.exec(`ALTER TABLE clientes ADD COLUMN telefone TEXT`); } catch (_) {}
-  try { db.exec(`ALTER TABLE clientes ADD COLUMN endereco TEXT`); } catch (_) {}
+  const tableExists = name => !!db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name=?`).get(name);
+  const colExists = (tbl, col) => db.prepare(`PRAGMA table_info(${tbl})`).all().some(c => c.name === col);
+
+  // Pre-v0.6 column additions (run against old Portuguese table names if still present)
+  // Errors here are expected when columns already exist; log anything unexpected.
+  const tryAlter = sql => { try { db.exec(sql); } catch (e) { if (!e.message.includes('duplicate column name')) console.warn('[migration]', e.message); } };
+  if (tableExists('servicos')) {
+    tryAlter(`ALTER TABLE servicos ADD COLUMN horas_desconto REAL DEFAULT 0`);
+    tryAlter(`ALTER TABLE servicos ADD COLUMN preco_hora REAL DEFAULT NULL`);
+    tryAlter(`ALTER TABLE servicos ADD COLUMN preco_deslocacao REAL DEFAULT NULL`);
+    tryAlter(`ALTER TABLE servicos ADD COLUMN desconto REAL DEFAULT NULL`);
+    tryAlter(`ALTER TABLE servicos ADD COLUMN pago INTEGER DEFAULT 0`);
+    tryAlter(`ALTER TABLE servicos ADD COLUMN gorjeta REAL DEFAULT 0`);
+  }
+  if (tableExists('clientes')) {
+    tryAlter(`ALTER TABLE clientes ADD COLUMN telefone TEXT`);
+    tryAlter(`ALTER TABLE clientes ADD COLUMN endereco TEXT`);
+  }
+
+  // v0.6.0 — rename tables to English
+  if (tableExists('clientes') && !tableExists('clients')) {
+    db.exec('ALTER TABLE clientes RENAME TO clients');
+  }
+  if (tableExists('servicos') && !tableExists('services')) {
+    db.exec('ALTER TABLE servicos RENAME TO services');
+  }
+
+  // v0.6.0 — rename clients columns
+  if (colExists('clients', 'nome'))      db.exec('ALTER TABLE clients RENAME COLUMN nome TO name');
+  if (colExists('clients', 'telefone'))  db.exec('ALTER TABLE clients RENAME COLUMN telefone TO phone');
+  if (colExists('clients', 'endereco'))  db.exec('ALTER TABLE clients RENAME COLUMN endereco TO address');
+  if (colExists('clients', 'criado_em')) db.exec('ALTER TABLE clients RENAME COLUMN criado_em TO created_at');
+
+  // v0.6.0 — rename services columns
+  if (colExists('services', 'data'))             db.exec('ALTER TABLE services RENAME COLUMN data TO date');
+  if (colExists('services', 'hora_inicio'))      db.exec('ALTER TABLE services RENAME COLUMN hora_inicio TO start_time');
+  if (colExists('services', 'hora_fim'))         db.exec('ALTER TABLE services RENAME COLUMN hora_fim TO end_time');
+  if (colExists('services', 'duracao_horas'))    db.exec('ALTER TABLE services RENAME COLUMN duracao_horas TO duration_hours');
+  if (colExists('services', 'horas_desconto'))   db.exec('ALTER TABLE services RENAME COLUMN horas_desconto TO discount_hours');
+  if (colExists('services', 'cliente_id'))       db.exec('ALTER TABLE services RENAME COLUMN cliente_id TO client_id');
+  if (colExists('services', 'descricao'))        db.exec('ALTER TABLE services RENAME COLUMN descricao TO description');
+  if (colExists('services', 'valor'))            db.exec('ALTER TABLE services RENAME COLUMN valor TO value');
+  if (colExists('services', 'preco_hora'))       db.exec('ALTER TABLE services RENAME COLUMN preco_hora TO price_per_hour');
+  if (colExists('services', 'preco_deslocacao')) db.exec('ALTER TABLE services RENAME COLUMN preco_deslocacao TO travel_fee');
+  if (colExists('services', 'desconto'))         db.exec('ALTER TABLE services RENAME COLUMN desconto TO discount');
+  if (colExists('services', 'pago'))             db.exec('ALTER TABLE services RENAME COLUMN pago TO paid');
+  if (colExists('services', 'gorjeta'))          db.exec('ALTER TABLE services RENAME COLUMN gorjeta TO tip');
+  if (colExists('services', 'horimetro_inicio')) db.exec('ALTER TABLE services RENAME COLUMN horimetro_inicio TO hourmeter_start');
+  if (colExists('services', 'horimetro_fim'))    db.exec('ALTER TABLE services RENAME COLUMN horimetro_fim TO hourmeter_end');
+  if (colExists('services', 'horimetro_delta'))  db.exec('ALTER TABLE services RENAME COLUMN horimetro_delta TO hourmeter_delta');
+  if (colExists('services', 'criado_em'))        db.exec('ALTER TABLE services RENAME COLUMN criado_em TO created_at');
 }
 runMigrations();
 
@@ -71,296 +122,289 @@ app.use(express.static(path.join(__dirname, 'public')));
 // ── Version ───────────────────────────────────────────────
 app.get('/api/version', (req, res) => res.json({ version: pkg.version }));
 
-// ── Clientes ──────────────────────────────────────────────
-app.get('/api/clientes', (req, res) => {
-  const rows = db.prepare('SELECT * FROM clientes ORDER BY nome').all();
+// ── Clients ───────────────────────────────────────────────
+app.get('/api/clients', (req, res) => {
+  const rows = db.prepare('SELECT * FROM clients ORDER BY name').all();
   res.json(rows);
 });
 
-app.post('/api/clientes', (req, res) => {
-  const { nome, telefone, endereco } = req.body;
-  if (!nome?.trim()) return res.status(400).json({ error: 'Nome obrigatório' });
+app.post('/api/clients', (req, res) => {
+  const { name, phone, address } = req.body;
+  if (!name?.trim()) return res.status(400).json({ error: 'Name is required' });
   try {
-    const result = db.prepare('INSERT INTO clientes (nome, telefone, endereco) VALUES (?,?,?)').run(
-      nome.trim(), telefone?.trim() || null, endereco?.trim() || null
+    const result = db.prepare('INSERT INTO clients (name, phone, address) VALUES (?,?,?)').run(
+      name.trim(), phone?.trim() || null, address?.trim() || null
     );
-    res.json({ id: result.lastInsertRowid, nome: nome.trim(), telefone: telefone?.trim() || null, endereco: endereco?.trim() || null });
+    res.json({ id: result.lastInsertRowid, name: name.trim(), phone: phone?.trim() || null, address: address?.trim() || null });
   } catch (e) {
-    res.status(409).json({ error: 'Cliente já existe' });
+    res.status(409).json({ error: 'Client already exists' });
   }
 });
 
-app.put('/api/clientes/:id', (req, res) => {
-  const { nome, telefone, endereco } = req.body;
-  if (!nome?.trim()) return res.status(400).json({ error: 'Nome obrigatório' });
+app.put('/api/clients/:id', (req, res) => {
+  const { name, phone, address } = req.body;
+  if (!name?.trim()) return res.status(400).json({ error: 'Name is required' });
   try {
-    db.prepare('UPDATE clientes SET nome=?, telefone=?, endereco=? WHERE id=?').run(
-      nome.trim(), telefone?.trim() || null, endereco?.trim() || null, req.params.id
+    db.prepare('UPDATE clients SET name=?, phone=?, address=? WHERE id=?').run(
+      name.trim(), phone?.trim() || null, address?.trim() || null, req.params.id
     );
     res.json({ ok: true });
   } catch (e) {
-    res.status(409).json({ error: 'Cliente já existe' });
+    res.status(409).json({ error: 'Client already exists' });
   }
 });
 
-app.delete('/api/clientes/:id', (req, res) => {
-  db.prepare('DELETE FROM clientes WHERE id = ?').run(req.params.id);
+app.delete('/api/clients/:id', (req, res) => {
+  db.prepare('DELETE FROM clients WHERE id = ?').run(req.params.id);
   res.json({ ok: true });
 });
 
-// ── Serviços ──────────────────────────────────────────────
-app.get('/api/servicos', (req, res) => {
-  const { mes, ano, cliente_id } = req.query;
+// ── Services ──────────────────────────────────────────────
+app.get('/api/services', (req, res) => {
+  const { month, year, client_id } = req.query;
   let query = `
-    SELECT s.*, c.nome as cliente_nome
-    FROM servicos s
-    LEFT JOIN clientes c ON s.cliente_id = c.id
+    SELECT s.*, c.name as client_name
+    FROM services s
+    LEFT JOIN clients c ON s.client_id = c.id
     WHERE 1=1
   `;
   const params = [];
-  if (mes && ano) {
-    query += ` AND strftime('%Y-%m', s.data) = ?`;
-    params.push(`${ano}-${mes.padStart(2,'0')}`);
+  if (month && year) {
+    query += ` AND strftime('%Y-%m', s.date) = ?`;
+    params.push(`${year}-${month.padStart(2,'0')}`);
   }
-  if (cliente_id) {
-    query += ` AND s.cliente_id = ?`;
-    params.push(cliente_id);
+  if (client_id) {
+    query += ` AND s.client_id = ?`;
+    params.push(client_id);
   }
-  query += ` ORDER BY s.data DESC, s.hora_inicio DESC`;
+  query += ` ORDER BY s.date DESC, s.start_time DESC`;
   const rows = db.prepare(query).all(...params);
   res.json(rows);
 });
 
-app.get('/api/servicos/:id', (req, res) => {
+app.get('/api/services/:id', (req, res) => {
   const row = db.prepare(`
-    SELECT s.*, c.nome as cliente_nome
-    FROM servicos s LEFT JOIN clientes c ON s.cliente_id = c.id
+    SELECT s.*, c.name as client_name
+    FROM services s LEFT JOIN clients c ON s.client_id = c.id
     WHERE s.id = ?
   `).get(req.params.id);
-  if (!row) return res.status(404).json({ error: 'Não encontrado' });
+  if (!row) return res.status(404).json({ error: 'Not found' });
   res.json(row);
 });
 
-// Client already sends net duracao_horas (deduction applied) — trust it if provided.
-// Only apply horas_desconto when computing from hora_inicio/hora_fim.
-function calcDuracao(hora_inicio, hora_fim, duracao_horas, horas_desconto) {
-  if (duracao_horas) return parseFloat(duracao_horas);
-  if (!hora_inicio || !hora_fim) return null;
-  const [h1, m1] = hora_inicio.split(':').map(Number);
-  const [h2, m2] = hora_fim.split(':').map(Number);
-  let duracao = ((h2 * 60 + m2) - (h1 * 60 + m1)) / 60;
-  if (duracao < 0) duracao += 24;
-  if (horas_desconto) duracao = Math.max(0, duracao - parseFloat(horas_desconto));
-  return parseFloat(duracao.toFixed(4));
+// Client already sends net duration_hours (deduction applied) — trust it if provided.
+// Only apply discount_hours when computing from start_time/end_time.
+function calcDuration(start_time, end_time, duration_hours, discount_hours) {
+  if (duration_hours) return parseFloat(duration_hours);
+  if (!start_time || !end_time) return null;
+  const [h1, m1] = start_time.split(':').map(Number);
+  const [h2, m2] = end_time.split(':').map(Number);
+  let duration = ((h2 * 60 + m2) - (h1 * 60 + m1)) / 60;
+  if (duration < 0) duration += 24;
+  if (discount_hours) duration = Math.max(0, duration - parseFloat(discount_hours));
+  return parseFloat(duration.toFixed(4));
 }
 
-function calcValorAuto(duracao, preco_hora, preco_deslocacao, desconto) {
-  if (!preco_hora || !duracao) return null;
-  let total = parseFloat(preco_hora) * parseFloat(duracao);
-  if (preco_deslocacao) total += parseFloat(preco_deslocacao);
-  if (desconto) total = Math.max(0, total - parseFloat(desconto));
+function calcValueAuto(duration, price_per_hour, travel_fee, discount) {
+  if (!price_per_hour || !duration) return null;
+  let total = parseFloat(price_per_hour) * parseFloat(duration);
+  if (travel_fee) total += parseFloat(travel_fee);
+  if (discount) total = Math.max(0, total - parseFloat(discount));
   return parseFloat(total.toFixed(2));
 }
 
-app.post('/api/servicos', (req, res) => {
+app.post('/api/services', (req, res) => {
   const {
-    data, hora_inicio, hora_fim, duracao_horas, horas_desconto,
-    cliente_id, descricao, valor,
-    horimetro_inicio, horimetro_fim,
-    preco_hora, preco_deslocacao, desconto, pago, gorjeta
+    date, start_time, end_time, duration_hours, discount_hours,
+    client_id, description, value,
+    hourmeter_start, hourmeter_end,
+    price_per_hour, travel_fee, discount, paid, tip
   } = req.body;
 
-  if (!data) return res.status(400).json({ error: 'Data obrigatória' });
+  if (!date) return res.status(400).json({ error: 'Date is required' });
 
   let delta = null;
-  if (horimetro_inicio != null && horimetro_fim != null) {
-    delta = parseFloat(horimetro_fim) - parseFloat(horimetro_inicio);
+  if (hourmeter_start != null && hourmeter_end != null) {
+    delta = parseFloat(hourmeter_end) - parseFloat(hourmeter_start);
   }
 
-  const duracao = calcDuracao(hora_inicio, hora_fim, duracao_horas, horas_desconto);
-  const finalValor = valor ? parseFloat(valor) : calcValorAuto(duracao, preco_hora, preco_deslocacao, desconto);
+  const duration = calcDuration(start_time, end_time, duration_hours, discount_hours);
+  const finalValue = value ? parseFloat(value) : calcValueAuto(duration, price_per_hour, travel_fee, discount);
 
   const result = db.prepare(`
-    INSERT INTO servicos
-      (data, hora_inicio, hora_fim, duracao_horas, horas_desconto, cliente_id, descricao, valor,
-       horimetro_inicio, horimetro_fim, horimetro_delta,
-       preco_hora, preco_deslocacao, desconto, pago, gorjeta)
+    INSERT INTO services
+      (date, start_time, end_time, duration_hours, discount_hours, client_id, description, value,
+       hourmeter_start, hourmeter_end, hourmeter_delta,
+       price_per_hour, travel_fee, discount, paid, tip)
     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
   `).run(
-    data, hora_inicio || null, hora_fim || null,
-    duracao,
-    horas_desconto ? parseFloat(horas_desconto) : 0,
-    cliente_id || null, descricao || null,
-    finalValor,
-    horimetro_inicio != null ? parseFloat(horimetro_inicio) : null,
-    horimetro_fim != null ? parseFloat(horimetro_fim) : null,
+    date, start_time || null, end_time || null,
+    duration,
+    discount_hours ? parseFloat(discount_hours) : 0,
+    client_id || null, description || null,
+    finalValue,
+    hourmeter_start != null ? parseFloat(hourmeter_start) : null,
+    hourmeter_end != null ? parseFloat(hourmeter_end) : null,
     delta,
-    preco_hora ? parseFloat(preco_hora) : null,
-    preco_deslocacao ? parseFloat(preco_deslocacao) : null,
-    desconto ? parseFloat(desconto) : null,
-    pago ? 1 : 0,
-    gorjeta ? parseFloat(gorjeta) : 0
+    price_per_hour ? parseFloat(price_per_hour) : null,
+    travel_fee ? parseFloat(travel_fee) : null,
+    discount ? parseFloat(discount) : null,
+    paid ? 1 : 0,
+    tip ? parseFloat(tip) : 0
   );
 
   res.json({ id: result.lastInsertRowid });
 });
 
-app.put('/api/servicos/:id', (req, res) => {
+app.put('/api/services/:id', (req, res) => {
   const {
-    data, hora_inicio, hora_fim, duracao_horas, horas_desconto,
-    cliente_id, descricao, valor,
-    horimetro_inicio, horimetro_fim,
-    preco_hora, preco_deslocacao, desconto, pago, gorjeta
+    date, start_time, end_time, duration_hours, discount_hours,
+    client_id, description, value,
+    hourmeter_start, hourmeter_end,
+    price_per_hour, travel_fee, discount, paid, tip
   } = req.body;
 
   let delta = null;
-  if (horimetro_inicio != null && horimetro_fim != null) {
-    delta = parseFloat(horimetro_fim) - parseFloat(horimetro_inicio);
+  if (hourmeter_start != null && hourmeter_end != null) {
+    delta = parseFloat(hourmeter_end) - parseFloat(hourmeter_start);
   }
 
-  const duracao = calcDuracao(hora_inicio, hora_fim, duracao_horas, horas_desconto);
-  const finalValor = valor ? parseFloat(valor) : calcValorAuto(duracao, preco_hora, preco_deslocacao, desconto);
+  const duration = calcDuration(start_time, end_time, duration_hours, discount_hours);
+  const finalValue = value ? parseFloat(value) : calcValueAuto(duration, price_per_hour, travel_fee, discount);
 
   db.prepare(`
-    UPDATE servicos SET
-      data=?, hora_inicio=?, hora_fim=?, duracao_horas=?, horas_desconto=?,
-      cliente_id=?, descricao=?, valor=?,
-      horimetro_inicio=?, horimetro_fim=?, horimetro_delta=?,
-      preco_hora=?, preco_deslocacao=?, desconto=?, pago=?, gorjeta=?
+    UPDATE services SET
+      date=?, start_time=?, end_time=?, duration_hours=?, discount_hours=?,
+      client_id=?, description=?, value=?,
+      hourmeter_start=?, hourmeter_end=?, hourmeter_delta=?,
+      price_per_hour=?, travel_fee=?, discount=?, paid=?, tip=?
     WHERE id=?
   `).run(
-    data, hora_inicio || null, hora_fim || null,
-    duracao,
-    horas_desconto ? parseFloat(horas_desconto) : 0,
-    cliente_id || null, descricao || null,
-    finalValor,
-    horimetro_inicio != null ? parseFloat(horimetro_inicio) : null,
-    horimetro_fim != null ? parseFloat(horimetro_fim) : null,
+    date, start_time || null, end_time || null,
+    duration,
+    discount_hours ? parseFloat(discount_hours) : 0,
+    client_id || null, description || null,
+    finalValue,
+    hourmeter_start != null ? parseFloat(hourmeter_start) : null,
+    hourmeter_end != null ? parseFloat(hourmeter_end) : null,
     delta,
-    preco_hora ? parseFloat(preco_hora) : null,
-    preco_deslocacao ? parseFloat(preco_deslocacao) : null,
-    desconto ? parseFloat(desconto) : null,
-    pago ? 1 : 0,
-    gorjeta ? parseFloat(gorjeta) : 0,
+    price_per_hour ? parseFloat(price_per_hour) : null,
+    travel_fee ? parseFloat(travel_fee) : null,
+    discount ? parseFloat(discount) : null,
+    paid ? 1 : 0,
+    tip ? parseFloat(tip) : 0,
     req.params.id
   );
 
   res.json({ ok: true });
 });
 
-app.delete('/api/servicos/:id', (req, res) => {
-  db.prepare('DELETE FROM servicos WHERE id = ?').run(req.params.id);
+app.delete('/api/services/:id', (req, res) => {
+  db.prepare('DELETE FROM services WHERE id = ?').run(req.params.id);
   res.json({ ok: true });
 });
 
-// ── Resumo / stats ─────────────────────────────────────────
-// When mes+ano are absent, returns all-time totals (global view)
-app.get('/api/resumo', (req, res) => {
-  const { mes, ano } = req.query;
+// ── Summary / stats ───────────────────────────────────────
+// When month+year are absent, returns all-time totals (global view)
+app.get('/api/summary', (req, res) => {
+  const { month, year } = req.query;
   let where = '1=1';
   const params = [];
-  if (mes && ano) {
-    where = `strftime('%Y-%m', data) = ?`;
-    params.push(`${ano}-${mes.padStart(2,'0')}`);
+  if (month && year) {
+    where = `strftime('%Y-%m', date) = ?`;
+    params.push(`${year}-${month.padStart(2,'0')}`);
   }
 
   const stats = db.prepare(`
     SELECT
-      COUNT(*) as total_servicos,
-      ROUND(SUM(duracao_horas),2) as total_horas,
-      ROUND(SUM(valor),2) as total_valor,
-      ROUND(SUM(CASE WHEN pago=1 THEN valor ELSE 0 END),2) as total_recebido,
-      ROUND(SUM(CASE WHEN (pago=0 OR pago IS NULL) AND valor IS NOT NULL THEN valor ELSE 0 END),2) as total_pendente,
-      ROUND(SUM(horimetro_delta),2) as total_horimetro,
-      ROUND(SUM(COALESCE(gorjeta,0)),2) as total_gorjetas
-    FROM servicos WHERE ${where}
+      COUNT(*) as total_services,
+      ROUND(SUM(duration_hours),2) as total_hours,
+      ROUND(SUM(value),2) as total_value,
+      ROUND(SUM(CASE WHEN paid=1 THEN COALESCE(value,0) + COALESCE(tip,0) ELSE 0 END),2) as total_received,
+      ROUND(SUM(CASE WHEN (paid=0 OR paid IS NULL) AND value IS NOT NULL THEN value ELSE 0 END),2) as total_pending,
+      ROUND(SUM(hourmeter_delta),2) as total_hourmeter,
+      ROUND(SUM(COALESCE(tip,0)),2) as total_tips
+    FROM services WHERE ${where}
   `).get(...params);
 
-  const porCliente = db.prepare(`
-    SELECT c.nome, COUNT(*) as servicos,
-           ROUND(SUM(s.duracao_horas),2) as horas,
-           ROUND(SUM(s.valor),2) as valor,
-           ROUND(SUM(COALESCE(s.gorjeta,0)),2) as gorjetas
-    FROM servicos s
-    LEFT JOIN clientes c ON s.cliente_id = c.id
+  const byClient = db.prepare(`
+    SELECT c.name, COUNT(*) as services,
+           ROUND(SUM(s.duration_hours),2) as hours,
+           ROUND(SUM(s.value),2) as value,
+           ROUND(SUM(COALESCE(s.tip,0)),2) as tips
+    FROM services s
+    LEFT JOIN clients c ON s.client_id = c.id
     WHERE ${where}
-    GROUP BY s.cliente_id ORDER BY valor DESC
+    GROUP BY s.client_id ORDER BY value DESC
   `).all(...params);
 
-  res.json({ stats, porCliente });
+  res.json({ stats, byClient });
 });
 
 // ── Export CSV ─────────────────────────────────────────────
 app.get('/api/export/csv', (req, res) => {
   const rows = db.prepare(`
-    SELECT s.data, s.hora_inicio, s.hora_fim,
-           ROUND(s.horas_desconto,2) as horas_desconto,
-           ROUND(s.duracao_horas,2) as duracao_horas,
-           c.nome as cliente,
-           s.descricao,
-           s.preco_hora, s.preco_deslocacao, s.desconto,
-           s.valor, s.pago,
-           ROUND(s.gorjeta,2) as gorjeta,
-           s.horimetro_inicio, s.horimetro_fim,
-           ROUND(s.horimetro_delta,2) as horimetro_delta
-    FROM servicos s
-    LEFT JOIN clientes c ON s.cliente_id = c.id
-    ORDER BY s.data DESC
+    SELECT s.date, s.start_time, s.end_time,
+           ROUND(s.discount_hours,2) as discount_hours,
+           ROUND(s.duration_hours,2) as duration_hours,
+           c.name as client,
+           s.description,
+           s.price_per_hour, s.travel_fee, s.discount,
+           s.value, s.paid,
+           ROUND(s.tip,2) as tip,
+           s.hourmeter_start, s.hourmeter_end,
+           ROUND(s.hourmeter_delta,2) as hourmeter_delta
+    FROM services s
+    LEFT JOIN clients c ON s.client_id = c.id
+    ORDER BY s.date DESC
   `).all();
 
-  const header = 'Data,Inicio,Fim,Desconto(h),Duracao(h),Cliente,Descricao,Preco/h,Deslocacao,Desconto(€),Valor(€),Pago,Gorjeta(€),Horim.Inicio,Horim.Fim,Horim.Delta\n';
+  const header = 'Date,Start,End,Discount(h),Duration(h),Client,Description,Price/h,Travel,Discount(€),Value(€),Paid,Tip(€),Hourmeter.Start,Hourmeter.End,Hourmeter.Delta\n';
   const csv = header + rows.map(r =>
-    [r.data, r.hora_inicio||'', r.hora_fim||'', r.horas_desconto||0, r.duracao_horas||'',
-     `"${r.cliente||''}"`, `"${r.descricao||''}"`,
-     r.preco_hora||'', r.preco_deslocacao||'', r.desconto||'',
-     r.valor||'', r.pago ? 'Sim' : 'Não',
-     r.gorjeta||0,
-     r.horimetro_inicio||'', r.horimetro_fim||'', r.horimetro_delta||'']
+    [r.date, r.start_time||'', r.end_time||'', r.discount_hours||0, r.duration_hours||'',
+     `"${r.client||''}"`, `"${r.description||''}"`,
+     r.price_per_hour||'', r.travel_fee||'', r.discount||'',
+     r.value||'', r.paid ? 'Yes' : 'No',
+     r.tip||0,
+     r.hourmeter_start||'', r.hourmeter_end||'', r.hourmeter_delta||'']
     .join(',')
   ).join('\n');
 
   res.setHeader('Content-Type', 'text/csv');
-  res.setHeader('Content-Disposition', 'attachment; filename="servicos.csv"');
+  res.setHeader('Content-Disposition', 'attachment; filename="services.csv"');
   res.send(csv);
 });
 
 // ── Backup ────────────────────────────────────────────────
 app.get('/api/backup/download', (req, res) => {
-  res.download(DB_PATH, 'servilog-backup.db');
+  res.setHeader('Content-Type', 'application/octet-stream');
+  res.setHeader('Content-Disposition', 'attachment; filename="servilog-backup.db"');
+  res.sendFile(path.resolve(DB_PATH));
 });
 
-// Restore: receives raw SQLite binary via application/octet-stream
 app.post('/api/backup/restore',
-  express.raw({ type: 'application/octet-stream', limit: '100mb' }),
+  express.raw({ type: 'application/octet-stream', limit: '50mb' }),
   (req, res) => {
-    const buf = req.body;
-    if (!Buffer.isBuffer(buf) || buf.length < 16) {
+    if (!Buffer.isBuffer(req.body) || req.body.length < 16) {
       return res.status(400).json({ error: 'Invalid file' });
     }
-    // Validate SQLite magic header: "SQLite format 3\0"
-    const magic = 'SQLite format 3\0';
-    for (let i = 0; i < magic.length; i++) {
-      if (buf[i] !== magic.charCodeAt(i)) {
-        return res.status(400).json({ error: 'Not a valid SQLite database' });
-      }
+    const magic = req.body.slice(0, 16).toString('utf8');
+    if (!magic.startsWith('SQLite format 3')) {
+      return res.status(400).json({ error: 'Invalid file' });
     }
-    try {
-      db.close();
-      fs.writeFileSync(DB_PATH, buf);
-      db = new Database(DB_PATH);
-      runMigrations();
-      res.json({ ok: true });
-    } catch (e) {
-      res.status(500).json({ error: 'Restore failed: ' + e.message });
-    }
+    db.close();
+    fs.writeFileSync(DB_PATH, req.body);
+    db = new Database(DB_PATH);
+    runMigrations();
+    res.json({ ok: true });
   }
 );
 
 // ── App stats (for settings page) ────────────────────────
 app.get('/api/stats', (req, res) => {
-  const totalServices = db.prepare('SELECT COUNT(*) as n FROM servicos').get().n;
-  const totalClients = db.prepare('SELECT COUNT(*) as n FROM clientes').get().n;
-  const dateRange = db.prepare('SELECT MIN(data) as first, MAX(data) as last FROM servicos').get();
+  const totalServices = db.prepare('SELECT COUNT(*) as n FROM services').get().n;
+  const totalClients = db.prepare('SELECT COUNT(*) as n FROM clients').get().n;
+  const dateRange = db.prepare('SELECT MIN(date) as first, MAX(date) as last FROM services').get();
   let dbSizeBytes = 0;
   try { dbSizeBytes = fs.statSync(DB_PATH).size; } catch (_) {}
   res.json({ totalServices, totalClients, dbSizeBytes, dateRange });

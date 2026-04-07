@@ -18,7 +18,7 @@ self.addEventListener('fetch', e => {
   // API requests: network first
   if (url.pathname.startsWith('/api/')) {
     e.respondWith(fetch(e.request).catch(() =>
-      new Response(JSON.stringify({ error: 'Sem ligação' }), {
+      new Response(JSON.stringify({ error: 'No connection' }), {
         headers: { 'Content-Type': 'application/json' }
       })
     ));
