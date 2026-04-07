@@ -1,63 +1,87 @@
 # ServiLog
 
-Minimalist web app to log machine/excavator service records.
-Installable PWA for mobile, self-hosted with Docker + Caddy.
+**v1.0.0** — Self-hosted service log for machines and excavators.
+Installable PWA, mobile-first, dark theme. Runs with Docker + Caddy.
 
 ---
 
 ## Features
 
-- Service records: date, client, hours, hour-meter, value, notes
-- Hour-meter: manual reading (start/end) + automatic delta calculation
-- Client management (predefined list with new-client addition)
-- Monthly summary with totals per client
+- Log service records: date, client, hours, hour-meter, notes
+- Hour-meter: manual start/end readings with automatic delta calculation
+- Billing per service: hourly rate, travel, discount, total value
+- Payment status per service: Pending / Paid
+- Tips field — included in total received, not in total billed
+- Client management with address and phone number
+- Monthly summary and all-time summary per client
+- Dashboard: billed vs received vs pending breakdown
 - CSV export
-- PWA: installable on Android/iOS
-- Dark theme, mobile-first
+- Settings: backup/restore, language selector, theme switcher, default values
+- PWA: installable on Android and iOS, works offline
+- Dark theme, mobile-first UI
 
 ---
 
-## Deploy
+## Quick start with Docker
 
-### 1. Prerequisite: shared Docker network with Caddy
+### 1. Create the shared Caddy network (once)
 
-If it does not exist yet:
 ```bash
 docker network create caddy_net
 ```
 
-### 2. Build and start
+### 2. Start ServiLog
 
 ```bash
-git clone <this-repo> servilog
-cd servilog
-docker compose up -d --build
+mkdir servilog && cd servilog
+curl -O https://raw.githubusercontent.com/jorges15/servilog/main/docker-compose.yml
+docker compose up -d
 ```
 
-The SQLite database is stored in `./data/tracker.db` (persistent volume).
+The SQLite database is created automatically at `./data/tracker.db`.
 
 ### 3. Configure Caddy
 
-In your `Caddyfile`, add:
+In your `Caddyfile`:
 
 ```caddyfile
-tracker.your-domain.duckdns.org {
+your-domain.example.com {
     reverse_proxy servilog:3000
 }
 ```
 
-If Caddy runs in the same `docker-compose.yml` or in a separate stack sharing the `caddy_net` network, the name `servilog` resolves automatically.
+Reload Caddy:
 
-Then: `docker exec caddy caddy reload --config /etc/caddy/Caddyfile`
+```bash
+docker exec caddy caddy reload --config /etc/caddy/Caddyfile
+```
 
-### 4. Install as PWA on mobile
+### 4. Install as PWA
 
-- Android (Chrome): open the URL → menu ⋮ → "Add to Home Screen"
-- iOS (Safari): open the URL → share → "Add to Home Screen"
+- **Android** (Chrome): open the URL → menu ⋮ → "Add to Home Screen"
+- **iOS** (Safari): open the URL → share icon → "Add to Home Screen"
 
 ---
 
-## Local development (without Docker)
+## Build from source
+
+To build the image locally instead of using the pre-built one, replace the `image:` line in `docker-compose.yml`:
+
+```yaml
+    build: .
+```
+
+Then:
+
+```bash
+git clone https://github.com/jorges15/servilog.git
+cd servilog
+docker compose up -d --build
+```
+
+---
+
+## Local development
 
 ```bash
 npm install
@@ -75,7 +99,7 @@ servilog/
 ├── package.json
 ├── Dockerfile
 ├── docker-compose.yml
-├── data/              # Database (auto-created)
+├── data/              # Database (auto-created, not in repo)
 │   └── tracker.db
 └── public/
     ├── index.html
@@ -87,15 +111,29 @@ servilog/
 
 ---
 
-## Data export
+## Backup
 
-- **CSV**: "CSV" button in the Services view, or access `/api/export/csv`
-- Exported fields: Date, Start, End, Duration, Client, Description, Value, Hour-meter start/end/delta
+Copy `data/tracker.db` to back up all your data. Restore by replacing the file and restarting the container.
+
+The Settings page also provides in-app backup and restore.
 
 ---
 
-## Notes
+## Security
 
-- The database is SQLite — back it up by copying `data/tracker.db`
-- No authentication by default — use Caddy with `basicauth` if exposing outside your local network
-- PWA icons (icon-192.png, icon-512.png): generate with any PWA icon tool and place in `public/`
+ServiLog has no built-in authentication. If you expose it outside your local network, protect it with Caddy's `basicauth`:
+
+```caddyfile
+your-domain.example.com {
+    basicauth {
+        user $2a$...   # bcrypt hash — generate with: caddy hash-password
+    }
+    reverse_proxy servilog:3000
+}
+```
+
+---
+
+## License
+
+MIT

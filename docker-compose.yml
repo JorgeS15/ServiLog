@@ -1,21 +1,10 @@
 services:
   servilog:
-    build: .
-    # or use the pre-built image:
-    # image: ghcr.io/jorges15/servilog:latest
+    image: ghcr.io/jorges15/servilog:latest
     container_name: servilog
     restart: unless-stopped
     volumes:
       - ./data:/data
-    environment:
-      - DB_PATH=/data/tracker.db
-      - PORT=3000
-    # Exposed locally only — Caddy handles reverse proxy
-    expose:
-      - "3000"
-    # For direct access without Caddy (optional, remove if using Caddy):
-    # ports:
-    #   - "3000:3000"
     networks:
       - caddy_net
 
