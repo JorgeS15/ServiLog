@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="110" fill="#1A2433"/>
+
+  <!-- LAGARTAS -->
+  <rect x="60" y="360" width="392" height="80" rx="40" fill="#C88820"/>
+  <rect x="80" y="374" width="352" height="52" rx="26" fill="#E8A130"/>
+  <circle cx="116" cy="400" r="30" fill="#C88820"/>
+  <circle cx="396" cy="400" r="30" fill="#C88820"/>
+  <circle cx="256" cy="400" r="20" fill="#C88820"/>
+  <circle cx="186" cy="400" r="16" fill="#C88820"/>
+  <circle cx="326" cy="400" r="16" fill="#C88820"/>
+  <circle cx="116" cy="400" r="14" fill="#E8A130"/>
+  <circle cx="396" cy="400" r="14" fill="#E8A130"/>
+
+  <!-- CORPO -->
+  <rect x="80" y="278" width="352" height="98" rx="18" fill="#E8A130"/>
+
+  <!-- CABINE -->
+  <rect x="90" y="168" width="200" height="120" rx="18" fill="#E8A130"/>
+
+  <!-- Tecto -->
+  <rect x="82" y="150" width="216" height="34" rx="14" fill="#C88820"/>
+
+  <!-- Janela -->
+  <rect x="106" y="188" width="112" height="72" rx="10" fill="#1A2433" opacity="0.8"/>
+  <rect x="112" y="194" width="32" height="18" rx="5" fill="#ffffff" opacity="0.12"/>
+
+  <!-- CONTRAPESO -->
+  <rect x="310" y="292" width="116" height="68" rx="12" fill="#C88820"/>
+  <rect x="322" y="304" width="92" height="20" rx="6" fill="#B07018"/>
+
+  <!-- CHAMINE -->
+  <rect x="258" y="118" width="22" height="46" rx="8" fill="#C88820"/>
+  <rect x="252" y="108" width="34" height="18" rx="9" fill="#C88820"/>
+</svg>
