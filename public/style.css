@@ -211,20 +211,20 @@ main {
 }
 
 /* ── Client rows (dashboard) ── */
-.cliente-row {
+.client-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 10px 0;
   border-bottom: 1px solid var(--border);
 }
-.cliente-row:last-child { border-bottom: none; }
-.cliente-row-name { font-weight: 600; }
-.cliente-row-stats { display: flex; gap: 12px; }
-.cliente-row-stat { font-size: 13px; color: var(--text2); }
+.client-row:last-child { border-bottom: none; }
+.client-row-name { font-weight: 600; }
+.client-row-stats { display: flex; gap: 12px; }
+.client-row-stat { font-size: 13px; color: var(--text2); }
 
 /* ── Service list ── */
-.servico-item {
+.service-item {
   background: var(--bg2);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -233,21 +233,21 @@ main {
   cursor: pointer;
   transition: border-color .15s;
 }
-.servico-item:active { border-color: var(--accent); }
+.service-item:active { border-color: var(--accent); }
 
-.servico-top {
+.service-top {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 8px;
 }
 
-.servico-data { font-size: 12px; color: var(--text2); margin-bottom: 2px; }
-.servico-cliente { font-weight: 600; font-size: 15px; }
-.servico-desc { font-size: 13px; color: var(--text2); margin-top: 3px; white-space: pre-line; }
-.servico-valor { font-family: var(--font-head); font-size: 18px; font-weight: 700; color: var(--accent); white-space: nowrap; }
+.service-date { font-size: 12px; color: var(--text2); margin-bottom: 2px; }
+.service-client { font-weight: 600; font-size: 15px; }
+.service-description { font-size: 13px; color: var(--text2); margin-top: 3px; white-space: pre-line; }
+.service-value { font-family: var(--font-head); font-size: 18px; font-weight: 700; color: var(--accent); white-space: nowrap; }
 
-.servico-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.service-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 
 .chip {
   font-size: 12px;
@@ -261,7 +261,7 @@ main {
 .chip.horim { border-color: #2e2a1a; color: var(--accent); }
 .chip.billing { border-color: #2a3a2a; color: var(--green); }
 
-.pago-tag {
+.payment-tag {
   display: inline-block;
   font-size: 10px;
   font-weight: 700;
@@ -271,11 +271,11 @@ main {
   border-radius: 20px;
   margin-top: 4px;
 }
-.pago-tag.pago { background: rgba(46,204,113,0.15); color: var(--green); }
-.pago-tag.pendente { background: rgba(231,76,60,0.12); color: var(--red); }
+.payment-tag.paid { background: rgba(46,204,113,0.15); color: var(--green); }
+.payment-tag.pending { background: rgba(231,76,60,0.12); color: var(--red); }
 
 /* ── Client list ── */
-.cliente-item {
+.client-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -285,8 +285,8 @@ main {
   border-radius: var(--radius);
   margin-bottom: 8px;
 }
-.cliente-nome { font-weight: 600; }
-.cliente-detail { font-size: 13px; color: var(--text2); margin-top: 2px; }
+.client-name { font-weight: 600; }
+.client-detail { font-size: 13px; color: var(--text2); margin-top: 2px; }
 
 /* ── Modal ── */
 .hidden { display: none !important; }
@@ -484,7 +484,7 @@ textarea.form-control { resize: vertical; min-height: 72px; }
 
 /* ── Animations ── */
 @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-.servico-item, .cliente-item { animation: fadeIn .2s ease; }
+.service-item, .client-item { animation: fadeIn .2s ease; }
 
 /* ── Light theme override ── */
 [data-theme="light"] {
