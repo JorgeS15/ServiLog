@@ -1,5 +1,41 @@
 # Changelog
 
+## [1.0.0] - 2026-04-07
+
+### Changed
+- Bumped to stable v1.0.0 release
+- Fixed silent suppression of migration errors — errors are now logged to console
+- Fixed `saveService` not surfacing server-side errors to the user
+
+## [0.6.0] - 2026-04-07
+
+### Changed
+- Renamed all database tables and columns from Portuguese to English (`clientes→clients`, `servicos→services`, column names throughout)
+- Rewrote `server.js` with English identifiers throughout
+- Tips (`gorjeta`) are now included in "total received" but not in "total billed"
+
+## [0.5.2] - 2026-04-06
+
+### Fixed
+- Manual total value override was being ignored on save
+- i18n polish: corrected several missing/wrong translation keys
+
+## [0.5.1] - 2026-04-06
+
+### Added
+- All-time toggle on the Services tab (show all services across all months)
+
+### Fixed
+- Language change was not updating the navigation tab labels
+
+## [0.5.0] - 2026-04-05
+
+### Added
+- Global (all-time) summary view on the Dashboard
+- Tips field (`gorjeta`) per service
+- Settings page with backup/restore, language selector, theme switcher, and default values
+- Address and phone number fields on client records
+
 ## [0.4.0] - 2026-03-29
 
 ### Fixed

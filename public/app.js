@@ -599,17 +599,18 @@ window.saveService = async function(id) {
   }
 
   try {
+    let result;
     if (id) {
-      await api.put(`/api/services/${id}`, body);
-      toast(t('toast_updated'));
+      result = await api.put(`/api/services/${id}`, body);
     } else {
-      await api.post('/api/services', body);
-      toast(t('toast_registered'));
+      result = await api.post('/api/services', body);
     }
+    if (result && result.error) throw new Error(result.error);
+    toast(id ? t('toast_updated') : t('toast_registered'));
     closeModal();
     renderView(state.view);
   } catch (e) {
-    toast(t('toast_save_error'), 'error');
+    toast(e.message || t('toast_save_error'), 'error');
   }
 };
 

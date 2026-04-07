@@ -57,17 +57,19 @@ function runMigrations() {
   const colExists = (tbl, col) => db.prepare(`PRAGMA table_info(${tbl})`).all().some(c => c.name === col);
 
   // Pre-v0.6 column additions (run against old Portuguese table names if still present)
+  // Errors here are expected when columns already exist; log anything unexpected.
+  const tryAlter = sql => { try { db.exec(sql); } catch (e) { if (!e.message.includes('duplicate column name')) console.warn('[migration]', e.message); } };
   if (tableExists('servicos')) {
-    try { db.exec(`ALTER TABLE servicos ADD COLUMN horas_desconto REAL DEFAULT 0`); } catch (_) {}
-    try { db.exec(`ALTER TABLE servicos ADD COLUMN preco_hora REAL DEFAULT NULL`); } catch (_) {}
-    try { db.exec(`ALTER TABLE servicos ADD COLUMN preco_deslocacao REAL DEFAULT NULL`); } catch (_) {}
-    try { db.exec(`ALTER TABLE servicos ADD COLUMN desconto REAL DEFAULT NULL`); } catch (_) {}
-    try { db.exec(`ALTER TABLE servicos ADD COLUMN pago INTEGER DEFAULT 0`); } catch (_) {}
-    try { db.exec(`ALTER TABLE servicos ADD COLUMN gorjeta REAL DEFAULT 0`); } catch (_) {}
+    tryAlter(`ALTER TABLE servicos ADD COLUMN horas_desconto REAL DEFAULT 0`);
+    tryAlter(`ALTER TABLE servicos ADD COLUMN preco_hora REAL DEFAULT NULL`);
+    tryAlter(`ALTER TABLE servicos ADD COLUMN preco_deslocacao REAL DEFAULT NULL`);
+    tryAlter(`ALTER TABLE servicos ADD COLUMN desconto REAL DEFAULT NULL`);
+    tryAlter(`ALTER TABLE servicos ADD COLUMN pago INTEGER DEFAULT 0`);
+    tryAlter(`ALTER TABLE servicos ADD COLUMN gorjeta REAL DEFAULT 0`);
   }
   if (tableExists('clientes')) {
-    try { db.exec(`ALTER TABLE clientes ADD COLUMN telefone TEXT`); } catch (_) {}
-    try { db.exec(`ALTER TABLE clientes ADD COLUMN endereco TEXT`); } catch (_) {}
+    tryAlter(`ALTER TABLE clientes ADD COLUMN telefone TEXT`);
+    tryAlter(`ALTER TABLE clientes ADD COLUMN endereco TEXT`);
   }
 
   // v0.6.0 — rename tables to English
