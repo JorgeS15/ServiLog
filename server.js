@@ -199,7 +199,7 @@ app.get('/api/services', (req, res) => {
 
 app.get('/api/services/:id', (req, res) => {
   const row = db.prepare(`
-    SELECT s.*, c.name as client_name
+    SELECT s.*, c.name as client_name, c.phone as client_phone, c.address as client_address
     FROM services s LEFT JOIN clients c ON s.client_id = c.id
     WHERE s.id = ?
   `).get(req.params.id);
