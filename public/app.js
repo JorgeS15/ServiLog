@@ -53,6 +53,10 @@ const TRANSLATIONS = {
     settings_date_range: 'Período de dados', settings_version: 'Versão',
     tip_badge: 'gorjeta',
     serv_abbr: 'serv.', discount_abbr: 'desc.',
+    form_pictures: 'Fotos', form_pictures_add: 'Adicionar fotos',
+    form_pictures_loading: 'A carregar...', form_pictures_empty: 'Sem fotos',
+    toast_picture_uploaded: 'Foto adicionada ✓', toast_picture_deleted: 'Foto eliminada',
+    confirm_delete_picture: 'Eliminar esta foto?',
   },
   en: {
     months: ['January','February','March','April','May','June','July','August','September','October','November','December'],
@@ -107,6 +111,10 @@ const TRANSLATIONS = {
     settings_date_range: 'Data range', settings_version: 'Version',
     tip_badge: 'tip',
     serv_abbr: 'svc.', discount_abbr: 'disc.',
+    form_pictures: 'Pictures', form_pictures_add: 'Add pictures',
+    form_pictures_loading: 'Loading...', form_pictures_empty: 'No pictures',
+    toast_picture_uploaded: 'Picture added ✓', toast_picture_deleted: 'Picture deleted',
+    confirm_delete_picture: 'Delete this picture?',
   },
 };
 
@@ -361,6 +369,9 @@ function serviceCard(s) {
   if (s.tip > 0) {
     chips.push(`<span class="chip billing" style="color:var(--accent)">+${parseFloat(s.tip).toFixed(2)}${cur} ${t('tip_badge')}</span>`);
   }
+  if (s.attachment_count > 0) {
+    chips.push(`<span class="chip">📷 ${s.attachment_count}</span>`);
+  }
 
   const paymentTag = s.value != null
     ? `<div class="payment-tag ${s.paid ? 'paid' : 'pending'}">${s.paid ? t('tag_paid') : t('tag_pending')}</div>`
@@ -506,6 +517,18 @@ function serviceFormHtml(s = {}) {
         <textarea class="form-control" id="f-description" placeholder="${t('form_desc_placeholder')}">${s.description || ''}</textarea>
       </div>
 
+      ${s.id ? `
+      <hr class="divider">
+      <div class="section-title">${t('form_pictures')}</div>
+      <div id="pictures-grid" class="pictures-grid">
+        <span class="pictures-empty">${t('form_pictures_loading')}</span>
+      </div>
+      <label class="btn btn-secondary btn-sm" style="cursor:pointer;width:fit-content">
+        📷 ${t('form_pictures_add')}
+        <input type="file" accept="image/*" multiple style="display:none" onchange="uploadPictures(this, ${s.id})">
+      </label>
+      ` : ''}
+
       <div class="actions">
         ${s.id ? `<button class="btn btn-danger btn-sm" onclick="deleteService(${s.id})">${t('form_delete')}</button>` : ''}
         <div style="flex:1"></div>
@@ -626,8 +649,52 @@ async function editService(id) {
   const s = await api.get(`/api/services/${id}`);
   openModal(t('form_edit_service'), serviceFormHtml(s));
   calcHourmeter();
-  // Don't auto-recalc duration on edit — keep stored value
+  loadPictures(id);
 }
+
+window.loadPictures = async function(serviceId) {
+  const grid = document.getElementById('pictures-grid');
+  if (!grid) return;
+  const attachments = await api.get(`/api/services/${serviceId}/attachments`);
+  if (attachments.length === 0) {
+    grid.innerHTML = `<span class="pictures-empty">${t('form_pictures_empty')}</span>`;
+    return;
+  }
+  grid.innerHTML = attachments.map(a => `
+    <div class="picture-thumb">
+      <img src="/api/attachments/${a.id}" alt="${escapeHtml(a.original_name || '')}" loading="lazy" onclick="viewPicture(${a.id})">
+      <button class="picture-thumb-del" onclick="deletePicture(${a.id}, ${serviceId})" title="Delete">✕</button>
+    </div>
+  `).join('');
+};
+
+window.uploadPictures = async function(input, serviceId) {
+  const files = Array.from(input.files);
+  if (!files.length) return;
+  for (const file of files) {
+    const r = await fetch(`/api/services/${serviceId}/attachments?name=${encodeURIComponent(file.name)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': file.type || 'application/octet-stream' },
+      body: file,
+    });
+    const result = await r.json();
+    if (result.error) { toast(result.error, 'error'); input.value = ''; return; }
+  }
+  input.value = '';
+  toast(t('toast_picture_uploaded'));
+  loadPictures(serviceId);
+};
+
+window.deletePicture = async function(id, serviceId) {
+  if (!confirm(t('confirm_delete_picture'))) return;
+  await api.del(`/api/attachments/${id}`);
+  toast(t('toast_picture_deleted'));
+  loadPictures(serviceId);
+};
+
+window.viewPicture = function(id) {
+  window.open(`/api/attachments/${id}`, '_blank');
+};
 
 function newService() {
   openModal(t('form_new_service'), serviceFormHtml());

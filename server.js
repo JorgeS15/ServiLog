@@ -12,6 +12,9 @@ const DB_PATH = process.env.DB_PATH || '/data/tracker.db';
 const dataDir = path.dirname(DB_PATH);
 if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 
+const UPLOADS_DIR = path.join(dataDir, 'uploads');
+if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+
 // Use let so the restore endpoint can close and reopen the connection
 let db = new Database(DB_PATH);
 
@@ -49,6 +52,16 @@ db.exec(`
   INSERT OR IGNORE INTO clients (name) VALUES
     ('Particular'),
     ('Sem cliente');
+
+  CREATE TABLE IF NOT EXISTS service_attachments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    service_id INTEGER NOT NULL REFERENCES services(id),
+    filename TEXT NOT NULL,
+    original_name TEXT,
+    mime_type TEXT,
+    size INTEGER,
+    created_at TEXT DEFAULT (datetime('now','localtime'))
+  );
 `);
 
 // Run all migrations — safe to call multiple times
@@ -163,9 +176,11 @@ app.delete('/api/clients/:id', (req, res) => {
 app.get('/api/services', (req, res) => {
   const { month, year, client_id } = req.query;
   let query = `
-    SELECT s.*, c.name as client_name
+    SELECT s.*, c.name as client_name,
+           COUNT(a.id) as attachment_count
     FROM services s
     LEFT JOIN clients c ON s.client_id = c.id
+    LEFT JOIN service_attachments a ON a.service_id = s.id
     WHERE 1=1
   `;
   const params = [];
@@ -177,7 +192,7 @@ app.get('/api/services', (req, res) => {
     query += ` AND s.client_id = ?`;
     params.push(client_id);
   }
-  query += ` ORDER BY s.date DESC, s.start_time DESC`;
+  query += ` GROUP BY s.id ORDER BY s.date DESC, s.start_time DESC`;
   const rows = db.prepare(query).all(...params);
   res.json(rows);
 });
@@ -300,7 +315,58 @@ app.put('/api/services/:id', (req, res) => {
 });
 
 app.delete('/api/services/:id', (req, res) => {
+  const attachments = db.prepare('SELECT filename FROM service_attachments WHERE service_id = ?').all(req.params.id);
+  attachments.forEach(a => { try { fs.unlinkSync(path.join(UPLOADS_DIR, a.filename)); } catch (_) {} });
+  db.prepare('DELETE FROM service_attachments WHERE service_id = ?').run(req.params.id);
   db.prepare('DELETE FROM services WHERE id = ?').run(req.params.id);
+  res.json({ ok: true });
+});
+
+// ── Service attachments ───────────────────────────────────
+app.get('/api/services/:id/attachments', (req, res) => {
+  const rows = db.prepare(
+    'SELECT id, original_name, mime_type, size, created_at FROM service_attachments WHERE service_id = ? ORDER BY created_at'
+  ).all(req.params.id);
+  res.json(rows);
+});
+
+app.post('/api/services/:id/attachments',
+  express.raw({ type: ['image/*', 'application/octet-stream'], limit: '20mb' }),
+  (req, res) => {
+    const service = db.prepare('SELECT id FROM services WHERE id = ?').get(req.params.id);
+    if (!service) return res.status(404).json({ error: 'Service not found' });
+    if (!Buffer.isBuffer(req.body) || req.body.length === 0) return res.status(400).json({ error: 'Empty file' });
+
+    const originalName = req.query.name ? decodeURIComponent(req.query.name) : 'photo';
+    const mimeType = (req.headers['content-type'] || 'application/octet-stream').split(';')[0].trim();
+    const extMap = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/gif': 'gif', 'image/webp': 'webp', 'image/heic': 'heic', 'image/heif': 'heif' };
+    const ext = extMap[mimeType] || originalName.split('.').pop() || 'bin';
+    const filename = `${req.params.id}_${Date.now()}_${Math.random().toString(36).slice(2,8)}.${ext}`;
+
+    fs.writeFileSync(path.join(UPLOADS_DIR, filename), req.body);
+
+    const result = db.prepare(
+      'INSERT INTO service_attachments (service_id, filename, original_name, mime_type, size) VALUES (?,?,?,?,?)'
+    ).run(req.params.id, filename, originalName, mimeType, req.body.length);
+
+    res.json({ id: result.lastInsertRowid });
+  }
+);
+
+app.get('/api/attachments/:id', (req, res) => {
+  const a = db.prepare('SELECT * FROM service_attachments WHERE id = ?').get(req.params.id);
+  if (!a) return res.status(404).json({ error: 'Not found' });
+  const filePath = path.join(UPLOADS_DIR, a.filename);
+  if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'File not found' });
+  res.setHeader('Content-Type', a.mime_type || 'application/octet-stream');
+  res.sendFile(path.resolve(filePath));
+});
+
+app.delete('/api/attachments/:id', (req, res) => {
+  const a = db.prepare('SELECT * FROM service_attachments WHERE id = ?').get(req.params.id);
+  if (!a) return res.status(404).json({ error: 'Not found' });
+  try { fs.unlinkSync(path.join(UPLOADS_DIR, a.filename)); } catch (_) {}
+  db.prepare('DELETE FROM service_attachments WHERE id = ?').run(req.params.id);
   res.json({ ok: true });
 });
 
