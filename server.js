@@ -387,9 +387,10 @@ app.get('/api/summary', (req, res) => {
     SELECT
       COUNT(*) as total_services,
       ROUND(SUM(duration_hours),2) as total_hours,
-      ROUND(SUM(value),2) as total_value,
-      ROUND(SUM(CASE WHEN paid=1 THEN COALESCE(value,0) + COALESCE(tip,0) ELSE 0 END),2) as total_received,
-      ROUND(SUM(CASE WHEN (paid=0 OR paid IS NULL) AND value IS NOT NULL THEN value ELSE 0 END),2) as total_pending,
+      ROUND(SUM(value),2) as total_net,
+      ROUND(SUM(COALESCE(value,0) * (1 + COALESCE(vat_rate,0)/100.0)),2) as total_gross,
+      ROUND(SUM(CASE WHEN paid=1 THEN COALESCE(value,0)*(1+COALESCE(vat_rate,0)/100.0) + COALESCE(tip,0) ELSE 0 END),2) as total_received,
+      ROUND(SUM(CASE WHEN (paid=0 OR paid IS NULL) AND value IS NOT NULL THEN value*(1+COALESCE(vat_rate,0)/100.0) ELSE 0 END),2) as total_pending,
       ROUND(SUM(hourmeter_delta),2) as total_hourmeter,
       ROUND(SUM(COALESCE(tip,0)),2) as total_tips
     FROM services WHERE ${where}
@@ -398,7 +399,8 @@ app.get('/api/summary', (req, res) => {
   const byClient = db.prepare(`
     SELECT c.name, COUNT(*) as services,
            ROUND(SUM(s.duration_hours),2) as hours,
-           ROUND(SUM(s.value),2) as value,
+           ROUND(SUM(s.value),2) as net,
+           ROUND(SUM(COALESCE(s.value,0) * (1 + COALESCE(s.vat_rate,0)/100.0)),2) as value,
            ROUND(SUM(COALESCE(s.tip,0)),2) as tips
     FROM services s
     LEFT JOIN clients c ON s.client_id = c.id
@@ -444,27 +446,81 @@ app.get('/api/export/csv', (req, res) => {
 });
 
 // ── Backup ────────────────────────────────────────────────
+// Bundle format (SLB1): magic(4) | dbSize(4 LE) | dbData | fileCount(4 LE)
+//   then per file: nameLen(4 LE) | name(UTF-8) | dataLen(4 LE) | data
 app.get('/api/backup/download', (req, res) => {
+  const dbBuf = fs.readFileSync(DB_PATH);
+  const files = [];
+  if (fs.existsSync(UPLOADS_DIR)) {
+    for (const name of fs.readdirSync(UPLOADS_DIR)) {
+      const p = path.join(UPLOADS_DIR, name);
+      if (fs.statSync(p).isFile()) files.push({ name, data: fs.readFileSync(p) });
+    }
+  }
+
+  const dbSizeBuf = Buffer.allocUnsafe(4); dbSizeBuf.writeUInt32LE(dbBuf.length, 0);
+  const countBuf  = Buffer.allocUnsafe(4); countBuf.writeUInt32LE(files.length, 0);
+  const parts = [Buffer.from('SLB1'), dbSizeBuf, dbBuf, countBuf];
+
+  for (const f of files) {
+    const nb  = Buffer.from(f.name, 'utf8');
+    const nlb = Buffer.allocUnsafe(4); nlb.writeUInt32LE(nb.length, 0);
+    const dsb = Buffer.allocUnsafe(4); dsb.writeUInt32LE(f.data.length, 0);
+    parts.push(nlb, nb, dsb, f.data);
+  }
+
   res.setHeader('Content-Type', 'application/octet-stream');
-  res.setHeader('Content-Disposition', 'attachment; filename="servilog-backup.db"');
-  res.sendFile(path.resolve(DB_PATH));
+  res.setHeader('Content-Disposition', 'attachment; filename="servilog-backup.slb"');
+  res.send(Buffer.concat(parts));
 });
 
 app.post('/api/backup/restore',
-  express.raw({ type: 'application/octet-stream', limit: '50mb' }),
+  express.raw({ type: 'application/octet-stream', limit: '500mb' }),
   (req, res) => {
-    if (!Buffer.isBuffer(req.body) || req.body.length < 16) {
+    if (!Buffer.isBuffer(req.body) || req.body.length < 8) {
       return res.status(400).json({ error: 'Invalid file' });
     }
-    const magic = req.body.slice(0, 16).toString('utf8');
-    if (!magic.startsWith('SQLite format 3')) {
-      return res.status(400).json({ error: 'Invalid file' });
+    const magic4 = req.body.slice(0, 4).toString('ascii');
+
+    if (magic4 === 'SLB1') {
+      try {
+        let off = 4;
+        const dbSize = req.body.readUInt32LE(off); off += 4;
+        const dbData = req.body.slice(off, off + dbSize); off += dbSize;
+        if (!dbData.slice(0, 15).toString('utf8').startsWith('SQLite format 3')) {
+          return res.status(400).json({ error: 'Invalid backup: bad database' });
+        }
+        const fileCount = req.body.readUInt32LE(off); off += 4;
+        const uploadFiles = [];
+        for (let i = 0; i < fileCount; i++) {
+          const nl   = req.body.readUInt32LE(off); off += 4;
+          const name = req.body.slice(off, off + nl).toString('utf8'); off += nl;
+          const dl   = req.body.readUInt32LE(off); off += 4;
+          const data = req.body.slice(off, off + dl); off += dl;
+          uploadFiles.push({ name, data });
+        }
+        db.close();
+        fs.writeFileSync(DB_PATH, dbData);
+        db = new Database(DB_PATH);
+        runMigrations();
+        if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+        for (const f of uploadFiles) {
+          fs.writeFileSync(path.join(UPLOADS_DIR, path.basename(f.name)), f.data);
+        }
+        res.json({ ok: true });
+      } catch (e) {
+        res.status(400).json({ error: 'Corrupt backup file' });
+      }
+    } else if (req.body.slice(0, 15).toString('utf8').startsWith('SQLite format 3')) {
+      // Legacy .db backup — no pictures
+      db.close();
+      fs.writeFileSync(DB_PATH, req.body);
+      db = new Database(DB_PATH);
+      runMigrations();
+      res.json({ ok: true });
+    } else {
+      res.status(400).json({ error: 'Invalid file' });
     }
-    db.close();
-    fs.writeFileSync(DB_PATH, req.body);
-    db = new Database(DB_PATH);
-    runMigrations();
-    res.json({ ok: true });
   }
 );
 
