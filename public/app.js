@@ -7,6 +7,7 @@ const TRANSLATIONS = {
     stat_services: 'Serviços', stat_hours: 'Horas Trab.', stat_received: 'Recebido',
     stat_pending: 'Pendente', stat_billed: 'Total Faturado', stat_horimetro: 'Horímetro',
     stat_tips: 'Gorjetas', stat_horimetro_sub: 'delta do período',
+    stat_net: 'Líquido (s/ IVA)', stat_gross: 'Bruto (c/ IVA)',
     by_client: 'Por Cliente',
     no_data: 'Sem dados', no_data_sub: 'Regista o primeiro serviço deste mês',
     no_services: 'Sem serviços', no_services_sub: 'Toca no botão + para registar',
@@ -82,6 +83,7 @@ const TRANSLATIONS = {
     stat_services: 'Services', stat_hours: 'Work Hours', stat_received: 'Received',
     stat_pending: 'Pending', stat_billed: 'Total Billed', stat_horimetro: 'Hourmeter',
     stat_tips: 'Tips', stat_horimetro_sub: 'period delta',
+    stat_net: 'Net (excl. VAT)', stat_gross: 'Gross (incl. VAT)',
     by_client: 'By Client',
     no_data: 'No data', no_data_sub: 'Register the first service of this month',
     no_services: 'No services', no_services_sub: 'Tap the + button to register',
@@ -277,24 +279,27 @@ async function renderDashboard() {
 
     <div class="card-row" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
       <div class="stat-block">
-        <div class="stat-label">${t('stat_billed')}</div>
-        <div class="stat-value">${s.total_value ? s.total_value.toFixed(2) + ' ' + cur : '—'}</div>
+        <div class="stat-label">${t('stat_net')}</div>
+        <div class="stat-value">${s.total_net ? s.total_net.toFixed(2) + ' ' + cur : '—'}</div>
       </div>
+      <div class="stat-block">
+        <div class="stat-label">${t('stat_gross')}</div>
+        <div class="stat-value accent">${s.total_gross ? s.total_gross.toFixed(2) + ' ' + cur : '—'}</div>
+      </div>
+    </div>
+
+    <div class="card-row" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
       <div class="stat-block">
         <div class="stat-label">${t('stat_horimetro')}</div>
         <div class="stat-value">${s.total_hourmeter != null ? s.total_hourmeter + ' h' : '—'}</div>
         <div class="stat-sub">${t('stat_horimetro_sub')}</div>
       </div>
-    </div>
-
-    ${s.total_tips > 0 ? `
-    <div class="card-row" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+      ${s.total_tips > 0 ? `
       <div class="stat-block">
         <div class="stat-label">${t('stat_tips')}</div>
         <div class="stat-value accent">${s.total_tips.toFixed(2)} ${cur}</div>
-      </div>
-      <div class="stat-block"></div>
-    </div>` : ''}
+      </div>` : '<div class="stat-block"></div>'}
+    </div>
 
     ${byClient.length ? `
     <div class="card">
@@ -305,7 +310,7 @@ async function renderDashboard() {
           <div class="client-row-stats">
             <div class="client-row-stat"><strong>${c.services}</strong> ${t('serv_abbr')}</div>
             <div class="client-row-stat"><strong>${c.hours || '—'}</strong> h</div>
-            <div class="client-row-stat"><strong>${c.value ? c.value.toFixed(2) + ' ' + cur : '—'}</strong></div>
+            <div class="client-row-stat"><strong>${c.value ? c.value.toFixed(2) + ' ' + cur : '—'}</strong>${c.net != null && c.net !== c.value ? `<div style="font-size:10px;color:var(--text3)">${t('stat_net')}: ${c.net.toFixed(2)} ${cur}</div>` : ''}</div>
             ${c.tips > 0 ? `<div class="client-row-stat" style="color:var(--accent)"><strong>+${c.tips.toFixed(2)} ${cur}</strong></div>` : ''}
           </div>
         </div>
@@ -1167,7 +1172,7 @@ async function renderSettings() {
           ${t('settings_backup_restore')}
         </button>
       </div>
-      <input type="file" id="restore-input" accept=".db,.sqlite,application/octet-stream"
+      <input type="file" id="restore-input" accept=".slb,.db,.sqlite,application/octet-stream"
              style="display:none" onchange="doRestore(this)">
     </div>
 
