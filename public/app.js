@@ -57,6 +57,21 @@ const TRANSLATIONS = {
     form_pictures_loading: 'A carregar...', form_pictures_empty: 'Sem fotos',
     toast_picture_uploaded: 'Foto adicionada ✓', toast_picture_deleted: 'Foto eliminada',
     confirm_delete_picture: 'Eliminar esta foto?',
+    settings_invoice: 'Dados para Faturas',
+    invoice_issuer_name: 'Nome / Empresa', invoice_issuer_name_placeholder: 'ex: João Silva - Serviços Agrícolas',
+    invoice_issuer_address: 'Morada', invoice_issuer_address_placeholder: 'ex: Rua Principal 10, 3000-000 Coimbra',
+    invoice_issuer_nif: 'NIF', invoice_issuer_nif_placeholder: 'ex: 123456789',
+    invoice_issuer_email: 'Email', invoice_issuer_email_placeholder: 'ex: joao@email.com',
+    invoice_footer_note: 'Nota de rodapé', invoice_footer_note_placeholder: 'ex: Pagamento a 30 dias',
+    invoice_btn: '📄 Fatura',
+    invoice_title: 'FATURA', invoice_ref: 'Ref.', invoice_date: 'Data',
+    invoice_issued_to: 'Faturado a', invoice_services: 'Serviços',
+    invoice_col_date: 'Data', invoice_col_desc: 'Descrição', invoice_col_hours: 'Horas',
+    invoice_col_rate: 'Preço/h', invoice_col_travel: 'Deslocação', invoice_col_discount: 'Desconto',
+    invoice_col_total: 'Total', invoice_subtotal: 'Subtotal', invoice_total: 'Total',
+    invoice_tip: 'Valor adicional', invoice_status_paid: 'PAGO', invoice_status_pending: 'PENDENTE',
+    invoice_print: 'Imprimir / Guardar PDF',
+    invoice_no_issuer: 'Configure os dados da fatura nas Definições antes de gerar uma fatura.',
   },
   en: {
     months: ['January','February','March','April','May','June','July','August','September','October','November','December'],
@@ -115,6 +130,21 @@ const TRANSLATIONS = {
     form_pictures_loading: 'Loading...', form_pictures_empty: 'No pictures',
     toast_picture_uploaded: 'Picture added ✓', toast_picture_deleted: 'Picture deleted',
     confirm_delete_picture: 'Delete this picture?',
+    settings_invoice: 'Invoice Details',
+    invoice_issuer_name: 'Name / Business', invoice_issuer_name_placeholder: 'e.g. John Smith - Farm Services',
+    invoice_issuer_address: 'Address', invoice_issuer_address_placeholder: 'e.g. 10 Main St, Springfield',
+    invoice_issuer_nif: 'Tax/VAT No.', invoice_issuer_nif_placeholder: 'e.g. 123456789',
+    invoice_issuer_email: 'Email', invoice_issuer_email_placeholder: 'e.g. john@email.com',
+    invoice_footer_note: 'Footer note', invoice_footer_note_placeholder: 'e.g. Payment due in 30 days',
+    invoice_btn: '📄 Invoice',
+    invoice_title: 'INVOICE', invoice_ref: 'Ref.', invoice_date: 'Date',
+    invoice_issued_to: 'Bill to', invoice_services: 'Services',
+    invoice_col_date: 'Date', invoice_col_desc: 'Description', invoice_col_hours: 'Hours',
+    invoice_col_rate: 'Rate/h', invoice_col_travel: 'Travel', invoice_col_discount: 'Discount',
+    invoice_col_total: 'Total', invoice_subtotal: 'Subtotal', invoice_total: 'Total',
+    invoice_tip: 'Additional', invoice_status_paid: 'PAID', invoice_status_pending: 'PENDING',
+    invoice_print: 'Print / Save as PDF',
+    invoice_no_issuer: 'Please configure your invoice details in Settings before generating an invoice.',
   },
 };
 
@@ -531,6 +561,7 @@ function serviceFormHtml(s = {}) {
 
       <div class="actions">
         ${s.id ? `<button class="btn btn-danger btn-sm" onclick="deleteService(${s.id})">${t('form_delete')}</button>` : ''}
+        ${s.id ? `<button class="btn btn-ghost btn-sm" onclick="generateInvoice(${s.id})">${t('invoice_btn')}</button>` : ''}
         <div style="flex:1"></div>
         <button class="btn btn-secondary" onclick="closeModal()">${t('form_cancel')}</button>
         <button class="btn btn-primary" onclick="saveService(${s.id || 0})">
@@ -694,6 +725,174 @@ window.deletePicture = async function(id, serviceId) {
 
 window.viewPicture = function(id) {
   window.open(`/api/attachments/${id}`, '_blank');
+};
+
+// ── Invoice generator ─────────────────────────────────────
+window.generateInvoice = async function(serviceId) {
+  const issuerName = (localStorage.getItem('inv_name') || '').trim();
+  if (!issuerName) { toast(t('invoice_no_issuer'), 'error'); return; }
+
+  const s = await api.get(`/api/services/${serviceId}`);
+  const cur = getCurrency();
+
+  const issuerAddress = (localStorage.getItem('inv_address') || '').trim();
+  const issuerNif    = (localStorage.getItem('inv_nif')     || '').trim();
+  const issuerEmail  = (localStorage.getItem('inv_email')   || '').trim();
+  const footerNote   = (localStorage.getItem('inv_note')    || '').trim();
+
+  const ref   = `F ${new Date().getFullYear()}/${String(serviceId).padStart(4, '0')}`;
+  const today = new Date().toLocaleDateString(state.lang === 'pt' ? 'pt-PT' : 'en-GB');
+
+  const esc   = str => (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const escNl = str => esc(str).replace(/\n/g,'<br>');
+  const fmt   = n   => (n != null && !isNaN(n)) ? parseFloat(n).toFixed(2) + '\u00a0' + cur : '—';
+
+  const valueAmt    = s.value      != null ? parseFloat(s.value)      : null;
+  const tipAmt      = s.tip        ?         parseFloat(s.tip)        : 0;
+  const travelAmt   = s.travel_fee ?         parseFloat(s.travel_fee) : 0;
+  const discountAmt = s.discount   ?         parseFloat(s.discount)   : 0;
+  const grandTotal  = valueAmt != null ? valueAmt + tipAmt : null;
+  const isPaid      = !!s.paid;
+
+  const statusLabel = isPaid ? t('invoice_status_paid') : t('invoice_status_pending');
+  const statusBg    = isPaid ? 'rgba(46,204,113,0.12)'  : 'rgba(231,76,60,0.10)';
+  const statusColor = isPaid ? '#1a8a4a' : '#c0392b';
+
+  const descMain = s.description ? `<div class="td-main">${esc(s.description)}</div>` : '';
+  const descSub  = (s.start_time || s.hourmeter_delta)
+    ? `<div class="td-sub">${[
+        s.start_time && s.end_time ? s.start_time + '\u2013' + s.end_time : (s.start_time || ''),
+        s.hourmeter_delta ? '\u2699 \u0394\u00a0' + s.hourmeter_delta + ' h' : ''
+      ].filter(Boolean).join(' \u00b7 ')}</div>`
+    : '';
+  const descCell = descMain + descSub || '<span>—</span>';
+
+  const showRate     = s.price_per_hour != null;
+  const showTravel   = travelAmt > 0;
+  const showDiscount = discountAmt > 0;
+
+  const html = `<!DOCTYPE html>
+<html lang="${state.lang}">
+<head>
+<meta charset="UTF-8">
+<title>${t('invoice_title')} ${ref}</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Helvetica Neue',Arial,sans-serif;font-size:13px;color:#1a1e2e;background:#e8e8e8}
+.topbar{background:#1a1e2e;color:#fff;padding:10px 24px;display:flex;justify-content:space-between;align-items:center;gap:12px;position:sticky;top:0;z-index:10}
+.topbar-ref{font-size:12px;opacity:.6}
+.print-btn{background:#e8a020;color:#000;border:none;border-radius:6px;font-size:13px;font-weight:700;padding:8px 20px;cursor:pointer;letter-spacing:.02em}
+.page{max-width:800px;margin:24px auto 48px;background:#fff;padding:52px;box-shadow:0 4px 24px rgba(0,0,0,.12)}
+.inv-header{display:flex;justify-content:space-between;align-items:flex-start;gap:24px;margin-bottom:40px;padding-bottom:24px;border-bottom:3px solid #1a1e2e}
+.issuer-name{font-size:19px;font-weight:800;margin-bottom:6px}
+.issuer-detail{font-size:12px;color:#555c7a;line-height:1.9}
+.inv-right{text-align:right}
+.inv-title{font-size:38px;font-weight:900;letter-spacing:.06em;line-height:1;margin-bottom:10px}
+.inv-meta{font-size:12px;color:#555c7a;line-height:1.9}
+.inv-meta strong{color:#1a1e2e}
+.sec-label{font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#9098b0;margin-bottom:8px}
+.bill-to{margin-bottom:32px}
+.bill-name{font-size:16px;font-weight:700;margin-bottom:4px}
+.bill-detail{font-size:12px;color:#555c7a;line-height:1.9}
+table{width:100%;border-collapse:collapse;margin-bottom:24px}
+th{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#9098b0;padding:8px 10px;text-align:left;border-bottom:2px solid #d0d4de}
+th.r,td.r{text-align:right}
+td{padding:13px 10px;font-size:13px;border-bottom:1px solid #ebedf0;vertical-align:top}
+.td-main{font-weight:600}
+.td-sub{font-size:11px;color:#9098b0;margin-top:3px}
+.totals{display:flex;justify-content:flex-end;margin-bottom:28px}
+.totals-inner{width:250px}
+.tot-row{display:flex;justify-content:space-between;padding:5px 0;font-size:13px;color:#555c7a;border-bottom:1px solid #ebedf0}
+.tot-row.grand{font-size:16px;font-weight:800;color:#1a1e2e;padding-top:10px;border-top:2px solid #1a1e2e;border-bottom:none;margin-top:6px}
+.status-badge{display:inline-block;font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;padding:5px 16px;border-radius:20px;background:${statusBg};color:${statusColor};border:1.5px solid ${statusColor};margin-bottom:32px}
+.footer{border-top:1px solid #d0d4de;padding-top:14px;display:flex;justify-content:space-between;align-items:flex-end;font-size:11px;color:#9098b0;margin-top:40px}
+@media print{
+  body{background:#fff}
+  .topbar{display:none}
+  .page{margin:0;padding:36px;box-shadow:none;max-width:100%}
+}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <span class="topbar-ref">${t('invoice_title')} &middot; ${ref} &middot; ${today}</span>
+  <button class="print-btn" onclick="window.print()">${t('invoice_print')}</button>
+</div>
+<div class="page">
+  <div class="inv-header">
+    <div>
+      <div class="issuer-name">${esc(issuerName)}</div>
+      <div class="issuer-detail">
+        ${issuerAddress ? escNl(issuerAddress) + '<br>' : ''}
+        ${issuerNif    ? 'NIF: ' + esc(issuerNif) + '<br>' : ''}
+        ${issuerEmail  ? esc(issuerEmail) : ''}
+      </div>
+    </div>
+    <div class="inv-right">
+      <div class="inv-title">${t('invoice_title')}</div>
+      <div class="inv-meta">
+        <strong>${t('invoice_ref')}:</strong> ${ref}<br>
+        <strong>${t('invoice_date')}:</strong> ${today}
+      </div>
+    </div>
+  </div>
+
+  <div class="bill-to">
+    <div class="sec-label">${t('invoice_issued_to')}</div>
+    ${s.client_name
+      ? `<div class="bill-name">${esc(s.client_name)}</div>
+         <div class="bill-detail">
+           ${s.client_address ? escNl(s.client_address) + '<br>' : ''}
+           ${s.client_phone   ? esc(s.client_phone) : ''}
+         </div>`
+      : `<div class="bill-name">—</div>`
+    }
+  </div>
+
+  <div class="sec-label" style="margin-bottom:8px">${t('invoice_services')}</div>
+  <table>
+    <thead><tr>
+      <th>${t('invoice_col_date')}</th>
+      <th>${t('invoice_col_desc')}</th>
+      <th class="r">${t('invoice_col_hours')}</th>
+      ${showRate     ? `<th class="r">${t('invoice_col_rate')}</th>`     : ''}
+      ${showTravel   ? `<th class="r">${t('invoice_col_travel')}</th>`   : ''}
+      ${showDiscount ? `<th class="r">${t('invoice_col_discount')}</th>` : ''}
+      <th class="r">${t('invoice_col_total')}</th>
+    </tr></thead>
+    <tbody><tr>
+      <td style="white-space:nowrap">${formatDate(s.date)}</td>
+      <td>${descCell}</td>
+      <td class="r">${s.duration_hours != null ? s.duration_hours + '\u00a0h' : '—'}</td>
+      ${showRate     ? `<td class="r">${fmt(s.price_per_hour)}</td>` : ''}
+      ${showTravel   ? `<td class="r">${fmt(travelAmt)}</td>`        : ''}
+      ${showDiscount ? `<td class="r">-${fmt(discountAmt)}</td>`     : ''}
+      <td class="r"><strong>${fmt(valueAmt)}</strong></td>
+    </tr></tbody>
+  </table>
+
+  <div class="totals">
+    <div class="totals-inner">
+      ${valueAmt != null ? `<div class="tot-row"><span>${t('invoice_subtotal')}</span><span>${fmt(valueAmt)}</span></div>` : ''}
+      ${tipAmt ? `<div class="tot-row"><span>${t('invoice_tip')}</span><span>+${fmt(tipAmt)}</span></div>` : ''}
+      <div class="tot-row grand"><span>${t('invoice_total')}</span><span>${fmt(grandTotal)}</span></div>
+    </div>
+  </div>
+
+  <div class="status-badge">${statusLabel}</div>
+
+  <div class="footer">
+    <div>${footerNote ? escNl(footerNote) : ''}</div>
+    <div>${esc(issuerName)}</div>
+  </div>
+</div>
+</body>
+</html>`;
+
+  const w = window.open('', '_blank');
+  if (!w) { toast('Popup blocked — allow popups for this site', 'error'); return; }
+  w.document.write(html);
+  w.document.close();
 };
 
 function newService() {
@@ -939,6 +1138,42 @@ async function renderSettings() {
           <input type="text" class="form-control" maxlength="3" value="${escapeHtml(currency)}"
                  oninput="saveSetting('currency', this.value)">
         </div>
+      </div>
+    </div>
+
+    <!-- Invoice Details -->
+    <div class="card" style="margin-bottom:12px">
+      <div class="section-title" style="margin-bottom:12px">${t('settings_invoice')}</div>
+      <div class="form-group">
+        <label class="form-label">${t('invoice_issuer_name')}</label>
+        <input type="text" class="form-control" placeholder="${t('invoice_issuer_name_placeholder')}"
+               value="${escapeHtml(localStorage.getItem('inv_name') || '')}"
+               oninput="saveSetting('inv_name', this.value)">
+      </div>
+      <div class="form-group">
+        <label class="form-label">${t('invoice_issuer_address')}</label>
+        <textarea class="form-control" style="min-height:56px" placeholder="${t('invoice_issuer_address_placeholder')}"
+                  oninput="saveSetting('inv_address', this.value)">${escapeHtml(localStorage.getItem('inv_address') || '')}</textarea>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">${t('invoice_issuer_nif')}</label>
+          <input type="text" class="form-control" placeholder="${t('invoice_issuer_nif_placeholder')}"
+                 value="${escapeHtml(localStorage.getItem('inv_nif') || '')}"
+                 oninput="saveSetting('inv_nif', this.value)">
+        </div>
+        <div class="form-group">
+          <label class="form-label">${t('invoice_issuer_email')}</label>
+          <input type="email" class="form-control" placeholder="${t('invoice_issuer_email_placeholder')}"
+                 value="${escapeHtml(localStorage.getItem('inv_email') || '')}"
+                 oninput="saveSetting('inv_email', this.value)">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">${t('invoice_footer_note')}</label>
+        <input type="text" class="form-control" placeholder="${t('invoice_footer_note_placeholder')}"
+               value="${escapeHtml(localStorage.getItem('inv_note') || '')}"
+               oninput="saveSetting('inv_note', this.value)">
       </div>
     </div>
 
