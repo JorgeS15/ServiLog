@@ -49,10 +49,6 @@ db.exec(`
     created_at TEXT DEFAULT (datetime('now','localtime'))
   );
 
-  INSERT OR IGNORE INTO clients (name) VALUES
-    ('Particular'),
-    ('Sem cliente');
-
   CREATE TABLE IF NOT EXISTS service_attachments (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     service_id INTEGER NOT NULL REFERENCES services(id),
@@ -240,7 +236,7 @@ app.post('/api/services', (req, res) => {
 
   let delta = null;
   if (hourmeter_start != null && hourmeter_end != null) {
-    delta = parseFloat(hourmeter_end) - parseFloat(hourmeter_start);
+    delta = parseFloat((parseFloat(hourmeter_end) - parseFloat(hourmeter_start)).toFixed(2));
   }
 
   const duration = calcDuration(start_time, end_time, duration_hours, discount_hours);
@@ -281,7 +277,7 @@ app.put('/api/services/:id', (req, res) => {
 
   let delta = null;
   if (hourmeter_start != null && hourmeter_end != null) {
-    delta = parseFloat(hourmeter_end) - parseFloat(hourmeter_start);
+    delta = parseFloat((parseFloat(hourmeter_end) - parseFloat(hourmeter_start)).toFixed(2));
   }
 
   const duration = calcDuration(start_time, end_time, duration_hours, discount_hours);
