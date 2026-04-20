@@ -72,6 +72,8 @@ const TRANSLATIONS = {
     invoice_tip: 'Valor adicional', invoice_status_paid: 'PAGO', invoice_status_pending: 'PENDENTE',
     invoice_print: 'Imprimir / Guardar PDF',
     invoice_no_issuer: 'Configure os dados da fatura nas Definições antes de gerar uma fatura.',
+    form_vat: 'IVA', form_vat_none: 'Sem IVA', form_vat_include: 'Com IVA',
+    form_vat_rate: 'Taxa IVA (%)', form_vat_amount: 'Valor IVA', form_vat_gross: 'Total c/ IVA',
   },
   en: {
     months: ['January','February','March','April','May','June','July','August','September','October','November','December'],
@@ -145,6 +147,8 @@ const TRANSLATIONS = {
     invoice_tip: 'Additional', invoice_status_paid: 'PAID', invoice_status_pending: 'PENDING',
     invoice_print: 'Print / Save as PDF',
     invoice_no_issuer: 'Please configure your invoice details in Settings before generating an invoice.',
+    form_vat: 'VAT', form_vat_none: 'No VAT', form_vat_include: 'Include VAT',
+    form_vat_rate: 'VAT rate (%)', form_vat_amount: 'VAT amount', form_vat_gross: 'Gross total (w/ VAT)',
   },
 };
 
@@ -402,8 +406,17 @@ function serviceCard(s) {
   if (s.attachment_count > 0) {
     chips.push(`<span class="chip">📷 ${s.attachment_count}</span>`);
   }
+  if (s.vat_rate != null) {
+    chips.push(`<span class="chip">${t('form_vat')} ${parseFloat(s.vat_rate)}%</span>`);
+  }
 
-  const paymentTag = s.value != null
+  const grossValue = s.value != null
+    ? (s.vat_rate != null
+        ? parseFloat(s.value) * (1 + parseFloat(s.vat_rate) / 100)
+        : parseFloat(s.value))
+    : null;
+
+  const paymentTag = grossValue != null
     ? `<div class="payment-tag ${s.paid ? 'paid' : 'pending'}">${s.paid ? t('tag_paid') : t('tag_pending')}</div>`
     : '';
 
@@ -416,7 +429,7 @@ function serviceCard(s) {
           ${s.description ? `<div class="service-description">${escapeHtml(s.description)}</div>` : ''}
         </div>
         <div style="text-align:right;flex-shrink:0">
-          ${s.value != null ? `<div class="service-value">${parseFloat(s.value).toFixed(2)} ${cur}</div>` : ''}
+          ${grossValue != null ? `<div class="service-value">${grossValue.toFixed(2)} ${cur}</div>` : ''}
           ${paymentTag}
         </div>
       </div>
@@ -534,11 +547,39 @@ function serviceFormHtml(s = {}) {
       <div class="form-row">
         <div class="form-group">
           <label class="form-label">${t('form_total')}</label>
-          <input type="number" class="form-control" id="f-value" step="0.01" min="0" placeholder="${t('form_auto_or_manual')}" value="${s.value ?? ''}" oninput="calcTotal.manual=true">
+          <input type="number" class="form-control" id="f-value" step="0.01" min="0" placeholder="${t('form_auto_or_manual')}" value="${s.value ?? ''}" oninput="calcTotal.manual=true;updateVatDisplay()">
         </div>
         <div class="form-group">
           <label class="form-label">${t('form_tip')}</label>
           <input type="number" class="form-control" id="f-tip" step="0.01" min="0" placeholder="${t('form_tip_placeholder')}" value="${s.tip || ''}">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">${t('form_vat')}</label>
+          <select class="form-control" id="f-vat-enabled" onchange="onVatChange()">
+            <option value="0" ${s.vat_rate == null ? 'selected' : ''}>${t('form_vat_none')}</option>
+            <option value="1" ${s.vat_rate != null ? 'selected' : ''}>${t('form_vat_include')}</option>
+          </select>
+        </div>
+        <div class="form-group" id="f-vat-rate-grp" ${s.vat_rate == null ? 'style="display:none"' : ''}>
+          <label class="form-label">${t('form_vat_rate')}</label>
+          <input type="number" class="form-control" id="f-vat-rate" min="0" max="100" step="0.01"
+                 placeholder="23" value="${s.vat_rate != null ? s.vat_rate : 23}"
+                 oninput="updateVatDisplay()">
+        </div>
+      </div>
+      <div id="f-vat-gross-row" ${s.vat_rate == null ? 'style="display:none"' : ''}>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">${t('form_vat_amount')}</label>
+            <input type="number" class="form-control" id="f-vat-amount" readonly step="0.01" placeholder="—" style="color:var(--text2)">
+          </div>
+          <div class="form-group">
+            <label class="form-label">${t('form_vat_gross')}</label>
+            <input type="number" class="form-control" id="f-vat-gross" readonly step="0.01" placeholder="—" style="color:var(--accent);font-weight:700">
+          </div>
         </div>
       </div>
 
@@ -594,14 +635,39 @@ window.calcDuration = function() {
 };
 
 window.calcTotal = function() {
-  if (calcTotal.manual) return;
-  const duration = parseFloat(document.getElementById('f-duration')?.value) || 0;
-  const pricePerHour = parseFloat(document.getElementById('f-price-per-hour')?.value) || 0;
-  if (!pricePerHour) return;
-  const travelFee = parseFloat(document.getElementById('f-travel-fee')?.value) || 0;
-  const discount = parseFloat(document.getElementById('f-discount')?.value) || 0;
-  const total = Math.max(0, (duration * pricePerHour) + travelFee - discount);
-  document.getElementById('f-value').value = total.toFixed(2);
+  if (!calcTotal.manual) {
+    const duration = parseFloat(document.getElementById('f-duration')?.value) || 0;
+    const pricePerHour = parseFloat(document.getElementById('f-price-per-hour')?.value) || 0;
+    if (pricePerHour) {
+      const travelFee = parseFloat(document.getElementById('f-travel-fee')?.value) || 0;
+      const discount = parseFloat(document.getElementById('f-discount')?.value) || 0;
+      const total = Math.max(0, (duration * pricePerHour) + travelFee - discount);
+      document.getElementById('f-value').value = total.toFixed(2);
+    }
+  }
+  updateVatDisplay();
+};
+
+window.onVatChange = function() {
+  const enabled = document.getElementById('f-vat-enabled')?.value === '1';
+  const rateGrp = document.getElementById('f-vat-rate-grp');
+  if (rateGrp) rateGrp.style.display = enabled ? '' : 'none';
+  updateVatDisplay();
+};
+
+window.updateVatDisplay = function() {
+  const grossRow = document.getElementById('f-vat-gross-row');
+  if (!grossRow) return;
+  const enabled = document.getElementById('f-vat-enabled')?.value === '1';
+  grossRow.style.display = enabled ? '' : 'none';
+  if (!enabled) return;
+  const net = parseFloat(document.getElementById('f-value')?.value) || 0;
+  const rate = parseFloat(document.getElementById('f-vat-rate')?.value) || 0;
+  const vatAmt = net * rate / 100;
+  const amountEl = document.getElementById('f-vat-amount');
+  const grossEl  = document.getElementById('f-vat-gross');
+  if (amountEl) amountEl.value = vatAmt.toFixed(2);
+  if (grossEl)  grossEl.value  = (net + vatAmt).toFixed(2);
 };
 
 window.calcHourmeter = function() {
@@ -635,6 +701,9 @@ function getFormData() {
     discount: document.getElementById('f-discount').value || null,
     paid: document.getElementById('f-paid').value === '1' ? 1 : 0,
     tip: document.getElementById('f-tip').value || null,
+    vat_rate: document.getElementById('f-vat-enabled').value === '1'
+      ? (parseFloat(document.getElementById('f-vat-rate').value) || 23)
+      : null,
   };
 }
 
@@ -680,6 +749,7 @@ async function editService(id) {
   const s = await api.get(`/api/services/${id}`);
   openModal(t('form_edit_service'), serviceFormHtml(s));
   calcHourmeter();
+  updateVatDisplay();
   loadPictures(id);
 }
 
@@ -751,7 +821,9 @@ window.generateInvoice = async function(serviceId) {
   const tipAmt      = s.tip        ?         parseFloat(s.tip)        : 0;
   const travelAmt   = s.travel_fee ?         parseFloat(s.travel_fee) : 0;
   const discountAmt = s.discount   ?         parseFloat(s.discount)   : 0;
-  const grandTotal  = valueAmt != null ? valueAmt + tipAmt : null;
+  const vatRate     = s.vat_rate   != null ? parseFloat(s.vat_rate)   : null;
+  const vatAmt      = vatRate != null && valueAmt != null ? valueAmt * vatRate / 100 : 0;
+  const grandTotal  = valueAmt != null ? valueAmt + vatAmt + tipAmt : null;
   const isPaid      = !!s.paid;
 
   const statusLabel = isPaid ? t('invoice_status_paid') : t('invoice_status_pending');
@@ -871,6 +943,7 @@ td{padding:13px 10px;font-size:13px;border-bottom:1px solid #ebedf0;vertical-ali
   <div class="totals">
     <div class="totals-inner">
       ${valueAmt != null ? `<div class="tot-row"><span>${t('invoice_subtotal')}</span><span>${fmt(valueAmt)}</span></div>` : ''}
+      ${vatRate != null ? `<div class="tot-row"><span>${t('form_vat')} (${vatRate}%)</span><span>+${fmt(vatAmt)}</span></div>` : ''}
       ${tipAmt ? `<div class="tot-row"><span>${t('invoice_tip')}</span><span>+${fmt(tipAmt)}</span></div>` : ''}
       <div class="tot-row grand"><span>${t('invoice_total')}</span><span>${fmt(grandTotal)}</span></div>
     </div>
