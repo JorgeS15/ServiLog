@@ -46,6 +46,7 @@ db.exec(`
     hourmeter_start REAL,
     hourmeter_end REAL,
     hourmeter_delta REAL,
+    vat_rate REAL DEFAULT NULL,
     created_at TEXT DEFAULT (datetime('now','localtime'))
   );
 
@@ -113,6 +114,9 @@ function runMigrations() {
   if (colExists('services', 'horimetro_fim'))    db.exec('ALTER TABLE services RENAME COLUMN horimetro_fim TO hourmeter_end');
   if (colExists('services', 'horimetro_delta'))  db.exec('ALTER TABLE services RENAME COLUMN horimetro_delta TO hourmeter_delta');
   if (colExists('services', 'criado_em'))        db.exec('ALTER TABLE services RENAME COLUMN criado_em TO created_at');
+
+  // v1.2.2 — VAT rate
+  tryAlter(`ALTER TABLE services ADD COLUMN vat_rate REAL DEFAULT NULL`);
 }
 runMigrations();
 
@@ -229,7 +233,7 @@ app.post('/api/services', (req, res) => {
     date, start_time, end_time, duration_hours, discount_hours,
     client_id, description, value,
     hourmeter_start, hourmeter_end,
-    price_per_hour, travel_fee, discount, paid, tip
+    price_per_hour, travel_fee, discount, paid, tip, vat_rate
   } = req.body;
 
   if (!date) return res.status(400).json({ error: 'Date is required' });
@@ -246,8 +250,8 @@ app.post('/api/services', (req, res) => {
     INSERT INTO services
       (date, start_time, end_time, duration_hours, discount_hours, client_id, description, value,
        hourmeter_start, hourmeter_end, hourmeter_delta,
-       price_per_hour, travel_fee, discount, paid, tip)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+       price_per_hour, travel_fee, discount, paid, tip, vat_rate)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
   `).run(
     date, start_time || null, end_time || null,
     duration,
@@ -261,7 +265,8 @@ app.post('/api/services', (req, res) => {
     travel_fee ? parseFloat(travel_fee) : null,
     discount ? parseFloat(discount) : null,
     paid ? 1 : 0,
-    tip ? parseFloat(tip) : 0
+    tip ? parseFloat(tip) : 0,
+    vat_rate != null && vat_rate !== '' ? parseFloat(vat_rate) : null
   );
 
   res.json({ id: result.lastInsertRowid });
@@ -272,7 +277,7 @@ app.put('/api/services/:id', (req, res) => {
     date, start_time, end_time, duration_hours, discount_hours,
     client_id, description, value,
     hourmeter_start, hourmeter_end,
-    price_per_hour, travel_fee, discount, paid, tip
+    price_per_hour, travel_fee, discount, paid, tip, vat_rate
   } = req.body;
 
   let delta = null;
@@ -288,7 +293,7 @@ app.put('/api/services/:id', (req, res) => {
       date=?, start_time=?, end_time=?, duration_hours=?, discount_hours=?,
       client_id=?, description=?, value=?,
       hourmeter_start=?, hourmeter_end=?, hourmeter_delta=?,
-      price_per_hour=?, travel_fee=?, discount=?, paid=?, tip=?
+      price_per_hour=?, travel_fee=?, discount=?, paid=?, tip=?, vat_rate=?
     WHERE id=?
   `).run(
     date, start_time || null, end_time || null,
@@ -304,6 +309,7 @@ app.put('/api/services/:id', (req, res) => {
     discount ? parseFloat(discount) : null,
     paid ? 1 : 0,
     tip ? parseFloat(tip) : 0,
+    vat_rate != null && vat_rate !== '' ? parseFloat(vat_rate) : null,
     req.params.id
   );
 
