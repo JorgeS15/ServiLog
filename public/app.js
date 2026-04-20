@@ -388,7 +388,7 @@ function serviceCard(s) {
     chips.push(`<span class="chip hora">⏱ ${s.duration_hours}h</span>`);
   }
   if (s.hourmeter_start != null || s.hourmeter_end != null) {
-    chips.push(`<span class="chip horim">⚙️ ${s.hourmeter_start ?? '?'} → ${s.hourmeter_end ?? '?'} h${s.hourmeter_delta != null ? ' (Δ' + s.hourmeter_delta + ')' : ''}</span>`);
+    chips.push(`<span class="chip horim">⚙️ ${s.hourmeter_start ?? '?'} → ${s.hourmeter_end ?? '?'} h${s.hourmeter_delta != null ? ' (Δ' + parseFloat(s.hourmeter_delta).toFixed(1) + ')' : ''}</span>`);
   }
   if (s.price_per_hour != null) {
     let billing = `${s.price_per_hour}${cur}/h`;
@@ -759,11 +759,8 @@ window.generateInvoice = async function(serviceId) {
   const statusColor = isPaid ? '#1a8a4a' : '#c0392b';
 
   const descMain = s.description ? `<div class="td-main">${esc(s.description)}</div>` : '';
-  const descSub  = (s.start_time || s.hourmeter_delta)
-    ? `<div class="td-sub">${[
-        s.start_time && s.end_time ? s.start_time + '\u2013' + s.end_time : (s.start_time || ''),
-        s.hourmeter_delta ? '\u2699 \u0394\u00a0' + s.hourmeter_delta + ' h' : ''
-      ].filter(Boolean).join(' \u00b7 ')}</div>`
+  const descSub  = s.start_time
+    ? `<div class="td-sub">${s.start_time}${s.end_time ? '\u2013' + s.end_time : ''}</div>`
     : '';
   const descCell = descMain + descSub || '<span>—</span>';
 
