@@ -54,10 +54,12 @@ const TRANSLATIONS = {
     settings_date_range: 'Período de dados', settings_version: 'Versão',
     tip_badge: 'gorjeta',
     serv_abbr: 'serv.', discount_abbr: 'desc.',
-    form_pictures: 'Fotos', form_pictures_add: 'Adicionar fotos',
-    form_pictures_loading: 'A carregar...', form_pictures_empty: 'Sem fotos',
-    toast_picture_uploaded: 'Foto adicionada ✓', toast_picture_deleted: 'Foto eliminada',
-    confirm_delete_picture: 'Eliminar esta foto?',
+    form_pictures: 'Anexos', form_pictures_add: 'Adicionar ficheiros',
+    form_pictures_loading: 'A carregar...', form_pictures_empty: 'Sem anexos',
+    toast_picture_uploaded: 'Ficheiro adicionado ✓', toast_picture_deleted: 'Ficheiro eliminado',
+    confirm_delete_picture: 'Eliminar este ficheiro?',
+    settings_total_attachments: 'Total de anexos', settings_uploads_size: 'Tamanho dos ficheiros',
+    settings_total_size: 'Tamanho total',
     settings_invoice: 'Dados para Faturas',
     invoice_issuer_name: 'Nome / Empresa', invoice_issuer_name_placeholder: 'ex: João Silva - Serviços Agrícolas',
     invoice_issuer_address: 'Morada', invoice_issuer_address_placeholder: 'ex: Rua Principal 10, 3000-000 Coimbra',
@@ -137,10 +139,12 @@ const TRANSLATIONS = {
     settings_date_range: 'Data range', settings_version: 'Version',
     tip_badge: 'tip',
     serv_abbr: 'svc.', discount_abbr: 'disc.',
-    form_pictures: 'Pictures', form_pictures_add: 'Add pictures',
-    form_pictures_loading: 'Loading...', form_pictures_empty: 'No pictures',
-    toast_picture_uploaded: 'Picture added ✓', toast_picture_deleted: 'Picture deleted',
-    confirm_delete_picture: 'Delete this picture?',
+    form_pictures: 'Attachments', form_pictures_add: 'Add files',
+    form_pictures_loading: 'Loading...', form_pictures_empty: 'No attachments',
+    toast_picture_uploaded: 'File added ✓', toast_picture_deleted: 'File deleted',
+    confirm_delete_picture: 'Delete this file?',
+    settings_total_attachments: 'Total attachments', settings_uploads_size: 'Files size',
+    settings_total_size: 'Total size',
     settings_invoice: 'Invoice Details',
     invoice_issuer_name: 'Name / Business', invoice_issuer_name_placeholder: 'e.g. John Smith - Farm Services',
     invoice_issuer_address: 'Address', invoice_issuer_address_placeholder: 'e.g. 10 Main St, Springfield',
@@ -634,7 +638,7 @@ function serviceFormHtml(s = {}) {
       </div>
       <label class="btn btn-secondary btn-sm" style="cursor:pointer;width:fit-content">
         📷 ${t('form_pictures_add')}
-        <input type="file" accept="image/*" multiple style="display:none" onchange="uploadPictures(this, ${s.id})">
+        <input type="file" accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx" multiple style="display:none" onchange="uploadPictures(this, ${s.id})">
       </label>
       ` : ''}
 
@@ -800,12 +804,22 @@ window.loadPictures = async function(serviceId) {
     grid.innerHTML = `<span class="pictures-empty">${t('form_pictures_empty')}</span>`;
     return;
   }
-  grid.innerHTML = attachments.map(a => `
-    <div class="picture-thumb">
-      <img src="/api/attachments/${a.id}" alt="${escapeHtml(a.original_name || '')}" loading="lazy" onclick="viewPicture(${a.id})">
-      <button class="picture-thumb-del" onclick="deletePicture(${a.id}, ${serviceId})" title="Delete">✕</button>
-    </div>
-  `).join('');
+  grid.innerHTML = attachments.map(a => {
+    const mime = a.mime_type || '';
+    const isImage = mime.startsWith('image/');
+    const isVideo = mime.startsWith('video/');
+    const isPdf   = mime === 'application/pdf';
+    const icon = isVideo ? '🎬' : isPdf ? '📄' : '📎';
+    const name  = escapeHtml(a.original_name || 'file');
+    const inner = isImage
+      ? `<img src="/api/attachments/${a.id}" alt="${name}" loading="lazy">`
+      : `<div class="file-thumb-icon">${icon}<span class="file-thumb-name">${name}</span></div>`;
+    return `
+      <div class="picture-thumb${isImage ? '' : ' file-thumb'}" onclick="viewPicture(${a.id})" title="${name}">
+        ${inner}
+        <button class="picture-thumb-del" onclick="event.stopPropagation();deletePicture(${a.id}, ${serviceId})" title="Delete">✕</button>
+      </div>`;
+  }).join('');
 };
 
 window.uploadPictures = async function(input, serviceId) {
@@ -1480,22 +1494,19 @@ async function renderSettings() {
     <!-- Data Statistics -->
     <div class="card" style="margin-bottom:12px">
       <div class="section-title" style="margin-bottom:12px">${t('settings_data_stats')}</div>
-      <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)">
-        <span class="stat-label">${t('settings_total_services')}</span>
-        <span>${stats.totalServices}</span>
-      </div>
-      <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)">
-        <span class="stat-label">${t('settings_total_clients')}</span>
-        <span>${stats.totalClients}</span>
-      </div>
-      <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)">
-        <span class="stat-label">${t('settings_db_size')}</span>
-        <span>${formatBytes(stats.dbSizeBytes)}</span>
-      </div>
-      <div style="display:flex;justify-content:space-between;padding:6px 0">
-        <span class="stat-label">${t('settings_date_range')}</span>
-        <span>${stats.dateRange && stats.dateRange.first ? stats.dateRange.first + ' → ' + stats.dateRange.last : '—'}</span>
-      </div>
+      ${[
+        [t('settings_total_services'), stats.totalServices],
+        [t('settings_total_clients'),  stats.totalClients],
+        [t('settings_total_attachments'), stats.totalAttachments],
+        [t('settings_db_size'),        formatBytes(stats.dbSizeBytes)],
+        [t('settings_uploads_size'),   formatBytes(stats.uploadsSizeBytes)],
+        [t('settings_total_size'),     formatBytes((stats.dbSizeBytes || 0) + (stats.uploadsSizeBytes || 0))],
+        [t('settings_date_range'),     stats.dateRange?.first ? stats.dateRange.first + ' → ' + stats.dateRange.last : '—'],
+      ].map(([label, value], i, arr) => `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;${i < arr.length-1 ? 'border-bottom:1px solid var(--border)' : ''}">
+          <span class="stat-label">${label}</span>
+          <span style="font-size:13px">${value}</span>
+        </div>`).join('')}
     </div>
 
     <!-- Version -->

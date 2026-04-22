@@ -530,6 +530,32 @@ textarea.form-control { resize: vertical; min-height: 72px; }
   cursor: pointer;
   display: block;
 }
+.file-thumb {
+  cursor: pointer;
+  background: var(--bg3);
+}
+.file-thumb-icon {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: 26px;
+  padding: 6px;
+}
+.file-thumb-name {
+  font-size: 9px;
+  color: var(--text2);
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
+  line-height: 1.2;
+}
+
 .picture-thumb-del {
   position: absolute;
   top: 3px;
