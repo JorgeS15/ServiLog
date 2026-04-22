@@ -33,7 +33,7 @@ Planned features for future releases:
 | Feature | Description |
 |---|---|
 | **Authentication & Users** | Built-in login system with user accounts and role-based access, eliminating the need for an external reverse proxy for auth |
-| **Service Attachments** | Upload and attach photos and videos directly to service records (receipts, damage photos, before/after shots) |
+| ~~**Service Attachments**~~ ✅ v1.2.3 | ~~Upload and attach photos and videos directly to service records (receipts, damage photos, before/after shots)~~|
 | **Service Scheduling** | Schedule upcoming maintenance and services with due-date alerts based on calendar date or hour-meter readings |
 | ~~**Invoice Generator**~~ ✅ v1.2.3 | ~~Generate invoices based on the service data (hours, client, etc)~~ |
 
