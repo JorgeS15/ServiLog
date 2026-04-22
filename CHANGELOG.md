@@ -1,5 +1,50 @@
 # Changelog
 
+## [1.2.3] - 2026-04-20
+
+### Added
+- Full backup now exports a `.slb` bundle containing the SQLite database **and** all uploaded service photos (custom binary format, zero new dependencies)
+- Restore accepts both new `.slb` bundles and legacy `.db` files (backwards compatible)
+- Restore size limit raised from 50 MB to 500 MB
+- Dashboard summary: **Líquido (s/ IVA)** and **Bruto (c/ IVA)** stat blocks showing net and gross billed totals
+- Horímetro delta and Gorjetas share a single row in the summary, reducing visual clutter
+
+### Changed
+- **Recebido** and **Pendente** summary values now display gross amounts (including VAT)
+- Per-client breakdown shows gross value with a net sub-label when VAT is present
+
+## [1.2.2] - 2026-04-18
+
+### Added
+- Per-service VAT toggle with editable rate (default 23 %)
+- Live VAT amount and gross total in the service form
+- Service cards display gross total and a VAT % chip when VAT is enabled
+- Invoices include a VAT line in the totals breakdown
+
+## [1.2.1] - 2026-04-16
+
+### Fixed
+- Hourmeter delta floating-point display (e.g. `5.399999…` now shows as `5.4`)
+- Hourmeter start/end readings removed from the invoice service description
+- Default clients "Particular" and "Sem cliente" no longer reappear after every server restart
+
+## [1.2.0] - 2026-04-14
+
+### Added
+- Invoice generator: generates a printable, self-contained HTML invoice from any service
+- Invoice opens in a new browser tab with a Print / Save as PDF button
+- Invoice includes issuer details, client details, service table, VAT row, totals, and payment status badge
+- Invoice reference format: `F {YEAR}/{SERVICE_ID}`
+- Settings card for invoice issuer details (business name, address, NIF, email, footer/payment terms note)
+- `GET /api/services/:id` now returns `client_phone` and `client_address` for invoice population
+
+## [1.1.0] - 2026-04-10
+
+### Added
+- Photo attachments: attach one or more photos to any service (JPEG, PNG, WEBP, HEIC, etc.)
+- Photos are stored in `/data/uploads/` and linked via the `service_attachments` table
+- Photo grid with lightbox viewer and per-photo delete in the service detail view
+
 ## [1.0.0] - 2026-04-07
 
 ### Changed
