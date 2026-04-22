@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.3.0] - 2026-04-22
+
+### Added
+- Agenda tab: monthly calendar grid with dot indicators, day detail panel, upcoming appointments list
+- Appointment scheduling: services now have a `status` field (`completed` | `scheduled`)
+- Scheduled services shown with a blue "Scheduled" badge on service cards and in all views
+- Service form auto-defaults status to "Scheduled" when a future date is selected
+- New API endpoint: `GET /api/appointments/upcoming` — returns scheduled services with date ≥ today
+- Dashboard summary and CSV export exclude scheduled (unbilled) services from financial aggregations
+
 ## [1.2.3] - 2026-04-20
 
 ### Added

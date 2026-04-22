@@ -2,7 +2,7 @@
 const TRANSLATIONS = {
   pt: {
     months: ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'],
-    nav_dashboard: 'Resumo', nav_lista: 'Serviços', nav_clientes: 'Clientes', nav_settings: 'Definições',
+    nav_dashboard: 'Resumo', nav_lista: 'Serviços', nav_clientes: 'Clientes', nav_settings: 'Definições', nav_agenda: 'Agenda',
     dashboard_title: 'Resumo', dashboard_monthly: 'Mensal', dashboard_alltime: 'Tudo',
     stat_services: 'Serviços', stat_hours: 'Horas Trab.', stat_received: 'Recebido',
     stat_pending: 'Pendente', stat_billed: 'Total Faturado', stat_horimetro: 'Horímetro',
@@ -75,10 +75,17 @@ const TRANSLATIONS = {
     invoice_no_issuer: 'Configure os dados da fatura nas Definições antes de gerar uma fatura.',
     form_vat: 'IVA', form_vat_none: 'Sem IVA', form_vat_include: 'Com IVA',
     form_vat_rate: 'Taxa IVA (%)', form_vat_amount: 'Valor IVA', form_vat_gross: 'Total c/ IVA',
+    form_status: 'Estado', form_status_scheduled: 'Agendado', form_status_completed: 'Concluído',
+    tag_scheduled: 'Agendado',
+    agenda_title: 'Agenda', agenda_upcoming: 'Próximos', agenda_new_appt: '+ Agendar',
+    agenda_no_upcoming: 'Sem agendamentos', agenda_no_upcoming_sub: 'Cria um agendamento acima',
+    agenda_day_services: 'Serviços do dia', agenda_no_day: 'Sem serviços neste dia',
+    months_short: ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'],
+    weekdays_short: ['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'],
   },
   en: {
     months: ['January','February','March','April','May','June','July','August','September','October','November','December'],
-    nav_dashboard: 'Summary', nav_lista: 'Services', nav_clientes: 'Clients', nav_settings: 'Settings',
+    nav_dashboard: 'Summary', nav_lista: 'Services', nav_clientes: 'Clients', nav_settings: 'Settings', nav_agenda: 'Agenda',
     dashboard_title: 'Summary', dashboard_monthly: 'Monthly', dashboard_alltime: 'All Time',
     stat_services: 'Services', stat_hours: 'Work Hours', stat_received: 'Received',
     stat_pending: 'Pending', stat_billed: 'Total Billed', stat_horimetro: 'Hourmeter',
@@ -151,6 +158,13 @@ const TRANSLATIONS = {
     invoice_no_issuer: 'Please configure your invoice details in Settings before generating an invoice.',
     form_vat: 'VAT', form_vat_none: 'No VAT', form_vat_include: 'Include VAT',
     form_vat_rate: 'VAT rate (%)', form_vat_amount: 'VAT amount', form_vat_gross: 'Gross total (w/ VAT)',
+    form_status: 'Status', form_status_scheduled: 'Scheduled', form_status_completed: 'Completed',
+    tag_scheduled: 'Scheduled',
+    agenda_title: 'Agenda', agenda_upcoming: 'Upcoming', agenda_new_appt: '+ Schedule',
+    agenda_no_upcoming: 'No appointments', agenda_no_upcoming_sub: 'Create one using the button above',
+    agenda_day_services: 'Services on this day', agenda_no_day: 'No services on this day',
+    months_short: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
+    weekdays_short: ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],
   },
 };
 
@@ -171,6 +185,8 @@ const state = {
   editingId: null,
   lang: localStorage.getItem('lang') || 'pt',
   globalView: false,
+  calendarSelectedDay: null,
+  calendarServices: [],
 };
 
 // ── API ───────────────────────────────────────────────────
@@ -226,6 +242,7 @@ async function renderView(view) {
   else if (view === 'list') await renderList();
   else if (view === 'clients') await renderClients();
   else if (view === 'settings') await renderSettings();
+  else if (view === 'agenda') await renderAgenda();
 }
 
 // ── Dashboard ─────────────────────────────────────────────
@@ -421,9 +438,12 @@ function serviceCard(s) {
         : parseFloat(s.value))
     : null;
 
-  const paymentTag = grossValue != null
-    ? `<div class="payment-tag ${s.paid ? 'paid' : 'pending'}">${s.paid ? t('tag_paid') : t('tag_pending')}</div>`
-    : '';
+  const isScheduled = s.status === 'scheduled';
+  const statusTag = isScheduled
+    ? `<div class="payment-tag scheduled">${t('tag_scheduled')}</div>`
+    : grossValue != null
+      ? `<div class="payment-tag ${s.paid ? 'paid' : 'pending'}">${s.paid ? t('tag_paid') : t('tag_pending')}</div>`
+      : '';
 
   return `
     <div class="service-item" data-id="${s.id}">
@@ -435,7 +455,7 @@ function serviceCard(s) {
         </div>
         <div style="text-align:right;flex-shrink:0">
           ${grossValue != null ? `<div class="service-value">${grossValue.toFixed(2)} ${cur}</div>` : ''}
-          ${paymentTag}
+          ${statusTag}
         </div>
       </div>
       ${chips.length ? `<div class="service-chips">${chips.join('')}</div>` : ''}
@@ -466,14 +486,27 @@ function serviceFormHtml(s = {}) {
   const defaultTravelFee = isNew ? (s.travel_fee ?? localStorage.getItem('default_travel_fee') ?? '') : (s.travel_fee ?? '');
   const defaultPaid = isNew ? (s.paid ?? localStorage.getItem('default_paid') ?? '0') : (s.paid ?? '0');
 
+  const serviceDate = s.date || today;
+  const defaultStatus = s.status || (serviceDate > today ? 'scheduled' : 'completed');
+
   return `
     <div class="form-grid">
       <div class="form-row">
         <div class="form-group">
           <label class="form-label">${t('form_date')}</label>
-          <input type="date" class="form-control" id="f-date" value="${s.date || today}" required>
+          <input type="date" class="form-control" id="f-date" value="${serviceDate}" required onchange="onDateChange(${isNew ? 'true' : 'false'})">
         </div>
         <div class="form-group">
+          <label class="form-label">${t('form_status')}</label>
+          <select class="form-control" id="f-status">
+            <option value="completed" ${defaultStatus === 'completed' ? 'selected' : ''}>${t('form_status_completed')}</option>
+            <option value="scheduled" ${defaultStatus === 'scheduled' ? 'selected' : ''}>${t('form_status_scheduled')}</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group" style="grid-column:1/-1">
           <label class="form-label">${t('form_client')}</label>
           <select class="form-control" id="f-client" onchange="onClientChange()">
             <option value="">${t('form_no_client')}</option>
@@ -709,6 +742,7 @@ function getFormData() {
     vat_rate: document.getElementById('f-vat-enabled').value === '1'
       ? (parseFloat(document.getElementById('f-vat-rate').value) || 23)
       : null,
+    status: document.getElementById('f-status')?.value || 'completed',
   };
 }
 
@@ -974,6 +1008,188 @@ function newService() {
   openModal(t('form_new_service'), serviceFormHtml());
 }
 
+window.onDateChange = function(isNew) {
+  if (!isNew) return;
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const dateVal = document.getElementById('f-date')?.value;
+  const statusEl = document.getElementById('f-status');
+  if (!dateVal || !statusEl) return;
+  statusEl.value = dateVal > todayStr ? 'scheduled' : 'completed';
+};
+
+// ── Agenda / Calendar ─────────────────────────────────────
+async function renderAgenda() {
+  const el = document.getElementById('view-agenda');
+  const [monthServices, upcoming] = await Promise.all([
+    api.get(`/api/services?month=${state.month}&year=${state.year}`),
+    api.get('/api/appointments/upcoming'),
+  ]);
+  state.calendarServices = monthServices;
+
+  const byDay = {};
+  for (const s of monthServices) {
+    if (!byDay[s.date]) byDay[s.date] = [];
+    byDay[s.date].push(s);
+  }
+
+  el.innerHTML = `
+    <div class="section-header">
+      <span class="section-title">${t('agenda_title')}</span>
+      <div style="display:flex;gap:6px;align-items:center">
+        <button class="btn btn-sm btn-primary" onclick="scheduleNew()">${t('agenda_new_appt')}</button>
+        <div class="month-picker">
+          <button id="agenda-prev">‹</button>
+          <span class="month-label">${t('months_short')[state.month-1]} ${state.year}</span>
+          <button id="agenda-next">›</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="padding:10px">
+      ${renderCalendarGrid(state.year, state.month, byDay, state.calendarSelectedDay)}
+    </div>
+
+    <div id="day-detail-panel"></div>
+
+    <div class="card" style="margin-top:12px">
+      <div class="section-title" style="margin-bottom:12px">${t('agenda_upcoming')}</div>
+      ${renderUpcomingList(upcoming)}
+    </div>
+  `;
+
+  document.getElementById('agenda-prev').onclick = () => {
+    state.month--; if (state.month < 1) { state.month = 12; state.year--; }
+    state.calendarSelectedDay = null;
+    renderAgenda();
+  };
+  document.getElementById('agenda-next').onclick = () => {
+    state.month++; if (state.month > 12) { state.month = 1; state.year++; }
+    state.calendarSelectedDay = null;
+    renderAgenda();
+  };
+
+  el.querySelectorAll('.upcoming-item').forEach(item => {
+    item.addEventListener('click', () => editService(parseInt(item.dataset.id)));
+  });
+
+  if (state.calendarSelectedDay) {
+    const dayServices = state.calendarServices.filter(s => s.date === state.calendarSelectedDay);
+    renderDayPanel(state.calendarSelectedDay, dayServices);
+  }
+}
+
+function renderCalendarGrid(year, month, byDay, selectedDay) {
+  const firstDay = new Date(year, month - 1, 1);
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const today = new Date().toISOString().slice(0, 10);
+
+  // Mon-first offset: JS getDay() is 0=Sun,1=Mon..6=Sat → (day+6)%7 → Mon=0
+  const startOffset = (firstDay.getDay() + 6) % 7;
+
+  const cells = [];
+  for (let i = 0; i < startOffset; i++) {
+    cells.push(`<div class="cal-cell cal-empty"></div>`);
+  }
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const services = byDay[dateStr] || [];
+    const hasCompleted = services.some(s => s.status !== 'scheduled');
+    const hasScheduled = services.some(s => s.status === 'scheduled');
+    const isToday = dateStr === today;
+    const isSelected = dateStr === selectedDay;
+
+    let dotHtml = '';
+    if (hasCompleted || hasScheduled) {
+      const dots = [];
+      if (hasCompleted) dots.push(`<span class="cal-dot dot-completed"></span>`);
+      if (hasScheduled) dots.push(`<span class="cal-dot dot-scheduled"></span>`);
+      dotHtml = `<div class="cal-dots">${dots.join('')}</div>`;
+    }
+
+    const classes = ['cal-cell',
+      isToday ? 'cal-today' : '',
+      isSelected ? 'cal-selected' : '',
+    ].filter(Boolean).join(' ');
+
+    cells.push(`
+      <div class="${classes}" data-date="${dateStr}" onclick="selectCalDay('${dateStr}')">
+        <span class="cal-day-num">${d}</span>
+        ${dotHtml}
+      </div>`);
+  }
+
+  const totalCells = cells.length;
+  const remainder = totalCells % 7;
+  if (remainder !== 0) {
+    for (let i = 0; i < 7 - remainder; i++) cells.push(`<div class="cal-cell cal-empty"></div>`);
+  }
+
+  const headers = t('weekdays_short').map(d => `<div class="cal-header-cell">${d}</div>`).join('');
+  return `<div class="cal-weekdays">${headers}</div><div class="cal-days">${cells.join('')}</div>`;
+}
+
+window.selectCalDay = function(dateStr) {
+  state.calendarSelectedDay = dateStr;
+  document.querySelectorAll('.cal-cell').forEach(c => {
+    c.classList.toggle('cal-selected', c.dataset.date === dateStr);
+  });
+  const services = state.calendarServices.filter(s => s.date === dateStr);
+  renderDayPanel(dateStr, services);
+};
+
+function renderDayPanel(dateStr, services) {
+  const panel = document.getElementById('day-detail-panel');
+  if (!panel) return;
+  panel.innerHTML = `
+    <div class="card" style="margin-top:10px">
+      <div class="section-title" style="margin-bottom:10px">
+        ${t('agenda_day_services')} — ${formatDate(dateStr)}
+      </div>
+      ${services.length === 0
+        ? `<div class="empty-sub" style="color:var(--text3);padding:12px 0">${t('agenda_no_day')}</div>`
+        : services.map(s => serviceCard(s)).join('')
+      }
+    </div>
+  `;
+  panel.querySelectorAll('.service-item').forEach(item => {
+    item.addEventListener('click', () => editService(parseInt(item.dataset.id)));
+  });
+}
+
+function renderUpcomingList(upcoming) {
+  if (!upcoming.length) {
+    return `<div class="empty-sub" style="color:var(--text3);padding:4px 0">${t('agenda_no_upcoming')}</div>`;
+  }
+  const groups = {};
+  for (const s of upcoming) {
+    if (!groups[s.date]) groups[s.date] = [];
+    groups[s.date].push(s);
+  }
+  return Object.entries(groups).map(([date, services]) => `
+    <div class="upcoming-group">
+      <div class="upcoming-date-label">${formatDate(date)}</div>
+      ${services.map(s => `
+        <div class="upcoming-item service-item" data-id="${s.id}" style="cursor:pointer">
+          <div class="service-top">
+            <div>
+              <div class="service-client">${escapeHtml(s.client_name || '—')}</div>
+              ${s.description ? `<div class="service-description">${escapeHtml(s.description)}</div>` : ''}
+              ${s.start_time ? `<div class="service-date">${s.start_time}${s.end_time ? ' – ' + s.end_time : ''}</div>` : ''}
+            </div>
+            <div class="payment-tag scheduled">${t('tag_scheduled')}</div>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `).join('');
+}
+
+window.scheduleNew = function() {
+  const date = state.calendarSelectedDay || new Date().toISOString().slice(0, 10);
+  openModal(t('form_new_service'), serviceFormHtml({ date, status: 'scheduled' }));
+};
+
 // ── Clients ───────────────────────────────────────────────
 async function renderClients() {
   const el = document.getElementById('view-clients');
@@ -1107,7 +1323,7 @@ async function init() {
   state.clients = await api.get('/api/clients');
 
   // Nav — apply translations and attach click handlers
-  const navKeyMap = { dashboard: 'nav_dashboard', list: 'nav_lista', clients: 'nav_clientes', settings: 'nav_settings' };
+  const navKeyMap = { dashboard: 'nav_dashboard', list: 'nav_lista', clients: 'nav_clientes', settings: 'nav_settings', agenda: 'nav_agenda' };
   document.querySelectorAll('.nav-btn').forEach(btn => {
     const key = navKeyMap[btn.dataset.view];
     if (key) btn.querySelector('span').textContent = t(key);
@@ -1300,7 +1516,7 @@ window.saveSetting = function(key, value) {
 window.setLang = function(lang) {
   state.lang = lang;
   localStorage.setItem('lang', lang);
-  const navKeyMap = { dashboard: 'nav_dashboard', list: 'nav_lista', clients: 'nav_clientes', settings: 'nav_settings' };
+  const navKeyMap = { dashboard: 'nav_dashboard', list: 'nav_lista', clients: 'nav_clientes', settings: 'nav_settings', agenda: 'nav_agenda' };
   document.querySelectorAll('.nav-btn').forEach(btn => {
     const key = navKeyMap[btn.dataset.view];
     if (key) btn.querySelector('span').textContent = t(key);
