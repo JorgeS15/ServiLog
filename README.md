@@ -78,12 +78,6 @@ ServiLog has no built-in authentication. If you expose it outside your local net
 
 ---
 
-## Changelog
-
-See [CHANGELOG.md](CHANGELOG.md) for the full version history.
-
----
-
 ## License
 
 [MIT](LICENSE)
