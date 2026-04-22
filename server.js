@@ -117,6 +117,9 @@ function runMigrations() {
 
   // v1.2.2 — VAT rate
   tryAlter(`ALTER TABLE services ADD COLUMN vat_rate REAL DEFAULT NULL`);
+
+  // v1.3.0 — scheduling status
+  tryAlter(`ALTER TABLE services ADD COLUMN status TEXT DEFAULT 'completed'`);
 }
 runMigrations();
 
@@ -174,7 +177,7 @@ app.delete('/api/clients/:id', (req, res) => {
 
 // ── Services ──────────────────────────────────────────────
 app.get('/api/services', (req, res) => {
-  const { month, year, client_id } = req.query;
+  const { month, year, client_id, status } = req.query;
   let query = `
     SELECT s.*, c.name as client_name,
            COUNT(a.id) as attachment_count
@@ -192,8 +195,25 @@ app.get('/api/services', (req, res) => {
     query += ` AND s.client_id = ?`;
     params.push(client_id);
   }
+  if (status) {
+    query += ` AND s.status = ?`;
+    params.push(status);
+  }
   query += ` GROUP BY s.id ORDER BY s.date DESC, s.start_time DESC`;
   const rows = db.prepare(query).all(...params);
+  res.json(rows);
+});
+
+app.get('/api/appointments/upcoming', (req, res) => {
+  const today = new Date().toISOString().slice(0, 10);
+  const rows = db.prepare(`
+    SELECT s.id, s.date, s.start_time, s.end_time, s.description,
+           s.status, c.name as client_name
+    FROM services s
+    LEFT JOIN clients c ON s.client_id = c.id
+    WHERE s.status = 'scheduled' AND s.date >= ?
+    ORDER BY s.date ASC, s.start_time ASC
+  `).all(today);
   res.json(rows);
 });
 
@@ -233,7 +253,7 @@ app.post('/api/services', (req, res) => {
     date, start_time, end_time, duration_hours, discount_hours,
     client_id, description, value,
     hourmeter_start, hourmeter_end,
-    price_per_hour, travel_fee, discount, paid, tip, vat_rate
+    price_per_hour, travel_fee, discount, paid, tip, vat_rate, status
   } = req.body;
 
   if (!date) return res.status(400).json({ error: 'Date is required' });
@@ -250,8 +270,8 @@ app.post('/api/services', (req, res) => {
     INSERT INTO services
       (date, start_time, end_time, duration_hours, discount_hours, client_id, description, value,
        hourmeter_start, hourmeter_end, hourmeter_delta,
-       price_per_hour, travel_fee, discount, paid, tip, vat_rate)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+       price_per_hour, travel_fee, discount, paid, tip, vat_rate, status)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
   `).run(
     date, start_time || null, end_time || null,
     duration,
@@ -266,7 +286,8 @@ app.post('/api/services', (req, res) => {
     discount ? parseFloat(discount) : null,
     paid ? 1 : 0,
     tip ? parseFloat(tip) : 0,
-    vat_rate != null && vat_rate !== '' ? parseFloat(vat_rate) : null
+    vat_rate != null && vat_rate !== '' ? parseFloat(vat_rate) : null,
+    status === 'scheduled' ? 'scheduled' : 'completed'
   );
 
   res.json({ id: result.lastInsertRowid });
@@ -277,7 +298,7 @@ app.put('/api/services/:id', (req, res) => {
     date, start_time, end_time, duration_hours, discount_hours,
     client_id, description, value,
     hourmeter_start, hourmeter_end,
-    price_per_hour, travel_fee, discount, paid, tip, vat_rate
+    price_per_hour, travel_fee, discount, paid, tip, vat_rate, status
   } = req.body;
 
   let delta = null;
@@ -293,7 +314,7 @@ app.put('/api/services/:id', (req, res) => {
       date=?, start_time=?, end_time=?, duration_hours=?, discount_hours=?,
       client_id=?, description=?, value=?,
       hourmeter_start=?, hourmeter_end=?, hourmeter_delta=?,
-      price_per_hour=?, travel_fee=?, discount=?, paid=?, tip=?, vat_rate=?
+      price_per_hour=?, travel_fee=?, discount=?, paid=?, tip=?, vat_rate=?, status=?
     WHERE id=?
   `).run(
     date, start_time || null, end_time || null,
@@ -310,6 +331,7 @@ app.put('/api/services/:id', (req, res) => {
     paid ? 1 : 0,
     tip ? parseFloat(tip) : 0,
     vat_rate != null && vat_rate !== '' ? parseFloat(vat_rate) : null,
+    status === 'scheduled' ? 'scheduled' : 'completed',
     req.params.id
   );
 
@@ -376,10 +398,10 @@ app.delete('/api/attachments/:id', (req, res) => {
 // When month+year are absent, returns all-time totals (global view)
 app.get('/api/summary', (req, res) => {
   const { month, year } = req.query;
-  let where = '1=1';
+  let where = `(status = 'completed' OR status IS NULL)`;
   const params = [];
   if (month && year) {
-    where = `strftime('%Y-%m', date) = ?`;
+    where = `strftime('%Y-%m', date) = ? AND (status = 'completed' OR status IS NULL)`;
     params.push(`${year}-${month.padStart(2,'0')}`);
   }
 
@@ -423,20 +445,22 @@ app.get('/api/export/csv', (req, res) => {
            s.value, s.paid,
            ROUND(s.tip,2) as tip,
            s.hourmeter_start, s.hourmeter_end,
-           ROUND(s.hourmeter_delta,2) as hourmeter_delta
+           ROUND(s.hourmeter_delta,2) as hourmeter_delta,
+           COALESCE(s.status,'completed') as status
     FROM services s
     LEFT JOIN clients c ON s.client_id = c.id
     ORDER BY s.date DESC
   `).all();
 
-  const header = 'Date,Start,End,Discount(h),Duration(h),Client,Description,Price/h,Travel,Discount(€),Value(€),Paid,Tip(€),Hourmeter.Start,Hourmeter.End,Hourmeter.Delta\n';
+  const header = 'Date,Start,End,Discount(h),Duration(h),Client,Description,Price/h,Travel,Discount(€),Value(€),Paid,Tip(€),Hourmeter.Start,Hourmeter.End,Hourmeter.Delta,Status\n';
   const csv = header + rows.map(r =>
     [r.date, r.start_time||'', r.end_time||'', r.discount_hours||0, r.duration_hours||'',
      `"${r.client||''}"`, `"${r.description||''}"`,
      r.price_per_hour||'', r.travel_fee||'', r.discount||'',
      r.value||'', r.paid ? 'Yes' : 'No',
      r.tip||0,
-     r.hourmeter_start||'', r.hourmeter_end||'', r.hourmeter_delta||'']
+     r.hourmeter_start||'', r.hourmeter_end||'', r.hourmeter_delta||'',
+     r.status]
     .join(',')
   ).join('\n');
 
