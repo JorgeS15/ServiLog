@@ -7,6 +7,7 @@ const TRANSLATIONS = {
     stat_services: 'Serviços', stat_hours: 'Horas Trab.', stat_received: 'Recebido',
     stat_pending: 'Pendente', stat_billed: 'Total Faturado', stat_horimetro: 'Horímetro',
     stat_tips: 'Gorjetas', stat_horimetro_sub: 'delta do período',
+    stat_net: 'Líquido (s/ IVA)', stat_gross: 'Bruto (c/ IVA)',
     by_client: 'Por Cliente',
     no_data: 'Sem dados', no_data_sub: 'Regista o primeiro serviço deste mês',
     no_services: 'Sem serviços', no_services_sub: 'Toca no botão + para registar',
@@ -53,6 +54,27 @@ const TRANSLATIONS = {
     settings_date_range: 'Período de dados', settings_version: 'Versão',
     tip_badge: 'gorjeta',
     serv_abbr: 'serv.', discount_abbr: 'desc.',
+    form_pictures: 'Fotos', form_pictures_add: 'Adicionar fotos',
+    form_pictures_loading: 'A carregar...', form_pictures_empty: 'Sem fotos',
+    toast_picture_uploaded: 'Foto adicionada ✓', toast_picture_deleted: 'Foto eliminada',
+    confirm_delete_picture: 'Eliminar esta foto?',
+    settings_invoice: 'Dados para Faturas',
+    invoice_issuer_name: 'Nome / Empresa', invoice_issuer_name_placeholder: 'ex: João Silva - Serviços Agrícolas',
+    invoice_issuer_address: 'Morada', invoice_issuer_address_placeholder: 'ex: Rua Principal 10, 3000-000 Coimbra',
+    invoice_issuer_nif: 'NIF', invoice_issuer_nif_placeholder: 'ex: 123456789',
+    invoice_issuer_email: 'Email', invoice_issuer_email_placeholder: 'ex: joao@email.com',
+    invoice_footer_note: 'Nota de rodapé', invoice_footer_note_placeholder: 'ex: Pagamento a 30 dias',
+    invoice_btn: '📄 Fatura',
+    invoice_title: 'FATURA', invoice_ref: 'Ref.', invoice_date: 'Data',
+    invoice_issued_to: 'Faturado a', invoice_services: 'Serviços',
+    invoice_col_date: 'Data', invoice_col_desc: 'Descrição', invoice_col_hours: 'Horas',
+    invoice_col_rate: 'Preço/h', invoice_col_travel: 'Deslocação', invoice_col_discount: 'Desconto',
+    invoice_col_total: 'Total', invoice_subtotal: 'Subtotal', invoice_total: 'Total',
+    invoice_tip: 'Valor adicional', invoice_status_paid: 'PAGO', invoice_status_pending: 'PENDENTE',
+    invoice_print: 'Imprimir / Guardar PDF',
+    invoice_no_issuer: 'Configure os dados da fatura nas Definições antes de gerar uma fatura.',
+    form_vat: 'IVA', form_vat_none: 'Sem IVA', form_vat_include: 'Com IVA',
+    form_vat_rate: 'Taxa IVA (%)', form_vat_amount: 'Valor IVA', form_vat_gross: 'Total c/ IVA',
   },
   en: {
     months: ['January','February','March','April','May','June','July','August','September','October','November','December'],
@@ -61,6 +83,7 @@ const TRANSLATIONS = {
     stat_services: 'Services', stat_hours: 'Work Hours', stat_received: 'Received',
     stat_pending: 'Pending', stat_billed: 'Total Billed', stat_horimetro: 'Hourmeter',
     stat_tips: 'Tips', stat_horimetro_sub: 'period delta',
+    stat_net: 'Net (excl. VAT)', stat_gross: 'Gross (incl. VAT)',
     by_client: 'By Client',
     no_data: 'No data', no_data_sub: 'Register the first service of this month',
     no_services: 'No services', no_services_sub: 'Tap the + button to register',
@@ -107,6 +130,27 @@ const TRANSLATIONS = {
     settings_date_range: 'Data range', settings_version: 'Version',
     tip_badge: 'tip',
     serv_abbr: 'svc.', discount_abbr: 'disc.',
+    form_pictures: 'Pictures', form_pictures_add: 'Add pictures',
+    form_pictures_loading: 'Loading...', form_pictures_empty: 'No pictures',
+    toast_picture_uploaded: 'Picture added ✓', toast_picture_deleted: 'Picture deleted',
+    confirm_delete_picture: 'Delete this picture?',
+    settings_invoice: 'Invoice Details',
+    invoice_issuer_name: 'Name / Business', invoice_issuer_name_placeholder: 'e.g. John Smith - Farm Services',
+    invoice_issuer_address: 'Address', invoice_issuer_address_placeholder: 'e.g. 10 Main St, Springfield',
+    invoice_issuer_nif: 'Tax/VAT No.', invoice_issuer_nif_placeholder: 'e.g. 123456789',
+    invoice_issuer_email: 'Email', invoice_issuer_email_placeholder: 'e.g. john@email.com',
+    invoice_footer_note: 'Footer note', invoice_footer_note_placeholder: 'e.g. Payment due in 30 days',
+    invoice_btn: '📄 Invoice',
+    invoice_title: 'INVOICE', invoice_ref: 'Ref.', invoice_date: 'Date',
+    invoice_issued_to: 'Bill to', invoice_services: 'Services',
+    invoice_col_date: 'Date', invoice_col_desc: 'Description', invoice_col_hours: 'Hours',
+    invoice_col_rate: 'Rate/h', invoice_col_travel: 'Travel', invoice_col_discount: 'Discount',
+    invoice_col_total: 'Total', invoice_subtotal: 'Subtotal', invoice_total: 'Total',
+    invoice_tip: 'Additional', invoice_status_paid: 'PAID', invoice_status_pending: 'PENDING',
+    invoice_print: 'Print / Save as PDF',
+    invoice_no_issuer: 'Please configure your invoice details in Settings before generating an invoice.',
+    form_vat: 'VAT', form_vat_none: 'No VAT', form_vat_include: 'Include VAT',
+    form_vat_rate: 'VAT rate (%)', form_vat_amount: 'VAT amount', form_vat_gross: 'Gross total (w/ VAT)',
   },
 };
 
@@ -235,24 +279,27 @@ async function renderDashboard() {
 
     <div class="card-row" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
       <div class="stat-block">
-        <div class="stat-label">${t('stat_billed')}</div>
-        <div class="stat-value">${s.total_value ? s.total_value.toFixed(2) + ' ' + cur : '—'}</div>
+        <div class="stat-label">${t('stat_net')}</div>
+        <div class="stat-value">${s.total_net ? s.total_net.toFixed(2) + ' ' + cur : '—'}</div>
       </div>
+      <div class="stat-block">
+        <div class="stat-label">${t('stat_gross')}</div>
+        <div class="stat-value accent">${s.total_gross ? s.total_gross.toFixed(2) + ' ' + cur : '—'}</div>
+      </div>
+    </div>
+
+    <div class="card-row" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
       <div class="stat-block">
         <div class="stat-label">${t('stat_horimetro')}</div>
         <div class="stat-value">${s.total_hourmeter != null ? s.total_hourmeter + ' h' : '—'}</div>
         <div class="stat-sub">${t('stat_horimetro_sub')}</div>
       </div>
-    </div>
-
-    ${s.total_tips > 0 ? `
-    <div class="card-row" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+      ${s.total_tips > 0 ? `
       <div class="stat-block">
         <div class="stat-label">${t('stat_tips')}</div>
         <div class="stat-value accent">${s.total_tips.toFixed(2)} ${cur}</div>
-      </div>
-      <div class="stat-block"></div>
-    </div>` : ''}
+      </div>` : '<div class="stat-block"></div>'}
+    </div>
 
     ${byClient.length ? `
     <div class="card">
@@ -263,7 +310,7 @@ async function renderDashboard() {
           <div class="client-row-stats">
             <div class="client-row-stat"><strong>${c.services}</strong> ${t('serv_abbr')}</div>
             <div class="client-row-stat"><strong>${c.hours || '—'}</strong> h</div>
-            <div class="client-row-stat"><strong>${c.value ? c.value.toFixed(2) + ' ' + cur : '—'}</strong></div>
+            <div class="client-row-stat"><strong>${c.value ? c.value.toFixed(2) + ' ' + cur : '—'}</strong>${c.net != null && c.net !== c.value ? `<div style="font-size:10px;color:var(--text3)">${t('stat_net')}: ${c.net.toFixed(2)} ${cur}</div>` : ''}</div>
             ${c.tips > 0 ? `<div class="client-row-stat" style="color:var(--accent)"><strong>+${c.tips.toFixed(2)} ${cur}</strong></div>` : ''}
           </div>
         </div>
@@ -350,7 +397,7 @@ function serviceCard(s) {
     chips.push(`<span class="chip hora">⏱ ${s.duration_hours}h</span>`);
   }
   if (s.hourmeter_start != null || s.hourmeter_end != null) {
-    chips.push(`<span class="chip horim">⚙️ ${s.hourmeter_start ?? '?'} → ${s.hourmeter_end ?? '?'} h${s.hourmeter_delta != null ? ' (Δ' + s.hourmeter_delta + ')' : ''}</span>`);
+    chips.push(`<span class="chip horim">⚙️ ${s.hourmeter_start ?? '?'} → ${s.hourmeter_end ?? '?'} h${s.hourmeter_delta != null ? ' (Δ' + parseFloat(s.hourmeter_delta).toFixed(1) + ')' : ''}</span>`);
   }
   if (s.price_per_hour != null) {
     let billing = `${s.price_per_hour}${cur}/h`;
@@ -361,8 +408,20 @@ function serviceCard(s) {
   if (s.tip > 0) {
     chips.push(`<span class="chip billing" style="color:var(--accent)">+${parseFloat(s.tip).toFixed(2)}${cur} ${t('tip_badge')}</span>`);
   }
+  if (s.attachment_count > 0) {
+    chips.push(`<span class="chip">📷 ${s.attachment_count}</span>`);
+  }
+  if (s.vat_rate != null) {
+    chips.push(`<span class="chip">${t('form_vat')} ${parseFloat(s.vat_rate)}%</span>`);
+  }
 
-  const paymentTag = s.value != null
+  const grossValue = s.value != null
+    ? (s.vat_rate != null
+        ? parseFloat(s.value) * (1 + parseFloat(s.vat_rate) / 100)
+        : parseFloat(s.value))
+    : null;
+
+  const paymentTag = grossValue != null
     ? `<div class="payment-tag ${s.paid ? 'paid' : 'pending'}">${s.paid ? t('tag_paid') : t('tag_pending')}</div>`
     : '';
 
@@ -375,7 +434,7 @@ function serviceCard(s) {
           ${s.description ? `<div class="service-description">${escapeHtml(s.description)}</div>` : ''}
         </div>
         <div style="text-align:right;flex-shrink:0">
-          ${s.value != null ? `<div class="service-value">${parseFloat(s.value).toFixed(2)} ${cur}</div>` : ''}
+          ${grossValue != null ? `<div class="service-value">${grossValue.toFixed(2)} ${cur}</div>` : ''}
           ${paymentTag}
         </div>
       </div>
@@ -493,11 +552,39 @@ function serviceFormHtml(s = {}) {
       <div class="form-row">
         <div class="form-group">
           <label class="form-label">${t('form_total')}</label>
-          <input type="number" class="form-control" id="f-value" step="0.01" min="0" placeholder="${t('form_auto_or_manual')}" value="${s.value ?? ''}" oninput="calcTotal.manual=true">
+          <input type="number" class="form-control" id="f-value" step="0.01" min="0" placeholder="${t('form_auto_or_manual')}" value="${s.value ?? ''}" oninput="calcTotal.manual=true;updateVatDisplay()">
         </div>
         <div class="form-group">
           <label class="form-label">${t('form_tip')}</label>
           <input type="number" class="form-control" id="f-tip" step="0.01" min="0" placeholder="${t('form_tip_placeholder')}" value="${s.tip || ''}">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">${t('form_vat')}</label>
+          <select class="form-control" id="f-vat-enabled" onchange="onVatChange()">
+            <option value="0" ${s.vat_rate == null ? 'selected' : ''}>${t('form_vat_none')}</option>
+            <option value="1" ${s.vat_rate != null ? 'selected' : ''}>${t('form_vat_include')}</option>
+          </select>
+        </div>
+        <div class="form-group" id="f-vat-rate-grp" ${s.vat_rate == null ? 'style="display:none"' : ''}>
+          <label class="form-label">${t('form_vat_rate')}</label>
+          <input type="number" class="form-control" id="f-vat-rate" min="0" max="100" step="0.01"
+                 placeholder="23" value="${s.vat_rate != null ? s.vat_rate : 23}"
+                 oninput="updateVatDisplay()">
+        </div>
+      </div>
+      <div id="f-vat-gross-row" ${s.vat_rate == null ? 'style="display:none"' : ''}>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">${t('form_vat_amount')}</label>
+            <input type="number" class="form-control" id="f-vat-amount" readonly step="0.01" placeholder="—" style="color:var(--text2)">
+          </div>
+          <div class="form-group">
+            <label class="form-label">${t('form_vat_gross')}</label>
+            <input type="number" class="form-control" id="f-vat-gross" readonly step="0.01" placeholder="—" style="color:var(--accent);font-weight:700">
+          </div>
         </div>
       </div>
 
@@ -506,8 +593,21 @@ function serviceFormHtml(s = {}) {
         <textarea class="form-control" id="f-description" placeholder="${t('form_desc_placeholder')}">${s.description || ''}</textarea>
       </div>
 
+      ${s.id ? `
+      <hr class="divider">
+      <div class="section-title">${t('form_pictures')}</div>
+      <div id="pictures-grid" class="pictures-grid">
+        <span class="pictures-empty">${t('form_pictures_loading')}</span>
+      </div>
+      <label class="btn btn-secondary btn-sm" style="cursor:pointer;width:fit-content">
+        📷 ${t('form_pictures_add')}
+        <input type="file" accept="image/*" multiple style="display:none" onchange="uploadPictures(this, ${s.id})">
+      </label>
+      ` : ''}
+
       <div class="actions">
         ${s.id ? `<button class="btn btn-danger btn-sm" onclick="deleteService(${s.id})">${t('form_delete')}</button>` : ''}
+        ${s.id ? `<button class="btn btn-ghost btn-sm" onclick="generateInvoice(${s.id})">${t('invoice_btn')}</button>` : ''}
         <div style="flex:1"></div>
         <button class="btn btn-secondary" onclick="closeModal()">${t('form_cancel')}</button>
         <button class="btn btn-primary" onclick="saveService(${s.id || 0})">
@@ -540,14 +640,39 @@ window.calcDuration = function() {
 };
 
 window.calcTotal = function() {
-  if (calcTotal.manual) return;
-  const duration = parseFloat(document.getElementById('f-duration')?.value) || 0;
-  const pricePerHour = parseFloat(document.getElementById('f-price-per-hour')?.value) || 0;
-  if (!pricePerHour) return;
-  const travelFee = parseFloat(document.getElementById('f-travel-fee')?.value) || 0;
-  const discount = parseFloat(document.getElementById('f-discount')?.value) || 0;
-  const total = Math.max(0, (duration * pricePerHour) + travelFee - discount);
-  document.getElementById('f-value').value = total.toFixed(2);
+  if (!calcTotal.manual) {
+    const duration = parseFloat(document.getElementById('f-duration')?.value) || 0;
+    const pricePerHour = parseFloat(document.getElementById('f-price-per-hour')?.value) || 0;
+    if (pricePerHour) {
+      const travelFee = parseFloat(document.getElementById('f-travel-fee')?.value) || 0;
+      const discount = parseFloat(document.getElementById('f-discount')?.value) || 0;
+      const total = Math.max(0, (duration * pricePerHour) + travelFee - discount);
+      document.getElementById('f-value').value = total.toFixed(2);
+    }
+  }
+  updateVatDisplay();
+};
+
+window.onVatChange = function() {
+  const enabled = document.getElementById('f-vat-enabled')?.value === '1';
+  const rateGrp = document.getElementById('f-vat-rate-grp');
+  if (rateGrp) rateGrp.style.display = enabled ? '' : 'none';
+  updateVatDisplay();
+};
+
+window.updateVatDisplay = function() {
+  const grossRow = document.getElementById('f-vat-gross-row');
+  if (!grossRow) return;
+  const enabled = document.getElementById('f-vat-enabled')?.value === '1';
+  grossRow.style.display = enabled ? '' : 'none';
+  if (!enabled) return;
+  const net = parseFloat(document.getElementById('f-value')?.value) || 0;
+  const rate = parseFloat(document.getElementById('f-vat-rate')?.value) || 0;
+  const vatAmt = net * rate / 100;
+  const amountEl = document.getElementById('f-vat-amount');
+  const grossEl  = document.getElementById('f-vat-gross');
+  if (amountEl) amountEl.value = vatAmt.toFixed(2);
+  if (grossEl)  grossEl.value  = (net + vatAmt).toFixed(2);
 };
 
 window.calcHourmeter = function() {
@@ -581,6 +706,9 @@ function getFormData() {
     discount: document.getElementById('f-discount').value || null,
     paid: document.getElementById('f-paid').value === '1' ? 1 : 0,
     tip: document.getElementById('f-tip').value || null,
+    vat_rate: document.getElementById('f-vat-enabled').value === '1'
+      ? (parseFloat(document.getElementById('f-vat-rate').value) || 23)
+      : null,
   };
 }
 
@@ -626,8 +754,221 @@ async function editService(id) {
   const s = await api.get(`/api/services/${id}`);
   openModal(t('form_edit_service'), serviceFormHtml(s));
   calcHourmeter();
-  // Don't auto-recalc duration on edit — keep stored value
+  updateVatDisplay();
+  loadPictures(id);
 }
+
+window.loadPictures = async function(serviceId) {
+  const grid = document.getElementById('pictures-grid');
+  if (!grid) return;
+  const attachments = await api.get(`/api/services/${serviceId}/attachments`);
+  if (attachments.length === 0) {
+    grid.innerHTML = `<span class="pictures-empty">${t('form_pictures_empty')}</span>`;
+    return;
+  }
+  grid.innerHTML = attachments.map(a => `
+    <div class="picture-thumb">
+      <img src="/api/attachments/${a.id}" alt="${escapeHtml(a.original_name || '')}" loading="lazy" onclick="viewPicture(${a.id})">
+      <button class="picture-thumb-del" onclick="deletePicture(${a.id}, ${serviceId})" title="Delete">✕</button>
+    </div>
+  `).join('');
+};
+
+window.uploadPictures = async function(input, serviceId) {
+  const files = Array.from(input.files);
+  if (!files.length) return;
+  for (const file of files) {
+    const r = await fetch(`/api/services/${serviceId}/attachments?name=${encodeURIComponent(file.name)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': file.type || 'application/octet-stream' },
+      body: file,
+    });
+    const result = await r.json();
+    if (result.error) { toast(result.error, 'error'); input.value = ''; return; }
+  }
+  input.value = '';
+  toast(t('toast_picture_uploaded'));
+  loadPictures(serviceId);
+};
+
+window.deletePicture = async function(id, serviceId) {
+  if (!confirm(t('confirm_delete_picture'))) return;
+  await api.del(`/api/attachments/${id}`);
+  toast(t('toast_picture_deleted'));
+  loadPictures(serviceId);
+};
+
+window.viewPicture = function(id) {
+  window.open(`/api/attachments/${id}`, '_blank');
+};
+
+// ── Invoice generator ─────────────────────────────────────
+window.generateInvoice = async function(serviceId) {
+  const issuerName = (localStorage.getItem('inv_name') || '').trim();
+  if (!issuerName) { toast(t('invoice_no_issuer'), 'error'); return; }
+
+  const s = await api.get(`/api/services/${serviceId}`);
+  const cur = getCurrency();
+
+  const issuerAddress = (localStorage.getItem('inv_address') || '').trim();
+  const issuerNif    = (localStorage.getItem('inv_nif')     || '').trim();
+  const issuerEmail  = (localStorage.getItem('inv_email')   || '').trim();
+  const footerNote   = (localStorage.getItem('inv_note')    || '').trim();
+
+  const ref   = `F ${new Date().getFullYear()}/${String(serviceId).padStart(4, '0')}`;
+  const today = new Date().toLocaleDateString(state.lang === 'pt' ? 'pt-PT' : 'en-GB');
+
+  const esc   = str => (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const escNl = str => esc(str).replace(/\n/g,'<br>');
+  const fmt   = n   => (n != null && !isNaN(n)) ? parseFloat(n).toFixed(2) + '\u00a0' + cur : '—';
+
+  const valueAmt    = s.value      != null ? parseFloat(s.value)      : null;
+  const tipAmt      = s.tip        ?         parseFloat(s.tip)        : 0;
+  const travelAmt   = s.travel_fee ?         parseFloat(s.travel_fee) : 0;
+  const discountAmt = s.discount   ?         parseFloat(s.discount)   : 0;
+  const vatRate     = s.vat_rate   != null ? parseFloat(s.vat_rate)   : null;
+  const vatAmt      = vatRate != null && valueAmt != null ? valueAmt * vatRate / 100 : 0;
+  const grandTotal  = valueAmt != null ? valueAmt + vatAmt + tipAmt : null;
+  const isPaid      = !!s.paid;
+
+  const statusLabel = isPaid ? t('invoice_status_paid') : t('invoice_status_pending');
+  const statusBg    = isPaid ? 'rgba(46,204,113,0.12)'  : 'rgba(231,76,60,0.10)';
+  const statusColor = isPaid ? '#1a8a4a' : '#c0392b';
+
+  const descMain = s.description ? `<div class="td-main">${esc(s.description)}</div>` : '';
+  const descSub  = s.start_time
+    ? `<div class="td-sub">${s.start_time}${s.end_time ? '\u2013' + s.end_time : ''}</div>`
+    : '';
+  const descCell = descMain + descSub || '<span>—</span>';
+
+  const showRate     = s.price_per_hour != null;
+  const showTravel   = travelAmt > 0;
+  const showDiscount = discountAmt > 0;
+
+  const html = `<!DOCTYPE html>
+<html lang="${state.lang}">
+<head>
+<meta charset="UTF-8">
+<title>${t('invoice_title')} ${ref}</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Helvetica Neue',Arial,sans-serif;font-size:13px;color:#1a1e2e;background:#e8e8e8}
+.topbar{background:#1a1e2e;color:#fff;padding:10px 24px;display:flex;justify-content:space-between;align-items:center;gap:12px;position:sticky;top:0;z-index:10}
+.topbar-ref{font-size:12px;opacity:.6}
+.print-btn{background:#e8a020;color:#000;border:none;border-radius:6px;font-size:13px;font-weight:700;padding:8px 20px;cursor:pointer;letter-spacing:.02em}
+.page{max-width:800px;margin:24px auto 48px;background:#fff;padding:52px;box-shadow:0 4px 24px rgba(0,0,0,.12)}
+.inv-header{display:flex;justify-content:space-between;align-items:flex-start;gap:24px;margin-bottom:40px;padding-bottom:24px;border-bottom:3px solid #1a1e2e}
+.issuer-name{font-size:19px;font-weight:800;margin-bottom:6px}
+.issuer-detail{font-size:12px;color:#555c7a;line-height:1.9}
+.inv-right{text-align:right}
+.inv-title{font-size:38px;font-weight:900;letter-spacing:.06em;line-height:1;margin-bottom:10px}
+.inv-meta{font-size:12px;color:#555c7a;line-height:1.9}
+.inv-meta strong{color:#1a1e2e}
+.sec-label{font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#9098b0;margin-bottom:8px}
+.bill-to{margin-bottom:32px}
+.bill-name{font-size:16px;font-weight:700;margin-bottom:4px}
+.bill-detail{font-size:12px;color:#555c7a;line-height:1.9}
+table{width:100%;border-collapse:collapse;margin-bottom:24px}
+th{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#9098b0;padding:8px 10px;text-align:left;border-bottom:2px solid #d0d4de}
+th.r,td.r{text-align:right}
+td{padding:13px 10px;font-size:13px;border-bottom:1px solid #ebedf0;vertical-align:top}
+.td-main{font-weight:600}
+.td-sub{font-size:11px;color:#9098b0;margin-top:3px}
+.totals{display:flex;justify-content:flex-end;margin-bottom:28px}
+.totals-inner{width:250px}
+.tot-row{display:flex;justify-content:space-between;padding:5px 0;font-size:13px;color:#555c7a;border-bottom:1px solid #ebedf0}
+.tot-row.grand{font-size:16px;font-weight:800;color:#1a1e2e;padding-top:10px;border-top:2px solid #1a1e2e;border-bottom:none;margin-top:6px}
+.status-badge{display:inline-block;font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;padding:5px 16px;border-radius:20px;background:${statusBg};color:${statusColor};border:1.5px solid ${statusColor};margin-bottom:32px}
+.footer{border-top:1px solid #d0d4de;padding-top:14px;display:flex;justify-content:space-between;align-items:flex-end;font-size:11px;color:#9098b0;margin-top:40px}
+@media print{
+  body{background:#fff}
+  .topbar{display:none}
+  .page{margin:0;padding:36px;box-shadow:none;max-width:100%}
+}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <span class="topbar-ref">${t('invoice_title')} &middot; ${ref} &middot; ${today}</span>
+  <button class="print-btn" onclick="window.print()">${t('invoice_print')}</button>
+</div>
+<div class="page">
+  <div class="inv-header">
+    <div>
+      <div class="issuer-name">${esc(issuerName)}</div>
+      <div class="issuer-detail">
+        ${issuerAddress ? escNl(issuerAddress) + '<br>' : ''}
+        ${issuerNif    ? 'NIF: ' + esc(issuerNif) + '<br>' : ''}
+        ${issuerEmail  ? esc(issuerEmail) : ''}
+      </div>
+    </div>
+    <div class="inv-right">
+      <div class="inv-title">${t('invoice_title')}</div>
+      <div class="inv-meta">
+        <strong>${t('invoice_ref')}:</strong> ${ref}<br>
+        <strong>${t('invoice_date')}:</strong> ${today}
+      </div>
+    </div>
+  </div>
+
+  <div class="bill-to">
+    <div class="sec-label">${t('invoice_issued_to')}</div>
+    ${s.client_name
+      ? `<div class="bill-name">${esc(s.client_name)}</div>
+         <div class="bill-detail">
+           ${s.client_address ? escNl(s.client_address) + '<br>' : ''}
+           ${s.client_phone   ? esc(s.client_phone) : ''}
+         </div>`
+      : `<div class="bill-name">—</div>`
+    }
+  </div>
+
+  <div class="sec-label" style="margin-bottom:8px">${t('invoice_services')}</div>
+  <table>
+    <thead><tr>
+      <th>${t('invoice_col_date')}</th>
+      <th>${t('invoice_col_desc')}</th>
+      <th class="r">${t('invoice_col_hours')}</th>
+      ${showRate     ? `<th class="r">${t('invoice_col_rate')}</th>`     : ''}
+      ${showTravel   ? `<th class="r">${t('invoice_col_travel')}</th>`   : ''}
+      ${showDiscount ? `<th class="r">${t('invoice_col_discount')}</th>` : ''}
+      <th class="r">${t('invoice_col_total')}</th>
+    </tr></thead>
+    <tbody><tr>
+      <td style="white-space:nowrap">${formatDate(s.date)}</td>
+      <td>${descCell}</td>
+      <td class="r">${s.duration_hours != null ? s.duration_hours + '\u00a0h' : '—'}</td>
+      ${showRate     ? `<td class="r">${fmt(s.price_per_hour)}</td>` : ''}
+      ${showTravel   ? `<td class="r">${fmt(travelAmt)}</td>`        : ''}
+      ${showDiscount ? `<td class="r">-${fmt(discountAmt)}</td>`     : ''}
+      <td class="r"><strong>${fmt(valueAmt)}</strong></td>
+    </tr></tbody>
+  </table>
+
+  <div class="totals">
+    <div class="totals-inner">
+      ${valueAmt != null ? `<div class="tot-row"><span>${t('invoice_subtotal')}</span><span>${fmt(valueAmt)}</span></div>` : ''}
+      ${vatRate != null ? `<div class="tot-row"><span>${t('form_vat')} (${vatRate}%)</span><span>+${fmt(vatAmt)}</span></div>` : ''}
+      ${tipAmt ? `<div class="tot-row"><span>${t('invoice_tip')}</span><span>+${fmt(tipAmt)}</span></div>` : ''}
+      <div class="tot-row grand"><span>${t('invoice_total')}</span><span>${fmt(grandTotal)}</span></div>
+    </div>
+  </div>
+
+  <div class="status-badge">${statusLabel}</div>
+
+  <div class="footer">
+    <div>${footerNote ? escNl(footerNote) : ''}</div>
+    <div>${esc(issuerName)}</div>
+  </div>
+</div>
+</body>
+</html>`;
+
+  const w = window.open('', '_blank');
+  if (!w) { toast('Popup blocked — allow popups for this site', 'error'); return; }
+  w.document.write(html);
+  w.document.close();
+};
 
 function newService() {
   openModal(t('form_new_service'), serviceFormHtml());
@@ -831,7 +1172,7 @@ async function renderSettings() {
           ${t('settings_backup_restore')}
         </button>
       </div>
-      <input type="file" id="restore-input" accept=".db,.sqlite,application/octet-stream"
+      <input type="file" id="restore-input" accept=".slb,.db,.sqlite,application/octet-stream"
              style="display:none" onchange="doRestore(this)">
     </div>
 
@@ -872,6 +1213,42 @@ async function renderSettings() {
           <input type="text" class="form-control" maxlength="3" value="${escapeHtml(currency)}"
                  oninput="saveSetting('currency', this.value)">
         </div>
+      </div>
+    </div>
+
+    <!-- Invoice Details -->
+    <div class="card" style="margin-bottom:12px">
+      <div class="section-title" style="margin-bottom:12px">${t('settings_invoice')}</div>
+      <div class="form-group">
+        <label class="form-label">${t('invoice_issuer_name')}</label>
+        <input type="text" class="form-control" placeholder="${t('invoice_issuer_name_placeholder')}"
+               value="${escapeHtml(localStorage.getItem('inv_name') || '')}"
+               oninput="saveSetting('inv_name', this.value)">
+      </div>
+      <div class="form-group">
+        <label class="form-label">${t('invoice_issuer_address')}</label>
+        <textarea class="form-control" style="min-height:56px" placeholder="${t('invoice_issuer_address_placeholder')}"
+                  oninput="saveSetting('inv_address', this.value)">${escapeHtml(localStorage.getItem('inv_address') || '')}</textarea>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">${t('invoice_issuer_nif')}</label>
+          <input type="text" class="form-control" placeholder="${t('invoice_issuer_nif_placeholder')}"
+                 value="${escapeHtml(localStorage.getItem('inv_nif') || '')}"
+                 oninput="saveSetting('inv_nif', this.value)">
+        </div>
+        <div class="form-group">
+          <label class="form-label">${t('invoice_issuer_email')}</label>
+          <input type="email" class="form-control" placeholder="${t('invoice_issuer_email_placeholder')}"
+                 value="${escapeHtml(localStorage.getItem('inv_email') || '')}"
+                 oninput="saveSetting('inv_email', this.value)">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">${t('invoice_footer_note')}</label>
+        <input type="text" class="form-control" placeholder="${t('invoice_footer_note_placeholder')}"
+               value="${escapeHtml(localStorage.getItem('inv_note') || '')}"
+               oninput="saveSetting('inv_note', this.value)">
       </div>
     </div>
 

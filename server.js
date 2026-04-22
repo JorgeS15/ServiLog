@@ -12,6 +12,9 @@ const DB_PATH = process.env.DB_PATH || '/data/tracker.db';
 const dataDir = path.dirname(DB_PATH);
 if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 
+const UPLOADS_DIR = path.join(dataDir, 'uploads');
+if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+
 // Use let so the restore endpoint can close and reopen the connection
 let db = new Database(DB_PATH);
 
@@ -43,12 +46,19 @@ db.exec(`
     hourmeter_start REAL,
     hourmeter_end REAL,
     hourmeter_delta REAL,
+    vat_rate REAL DEFAULT NULL,
     created_at TEXT DEFAULT (datetime('now','localtime'))
   );
 
-  INSERT OR IGNORE INTO clients (name) VALUES
-    ('Particular'),
-    ('Sem cliente');
+  CREATE TABLE IF NOT EXISTS service_attachments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    service_id INTEGER NOT NULL REFERENCES services(id),
+    filename TEXT NOT NULL,
+    original_name TEXT,
+    mime_type TEXT,
+    size INTEGER,
+    created_at TEXT DEFAULT (datetime('now','localtime'))
+  );
 `);
 
 // Run all migrations — safe to call multiple times
@@ -104,6 +114,9 @@ function runMigrations() {
   if (colExists('services', 'horimetro_fim'))    db.exec('ALTER TABLE services RENAME COLUMN horimetro_fim TO hourmeter_end');
   if (colExists('services', 'horimetro_delta'))  db.exec('ALTER TABLE services RENAME COLUMN horimetro_delta TO hourmeter_delta');
   if (colExists('services', 'criado_em'))        db.exec('ALTER TABLE services RENAME COLUMN criado_em TO created_at');
+
+  // v1.2.2 — VAT rate
+  tryAlter(`ALTER TABLE services ADD COLUMN vat_rate REAL DEFAULT NULL`);
 }
 runMigrations();
 
@@ -163,9 +176,11 @@ app.delete('/api/clients/:id', (req, res) => {
 app.get('/api/services', (req, res) => {
   const { month, year, client_id } = req.query;
   let query = `
-    SELECT s.*, c.name as client_name
+    SELECT s.*, c.name as client_name,
+           COUNT(a.id) as attachment_count
     FROM services s
     LEFT JOIN clients c ON s.client_id = c.id
+    LEFT JOIN service_attachments a ON a.service_id = s.id
     WHERE 1=1
   `;
   const params = [];
@@ -177,14 +192,14 @@ app.get('/api/services', (req, res) => {
     query += ` AND s.client_id = ?`;
     params.push(client_id);
   }
-  query += ` ORDER BY s.date DESC, s.start_time DESC`;
+  query += ` GROUP BY s.id ORDER BY s.date DESC, s.start_time DESC`;
   const rows = db.prepare(query).all(...params);
   res.json(rows);
 });
 
 app.get('/api/services/:id', (req, res) => {
   const row = db.prepare(`
-    SELECT s.*, c.name as client_name
+    SELECT s.*, c.name as client_name, c.phone as client_phone, c.address as client_address
     FROM services s LEFT JOIN clients c ON s.client_id = c.id
     WHERE s.id = ?
   `).get(req.params.id);
@@ -218,14 +233,14 @@ app.post('/api/services', (req, res) => {
     date, start_time, end_time, duration_hours, discount_hours,
     client_id, description, value,
     hourmeter_start, hourmeter_end,
-    price_per_hour, travel_fee, discount, paid, tip
+    price_per_hour, travel_fee, discount, paid, tip, vat_rate
   } = req.body;
 
   if (!date) return res.status(400).json({ error: 'Date is required' });
 
   let delta = null;
   if (hourmeter_start != null && hourmeter_end != null) {
-    delta = parseFloat(hourmeter_end) - parseFloat(hourmeter_start);
+    delta = parseFloat((parseFloat(hourmeter_end) - parseFloat(hourmeter_start)).toFixed(2));
   }
 
   const duration = calcDuration(start_time, end_time, duration_hours, discount_hours);
@@ -235,8 +250,8 @@ app.post('/api/services', (req, res) => {
     INSERT INTO services
       (date, start_time, end_time, duration_hours, discount_hours, client_id, description, value,
        hourmeter_start, hourmeter_end, hourmeter_delta,
-       price_per_hour, travel_fee, discount, paid, tip)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+       price_per_hour, travel_fee, discount, paid, tip, vat_rate)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
   `).run(
     date, start_time || null, end_time || null,
     duration,
@@ -250,7 +265,8 @@ app.post('/api/services', (req, res) => {
     travel_fee ? parseFloat(travel_fee) : null,
     discount ? parseFloat(discount) : null,
     paid ? 1 : 0,
-    tip ? parseFloat(tip) : 0
+    tip ? parseFloat(tip) : 0,
+    vat_rate != null && vat_rate !== '' ? parseFloat(vat_rate) : null
   );
 
   res.json({ id: result.lastInsertRowid });
@@ -261,12 +277,12 @@ app.put('/api/services/:id', (req, res) => {
     date, start_time, end_time, duration_hours, discount_hours,
     client_id, description, value,
     hourmeter_start, hourmeter_end,
-    price_per_hour, travel_fee, discount, paid, tip
+    price_per_hour, travel_fee, discount, paid, tip, vat_rate
   } = req.body;
 
   let delta = null;
   if (hourmeter_start != null && hourmeter_end != null) {
-    delta = parseFloat(hourmeter_end) - parseFloat(hourmeter_start);
+    delta = parseFloat((parseFloat(hourmeter_end) - parseFloat(hourmeter_start)).toFixed(2));
   }
 
   const duration = calcDuration(start_time, end_time, duration_hours, discount_hours);
@@ -277,7 +293,7 @@ app.put('/api/services/:id', (req, res) => {
       date=?, start_time=?, end_time=?, duration_hours=?, discount_hours=?,
       client_id=?, description=?, value=?,
       hourmeter_start=?, hourmeter_end=?, hourmeter_delta=?,
-      price_per_hour=?, travel_fee=?, discount=?, paid=?, tip=?
+      price_per_hour=?, travel_fee=?, discount=?, paid=?, tip=?, vat_rate=?
     WHERE id=?
   `).run(
     date, start_time || null, end_time || null,
@@ -293,6 +309,7 @@ app.put('/api/services/:id', (req, res) => {
     discount ? parseFloat(discount) : null,
     paid ? 1 : 0,
     tip ? parseFloat(tip) : 0,
+    vat_rate != null && vat_rate !== '' ? parseFloat(vat_rate) : null,
     req.params.id
   );
 
@@ -300,7 +317,58 @@ app.put('/api/services/:id', (req, res) => {
 });
 
 app.delete('/api/services/:id', (req, res) => {
+  const attachments = db.prepare('SELECT filename FROM service_attachments WHERE service_id = ?').all(req.params.id);
+  attachments.forEach(a => { try { fs.unlinkSync(path.join(UPLOADS_DIR, a.filename)); } catch (_) {} });
+  db.prepare('DELETE FROM service_attachments WHERE service_id = ?').run(req.params.id);
   db.prepare('DELETE FROM services WHERE id = ?').run(req.params.id);
+  res.json({ ok: true });
+});
+
+// ── Service attachments ───────────────────────────────────
+app.get('/api/services/:id/attachments', (req, res) => {
+  const rows = db.prepare(
+    'SELECT id, original_name, mime_type, size, created_at FROM service_attachments WHERE service_id = ? ORDER BY created_at'
+  ).all(req.params.id);
+  res.json(rows);
+});
+
+app.post('/api/services/:id/attachments',
+  express.raw({ type: ['image/*', 'application/octet-stream'], limit: '20mb' }),
+  (req, res) => {
+    const service = db.prepare('SELECT id FROM services WHERE id = ?').get(req.params.id);
+    if (!service) return res.status(404).json({ error: 'Service not found' });
+    if (!Buffer.isBuffer(req.body) || req.body.length === 0) return res.status(400).json({ error: 'Empty file' });
+
+    const originalName = req.query.name ? decodeURIComponent(req.query.name) : 'photo';
+    const mimeType = (req.headers['content-type'] || 'application/octet-stream').split(';')[0].trim();
+    const extMap = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/gif': 'gif', 'image/webp': 'webp', 'image/heic': 'heic', 'image/heif': 'heif' };
+    const ext = extMap[mimeType] || originalName.split('.').pop() || 'bin';
+    const filename = `${req.params.id}_${Date.now()}_${Math.random().toString(36).slice(2,8)}.${ext}`;
+
+    fs.writeFileSync(path.join(UPLOADS_DIR, filename), req.body);
+
+    const result = db.prepare(
+      'INSERT INTO service_attachments (service_id, filename, original_name, mime_type, size) VALUES (?,?,?,?,?)'
+    ).run(req.params.id, filename, originalName, mimeType, req.body.length);
+
+    res.json({ id: result.lastInsertRowid });
+  }
+);
+
+app.get('/api/attachments/:id', (req, res) => {
+  const a = db.prepare('SELECT * FROM service_attachments WHERE id = ?').get(req.params.id);
+  if (!a) return res.status(404).json({ error: 'Not found' });
+  const filePath = path.join(UPLOADS_DIR, a.filename);
+  if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'File not found' });
+  res.setHeader('Content-Type', a.mime_type || 'application/octet-stream');
+  res.sendFile(path.resolve(filePath));
+});
+
+app.delete('/api/attachments/:id', (req, res) => {
+  const a = db.prepare('SELECT * FROM service_attachments WHERE id = ?').get(req.params.id);
+  if (!a) return res.status(404).json({ error: 'Not found' });
+  try { fs.unlinkSync(path.join(UPLOADS_DIR, a.filename)); } catch (_) {}
+  db.prepare('DELETE FROM service_attachments WHERE id = ?').run(req.params.id);
   res.json({ ok: true });
 });
 
@@ -319,9 +387,10 @@ app.get('/api/summary', (req, res) => {
     SELECT
       COUNT(*) as total_services,
       ROUND(SUM(duration_hours),2) as total_hours,
-      ROUND(SUM(value),2) as total_value,
-      ROUND(SUM(CASE WHEN paid=1 THEN COALESCE(value,0) + COALESCE(tip,0) ELSE 0 END),2) as total_received,
-      ROUND(SUM(CASE WHEN (paid=0 OR paid IS NULL) AND value IS NOT NULL THEN value ELSE 0 END),2) as total_pending,
+      ROUND(SUM(value),2) as total_net,
+      ROUND(SUM(COALESCE(value,0) * (1 + COALESCE(vat_rate,0)/100.0)),2) as total_gross,
+      ROUND(SUM(CASE WHEN paid=1 THEN COALESCE(value,0)*(1+COALESCE(vat_rate,0)/100.0) + COALESCE(tip,0) ELSE 0 END),2) as total_received,
+      ROUND(SUM(CASE WHEN (paid=0 OR paid IS NULL) AND value IS NOT NULL THEN value*(1+COALESCE(vat_rate,0)/100.0) ELSE 0 END),2) as total_pending,
       ROUND(SUM(hourmeter_delta),2) as total_hourmeter,
       ROUND(SUM(COALESCE(tip,0)),2) as total_tips
     FROM services WHERE ${where}
@@ -330,7 +399,8 @@ app.get('/api/summary', (req, res) => {
   const byClient = db.prepare(`
     SELECT c.name, COUNT(*) as services,
            ROUND(SUM(s.duration_hours),2) as hours,
-           ROUND(SUM(s.value),2) as value,
+           ROUND(SUM(s.value),2) as net,
+           ROUND(SUM(COALESCE(s.value,0) * (1 + COALESCE(s.vat_rate,0)/100.0)),2) as value,
            ROUND(SUM(COALESCE(s.tip,0)),2) as tips
     FROM services s
     LEFT JOIN clients c ON s.client_id = c.id
@@ -376,27 +446,81 @@ app.get('/api/export/csv', (req, res) => {
 });
 
 // ── Backup ────────────────────────────────────────────────
+// Bundle format (SLB1): magic(4) | dbSize(4 LE) | dbData | fileCount(4 LE)
+//   then per file: nameLen(4 LE) | name(UTF-8) | dataLen(4 LE) | data
 app.get('/api/backup/download', (req, res) => {
+  const dbBuf = fs.readFileSync(DB_PATH);
+  const files = [];
+  if (fs.existsSync(UPLOADS_DIR)) {
+    for (const name of fs.readdirSync(UPLOADS_DIR)) {
+      const p = path.join(UPLOADS_DIR, name);
+      if (fs.statSync(p).isFile()) files.push({ name, data: fs.readFileSync(p) });
+    }
+  }
+
+  const dbSizeBuf = Buffer.allocUnsafe(4); dbSizeBuf.writeUInt32LE(dbBuf.length, 0);
+  const countBuf  = Buffer.allocUnsafe(4); countBuf.writeUInt32LE(files.length, 0);
+  const parts = [Buffer.from('SLB1'), dbSizeBuf, dbBuf, countBuf];
+
+  for (const f of files) {
+    const nb  = Buffer.from(f.name, 'utf8');
+    const nlb = Buffer.allocUnsafe(4); nlb.writeUInt32LE(nb.length, 0);
+    const dsb = Buffer.allocUnsafe(4); dsb.writeUInt32LE(f.data.length, 0);
+    parts.push(nlb, nb, dsb, f.data);
+  }
+
   res.setHeader('Content-Type', 'application/octet-stream');
-  res.setHeader('Content-Disposition', 'attachment; filename="servilog-backup.db"');
-  res.sendFile(path.resolve(DB_PATH));
+  res.setHeader('Content-Disposition', 'attachment; filename="servilog-backup.slb"');
+  res.send(Buffer.concat(parts));
 });
 
 app.post('/api/backup/restore',
-  express.raw({ type: 'application/octet-stream', limit: '50mb' }),
+  express.raw({ type: 'application/octet-stream', limit: '500mb' }),
   (req, res) => {
-    if (!Buffer.isBuffer(req.body) || req.body.length < 16) {
+    if (!Buffer.isBuffer(req.body) || req.body.length < 8) {
       return res.status(400).json({ error: 'Invalid file' });
     }
-    const magic = req.body.slice(0, 16).toString('utf8');
-    if (!magic.startsWith('SQLite format 3')) {
-      return res.status(400).json({ error: 'Invalid file' });
+    const magic4 = req.body.slice(0, 4).toString('ascii');
+
+    if (magic4 === 'SLB1') {
+      try {
+        let off = 4;
+        const dbSize = req.body.readUInt32LE(off); off += 4;
+        const dbData = req.body.slice(off, off + dbSize); off += dbSize;
+        if (!dbData.slice(0, 15).toString('utf8').startsWith('SQLite format 3')) {
+          return res.status(400).json({ error: 'Invalid backup: bad database' });
+        }
+        const fileCount = req.body.readUInt32LE(off); off += 4;
+        const uploadFiles = [];
+        for (let i = 0; i < fileCount; i++) {
+          const nl   = req.body.readUInt32LE(off); off += 4;
+          const name = req.body.slice(off, off + nl).toString('utf8'); off += nl;
+          const dl   = req.body.readUInt32LE(off); off += 4;
+          const data = req.body.slice(off, off + dl); off += dl;
+          uploadFiles.push({ name, data });
+        }
+        db.close();
+        fs.writeFileSync(DB_PATH, dbData);
+        db = new Database(DB_PATH);
+        runMigrations();
+        if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+        for (const f of uploadFiles) {
+          fs.writeFileSync(path.join(UPLOADS_DIR, path.basename(f.name)), f.data);
+        }
+        res.json({ ok: true });
+      } catch (e) {
+        res.status(400).json({ error: 'Corrupt backup file' });
+      }
+    } else if (req.body.slice(0, 15).toString('utf8').startsWith('SQLite format 3')) {
+      // Legacy .db backup — no pictures
+      db.close();
+      fs.writeFileSync(DB_PATH, req.body);
+      db = new Database(DB_PATH);
+      runMigrations();
+      res.json({ ok: true });
+    } else {
+      res.status(400).json({ error: 'Invalid file' });
     }
-    db.close();
-    fs.writeFileSync(DB_PATH, req.body);
-    db = new Database(DB_PATH);
-    runMigrations();
-    res.json({ ok: true });
   }
 );
 
