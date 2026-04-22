@@ -1094,18 +1094,18 @@ function renderCalendarGrid(year, month, byDay, selectedDay) {
   for (let d = 1; d <= daysInMonth; d++) {
     const dateStr = `${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
     const services = byDay[dateStr] || [];
-    const hasCompleted = services.some(s => s.status !== 'scheduled');
-    const hasScheduled = services.some(s => s.status === 'scheduled');
     const isToday = dateStr === today;
     const isSelected = dateStr === selectedDay;
 
-    let dotHtml = '';
-    if (hasCompleted || hasScheduled) {
-      const dots = [];
-      if (hasCompleted) dots.push(`<span class="cal-dot dot-completed"></span>`);
-      if (hasScheduled) dots.push(`<span class="cal-dot dot-scheduled"></span>`);
-      dotHtml = `<div class="cal-dots">${dots.join('')}</div>`;
-    }
+    const MAX_CHIPS = 2;
+    const chips = services.slice(0, MAX_CHIPS).map(s => {
+      const label = escapeHtml((s.client_name || s.description || '—').slice(0, 12));
+      const cls = s.status === 'scheduled' ? 'cal-event-scheduled' : 'cal-event-completed';
+      return `<div class="cal-event ${cls}" onclick="event.stopPropagation();editService(${s.id})">${label}</div>`;
+    }).join('');
+    const overflow = services.length > MAX_CHIPS
+      ? `<div class="cal-event-more">+${services.length - MAX_CHIPS}</div>`
+      : '';
 
     const classes = ['cal-cell',
       isToday ? 'cal-today' : '',
@@ -1115,7 +1115,7 @@ function renderCalendarGrid(year, month, byDay, selectedDay) {
     cells.push(`
       <div class="${classes}" data-date="${dateStr}" onclick="selectCalDay('${dateStr}')">
         <span class="cal-day-num">${d}</span>
-        ${dotHtml}
+        ${chips}${overflow}
       </div>`);
   }
 
