@@ -355,15 +355,24 @@ app.get('/api/services/:id/attachments', (req, res) => {
 });
 
 app.post('/api/services/:id/attachments',
-  express.raw({ type: ['image/*', 'application/octet-stream'], limit: '20mb' }),
+  express.raw({ type: '*/*', limit: '100mb' }),
   (req, res) => {
     const service = db.prepare('SELECT id FROM services WHERE id = ?').get(req.params.id);
     if (!service) return res.status(404).json({ error: 'Service not found' });
     if (!Buffer.isBuffer(req.body) || req.body.length === 0) return res.status(400).json({ error: 'Empty file' });
 
-    const originalName = req.query.name ? decodeURIComponent(req.query.name) : 'photo';
+    const originalName = req.query.name ? decodeURIComponent(req.query.name) : 'file';
     const mimeType = (req.headers['content-type'] || 'application/octet-stream').split(';')[0].trim();
-    const extMap = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/gif': 'gif', 'image/webp': 'webp', 'image/heic': 'heic', 'image/heif': 'heif' };
+    const extMap = {
+      'image/jpeg': 'jpg', 'image/png': 'png', 'image/gif': 'gif',
+      'image/webp': 'webp', 'image/heic': 'heic', 'image/heif': 'heif',
+      'video/mp4': 'mp4', 'video/quicktime': 'mov', 'video/x-msvideo': 'avi',
+      'video/webm': 'webm', 'application/pdf': 'pdf',
+      'application/msword': 'doc',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+      'application/vnd.ms-excel': 'xls',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
+    };
     const ext = extMap[mimeType] || originalName.split('.').pop() || 'bin';
     const filename = `${req.params.id}_${Date.now()}_${Math.random().toString(36).slice(2,8)}.${ext}`;
 
@@ -552,10 +561,17 @@ app.post('/api/backup/restore',
 app.get('/api/stats', (req, res) => {
   const totalServices = db.prepare('SELECT COUNT(*) as n FROM services').get().n;
   const totalClients = db.prepare('SELECT COUNT(*) as n FROM clients').get().n;
+  const totalAttachments = db.prepare('SELECT COUNT(*) as n FROM service_attachments').get().n;
   const dateRange = db.prepare('SELECT MIN(date) as first, MAX(date) as last FROM services').get();
   let dbSizeBytes = 0;
+  let uploadsSizeBytes = 0;
   try { dbSizeBytes = fs.statSync(DB_PATH).size; } catch (_) {}
-  res.json({ totalServices, totalClients, dbSizeBytes, dateRange });
+  try {
+    for (const name of fs.readdirSync(UPLOADS_DIR)) {
+      try { uploadsSizeBytes += fs.statSync(path.join(UPLOADS_DIR, name)).size; } catch (_) {}
+    }
+  } catch (_) {}
+  res.json({ totalServices, totalClients, totalAttachments, dbSizeBytes, uploadsSizeBytes, dateRange });
 });
 
 app.listen(PORT, () => console.log(`ServiLog running on port ${PORT}`));
