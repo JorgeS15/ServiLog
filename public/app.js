@@ -84,6 +84,13 @@ const TRANSLATIONS = {
     agenda_day_services: 'Serviços do dia', agenda_no_day: 'Sem serviços neste dia',
     months_short: ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'],
     weekdays_short: ['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'],
+    map_pick: '📍 Selecionar no mapa',
+    map_search_placeholder: 'Pesquisar morada...',
+    map_drag_hint: 'Clique no mapa ou arraste o pin para selecionar',
+    map_confirm: 'Confirmar morada',
+    map_my_location: 'A minha localização',
+    map_no_results: 'Sem resultados',
+    map_locating: 'A localizar...',
   },
   en: {
     months: ['January','February','March','April','May','June','July','August','September','October','November','December'],
@@ -169,6 +176,13 @@ const TRANSLATIONS = {
     agenda_day_services: 'Services on this day', agenda_no_day: 'No services on this day',
     months_short: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
     weekdays_short: ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],
+    map_pick: '📍 Pick on map',
+    map_search_placeholder: 'Search address...',
+    map_drag_hint: 'Click the map or drag the pin to select',
+    map_confirm: 'Confirm address',
+    map_my_location: 'My location',
+    map_no_results: 'No results',
+    map_locating: 'Locating...',
   },
 };
 
@@ -1204,6 +1218,154 @@ window.scheduleNew = function() {
   openModal(t('form_new_service'), serviceFormHtml({ date, status: 'scheduled' }));
 };
 
+// ── Map picker ────────────────────────────────────────────
+const mapPicker = { map: null, marker: null, targetId: null, resolvedAddress: '' };
+
+window.openMapPicker = function(targetInputId) {
+  mapPicker.targetId = targetInputId;
+  mapPicker.resolvedAddress = '';
+
+  const overlay = document.getElementById('map-picker-overlay');
+  overlay.classList.remove('hidden');
+
+  // Update i18n strings in the static HTML
+  document.getElementById('map-search-input').placeholder = t('map_search_placeholder');
+  document.getElementById('map-resolved-address').textContent = t('map_drag_hint');
+  overlay.querySelector('.map-picker-footer .btn-primary').textContent = t('map_confirm');
+  document.getElementById('map-search-results').innerHTML = '';
+  document.getElementById('map-search-input').value = '';
+
+  requestAnimationFrame(() => {
+    if (!mapPicker.map) {
+      // Default center: Portugal
+      mapPicker.map = L.map('map-leaflet').setView([39.5, -8.0], 6);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© <a href="https://www.openstreetmap.org">OpenStreetMap</a>',
+        maxZoom: 19,
+      }).addTo(mapPicker.map);
+
+      mapPicker.marker = L.marker([39.5, -8.0], { draggable: true }).addTo(mapPicker.map);
+      mapPicker.marker.on('dragend', () => {
+        const { lat, lng } = mapPicker.marker.getLatLng();
+        reverseGeocode(lat, lng);
+      });
+      mapPicker.map.on('click', e => {
+        mapPicker.marker.setLatLng(e.latlng);
+        reverseGeocode(e.latlng.lat, e.latlng.lng);
+      });
+    } else {
+      mapPicker.map.invalidateSize();
+    }
+
+    // If there's an existing address, try to show it on the map
+    const existing = document.getElementById(targetInputId)?.value?.trim();
+    if (existing) geocodeForMap(existing);
+  });
+};
+
+async function reverseGeocode(lat, lng) {
+  const hint = document.getElementById('map-resolved-address');
+  hint.textContent = t('map_locating');
+  try {
+    const r = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`,
+      { headers: { 'Accept-Language': state.lang === 'pt' ? 'pt' : 'en' } }
+    );
+    const data = await r.json();
+    const addr = buildAddressString(data.address) || data.display_name || `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+    mapPicker.resolvedAddress = addr;
+    hint.textContent = addr;
+  } catch (_) {
+    const coords = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+    mapPicker.resolvedAddress = coords;
+    hint.textContent = coords;
+  }
+}
+
+function buildAddressString(a) {
+  if (!a) return '';
+  const parts = [];
+  if (a.road) parts.push(a.house_number ? `${a.road} ${a.house_number}` : a.road);
+  const city = a.city || a.town || a.village || a.municipality || a.county;
+  if (city) parts.push(city);
+  if (a.postcode) parts.push(a.postcode);
+  if (a.country && parts.length < 2) parts.push(a.country);
+  return parts.join(', ');
+}
+
+async function geocodeForMap(query) {
+  try {
+    const r = await fetch(
+      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`,
+      { headers: { 'Accept-Language': state.lang === 'pt' ? 'pt' : 'en' } }
+    );
+    const data = await r.json();
+    if (data[0]) {
+      const lat = parseFloat(data[0].lat);
+      const lon = parseFloat(data[0].lon);
+      mapPicker.map.setView([lat, lon], 15);
+      mapPicker.marker.setLatLng([lat, lon]);
+      mapPicker.resolvedAddress = query;
+      document.getElementById('map-resolved-address').textContent = query;
+    }
+  } catch (_) {}
+}
+
+let mapSearchTimeout;
+window.onMapSearch = function(query) {
+  clearTimeout(mapSearchTimeout);
+  const results = document.getElementById('map-search-results');
+  if (!query.trim()) { results.innerHTML = ''; return; }
+  mapSearchTimeout = setTimeout(async () => {
+    try {
+      const r = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=5&addressdetails=1`,
+        { headers: { 'Accept-Language': state.lang === 'pt' ? 'pt' : 'en' } }
+      );
+      const data = await r.json();
+      results.innerHTML = data.length
+        ? data.map(item => `
+            <div class="map-search-result" onclick="selectMapResult(${item.lat},${item.lon})">
+              ${escapeHtml(item.display_name)}
+            </div>`).join('')
+        : `<div class="map-search-result map-no-result">${t('map_no_results')}</div>`;
+    } catch (_) {}
+  }, 400);
+};
+
+window.selectMapResult = function(lat, lon) {
+  const latlng = [parseFloat(lat), parseFloat(lon)];
+  mapPicker.map.setView(latlng, 16);
+  mapPicker.marker.setLatLng(latlng);
+  document.getElementById('map-search-results').innerHTML = '';
+  document.getElementById('map-search-input').value = '';
+  reverseGeocode(lat, lon);
+};
+
+window.useMyLocation = function() {
+  if (!navigator.geolocation) { toast('Geolocation not supported', 'error'); return; }
+  document.getElementById('map-resolved-address').textContent = t('map_locating');
+  navigator.geolocation.getCurrentPosition(pos => {
+    const { latitude, longitude } = pos.coords;
+    mapPicker.map.setView([latitude, longitude], 16);
+    mapPicker.marker.setLatLng([latitude, longitude]);
+    reverseGeocode(latitude, longitude);
+  }, () => toast(t('map_locating'), 'error'));
+};
+
+window.confirmMapPicker = function() {
+  if (mapPicker.resolvedAddress && mapPicker.targetId) {
+    const input = document.getElementById(mapPicker.targetId);
+    if (input) { input.value = mapPicker.resolvedAddress; input.dispatchEvent(new Event('input')); }
+  }
+  closeMapPicker();
+};
+
+window.closeMapPicker = function() {
+  document.getElementById('map-picker-overlay').classList.add('hidden');
+  document.getElementById('map-search-results').innerHTML = '';
+};
+
 // ── Clients ───────────────────────────────────────────────
 async function renderClients() {
   const el = document.getElementById('view-clients');
@@ -1226,6 +1388,7 @@ async function renderClients() {
       <div class="form-group">
         <label class="form-label">${t('client_address')}</label>
         <input type="text" class="form-control" id="new-client-address" placeholder="${t('client_address_placeholder')}">
+        <button class="btn btn-ghost btn-sm" style="margin-top:6px" type="button" onclick="openMapPicker('new-client-address')">${t('map_pick')}</button>
       </div>
       <button class="btn btn-primary" onclick="addClient()" style="width:100%">${t('client_add')}</button>
     </div>
@@ -1286,6 +1449,7 @@ window.editClient = function(id) {
     <div class="form-group">
       <label class="form-label">${t('client_address')}</label>
       <input type="text" class="form-control" id="edit-client-address" value="${escapeHtml(c.address || '')}" placeholder="${t('client_address_placeholder')}">
+      <button class="btn btn-ghost btn-sm" style="margin-top:6px" type="button" onclick="openMapPicker('edit-client-address')">${t('map_pick')}</button>
     </div>
     <div style="display:flex;gap:8px;margin-top:8px">
       <button class="btn btn-secondary" style="flex:1" onclick="closeModal()">${t('form_cancel')}</button>

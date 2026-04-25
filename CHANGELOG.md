@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.4.0] - 2026-04-22
+
+### Added
+- **Map picker** for client address: "📍 Pick on map" button opens an OpenStreetMap panel (Leaflet.js, no API key required)
+  - Click or drag the pin → address auto-filled via Nominatim reverse geocoding
+  - Address search box with live results and 400 ms debounce
+  - "My location" button uses the device GPS
+  - Pre-centers on the existing address when re-opened
+- **Agenda calendar**: day cells now show full event chips (client name, colour-coded orange/blue) instead of dots; clicking a chip opens the service directly; "+N" overflow indicator for busy days
+- **File attachments**: services now accept any file type — images, video (MP4, MOV, WebM), PDF, Word, Excel — up to 100 MB; non-image files display a 🎬 / 📄 / 📎 icon
+
+### Fixed
+- Storage statistics now correctly report uploads folder size separately from the SQLite database, plus a combined total — previously only the DB file was counted
+
+### Changed
+- Attachment section renamed from "Fotos / Photos" to "Anexos / Attachments"
+
 ## [1.3.0] - 2026-04-22
 
 ### Added
