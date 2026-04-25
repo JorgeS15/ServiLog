@@ -120,6 +120,12 @@ function runMigrations() {
 
   // v1.3.0 — scheduling status
   tryAlter(`ALTER TABLE services ADD COLUMN status TEXT DEFAULT 'completed'`);
+
+  // v1.5.0 — split price_per_hour into operator_rate + machine_rate
+  tryAlter(`ALTER TABLE services ADD COLUMN operator_rate REAL DEFAULT 0`);
+  tryAlter(`ALTER TABLE services ADD COLUMN machine_rate REAL DEFAULT 0`);
+  db.prepare(`UPDATE services SET operator_rate = COALESCE(price_per_hour, 0)
+    WHERE price_per_hour IS NOT NULL AND operator_rate = 0`).run();
 }
 runMigrations();
 
@@ -240,9 +246,10 @@ function calcDuration(start_time, end_time, duration_hours, discount_hours) {
   return parseFloat(duration.toFixed(4));
 }
 
-function calcValueAuto(duration, price_per_hour, travel_fee, discount) {
-  if (!price_per_hour || !duration) return null;
-  let total = parseFloat(price_per_hour) * parseFloat(duration);
+function calcValueAuto(duration, operator_rate, machine_rate, travel_fee, discount) {
+  const totalRate = (parseFloat(operator_rate) || 0) + (parseFloat(machine_rate) || 0);
+  if (!totalRate || !duration) return null;
+  let total = totalRate * parseFloat(duration);
   if (travel_fee) total += parseFloat(travel_fee);
   if (discount) total = Math.max(0, total - parseFloat(discount));
   return parseFloat(total.toFixed(2));
@@ -253,7 +260,7 @@ app.post('/api/services', (req, res) => {
     date, start_time, end_time, duration_hours, discount_hours,
     client_id, description, value,
     hourmeter_start, hourmeter_end,
-    price_per_hour, travel_fee, discount, paid, tip, vat_rate, status
+    operator_rate, machine_rate, travel_fee, discount, paid, tip, vat_rate, status
   } = req.body;
 
   if (!date) return res.status(400).json({ error: 'Date is required' });
@@ -264,14 +271,14 @@ app.post('/api/services', (req, res) => {
   }
 
   const duration = calcDuration(start_time, end_time, duration_hours, discount_hours);
-  const finalValue = value ? parseFloat(value) : calcValueAuto(duration, price_per_hour, travel_fee, discount);
+  const finalValue = value ? parseFloat(value) : calcValueAuto(duration, operator_rate, machine_rate, travel_fee, discount);
 
   const result = db.prepare(`
     INSERT INTO services
       (date, start_time, end_time, duration_hours, discount_hours, client_id, description, value,
        hourmeter_start, hourmeter_end, hourmeter_delta,
-       price_per_hour, travel_fee, discount, paid, tip, vat_rate, status)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+       operator_rate, machine_rate, travel_fee, discount, paid, tip, vat_rate, status)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
   `).run(
     date, start_time || null, end_time || null,
     duration,
@@ -281,7 +288,8 @@ app.post('/api/services', (req, res) => {
     hourmeter_start != null ? parseFloat(hourmeter_start) : null,
     hourmeter_end != null ? parseFloat(hourmeter_end) : null,
     delta,
-    price_per_hour ? parseFloat(price_per_hour) : null,
+    operator_rate ? parseFloat(operator_rate) : 0,
+    machine_rate  ? parseFloat(machine_rate)  : 0,
     travel_fee ? parseFloat(travel_fee) : null,
     discount ? parseFloat(discount) : null,
     paid ? 1 : 0,
@@ -298,7 +306,7 @@ app.put('/api/services/:id', (req, res) => {
     date, start_time, end_time, duration_hours, discount_hours,
     client_id, description, value,
     hourmeter_start, hourmeter_end,
-    price_per_hour, travel_fee, discount, paid, tip, vat_rate, status
+    operator_rate, machine_rate, travel_fee, discount, paid, tip, vat_rate, status
   } = req.body;
 
   let delta = null;
@@ -307,14 +315,14 @@ app.put('/api/services/:id', (req, res) => {
   }
 
   const duration = calcDuration(start_time, end_time, duration_hours, discount_hours);
-  const finalValue = value ? parseFloat(value) : calcValueAuto(duration, price_per_hour, travel_fee, discount);
+  const finalValue = value ? parseFloat(value) : calcValueAuto(duration, operator_rate, machine_rate, travel_fee, discount);
 
   db.prepare(`
     UPDATE services SET
       date=?, start_time=?, end_time=?, duration_hours=?, discount_hours=?,
       client_id=?, description=?, value=?,
       hourmeter_start=?, hourmeter_end=?, hourmeter_delta=?,
-      price_per_hour=?, travel_fee=?, discount=?, paid=?, tip=?, vat_rate=?, status=?
+      operator_rate=?, machine_rate=?, travel_fee=?, discount=?, paid=?, tip=?, vat_rate=?, status=?
     WHERE id=?
   `).run(
     date, start_time || null, end_time || null,
@@ -325,7 +333,8 @@ app.put('/api/services/:id', (req, res) => {
     hourmeter_start != null ? parseFloat(hourmeter_start) : null,
     hourmeter_end != null ? parseFloat(hourmeter_end) : null,
     delta,
-    price_per_hour ? parseFloat(price_per_hour) : null,
+    operator_rate ? parseFloat(operator_rate) : 0,
+    machine_rate  ? parseFloat(machine_rate)  : 0,
     travel_fee ? parseFloat(travel_fee) : null,
     discount ? parseFloat(discount) : null,
     paid ? 1 : 0,
@@ -423,7 +432,9 @@ app.get('/api/summary', (req, res) => {
       ROUND(SUM(CASE WHEN paid=1 THEN COALESCE(value,0)*(1+COALESCE(vat_rate,0)/100.0) + COALESCE(tip,0) ELSE 0 END),2) as total_received,
       ROUND(SUM(CASE WHEN (paid=0 OR paid IS NULL) AND value IS NOT NULL THEN value*(1+COALESCE(vat_rate,0)/100.0) ELSE 0 END),2) as total_pending,
       ROUND(SUM(hourmeter_delta),2) as total_hourmeter,
-      ROUND(SUM(COALESCE(tip,0)),2) as total_tips
+      ROUND(SUM(COALESCE(tip,0)),2) as total_tips,
+      ROUND(SUM(COALESCE(operator_rate,0) * COALESCE(duration_hours,0)),2) as total_operator,
+      ROUND(SUM(COALESCE(machine_rate,0)  * COALESCE(duration_hours,0)),2) as total_machine
     FROM services WHERE ${where}
   `).get(...params);
 
@@ -450,7 +461,7 @@ app.get('/api/export/csv', (req, res) => {
            ROUND(s.duration_hours,2) as duration_hours,
            c.name as client,
            s.description,
-           s.price_per_hour, s.travel_fee, s.discount,
+           s.operator_rate, s.machine_rate, s.travel_fee, s.discount,
            s.value, s.paid,
            ROUND(s.tip,2) as tip,
            s.hourmeter_start, s.hourmeter_end,
@@ -461,11 +472,11 @@ app.get('/api/export/csv', (req, res) => {
     ORDER BY s.date DESC
   `).all();
 
-  const header = 'Date,Start,End,Discount(h),Duration(h),Client,Description,Price/h,Travel,Discount(€),Value(€),Paid,Tip(€),Hourmeter.Start,Hourmeter.End,Hourmeter.Delta,Status\n';
+  const header = 'Date,Start,End,Discount(h),Duration(h),Client,Description,Operator/h,Machine/h,Travel,Discount(€),Value(€),Paid,Tip(€),Hourmeter.Start,Hourmeter.End,Hourmeter.Delta,Status\n';
   const csv = header + rows.map(r =>
     [r.date, r.start_time||'', r.end_time||'', r.discount_hours||0, r.duration_hours||'',
      `"${r.client||''}"`, `"${r.description||''}"`,
-     r.price_per_hour||'', r.travel_fee||'', r.discount||'',
+     r.operator_rate||0, r.machine_rate||0, r.travel_fee||'', r.discount||'',
      r.value||'', r.paid ? 'Yes' : 'No',
      r.tip||0,
      r.hourmeter_start||'', r.hourmeter_end||'', r.hourmeter_delta||'',
