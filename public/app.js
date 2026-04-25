@@ -8,6 +8,7 @@ const TRANSLATIONS = {
     stat_pending: 'Pendente', stat_billed: 'Total Faturado', stat_horimetro: 'Horímetro',
     stat_tips: 'Gorjetas', stat_horimetro_sub: 'delta do período',
     stat_net: 'Líquido (s/ IVA)', stat_gross: 'Bruto (c/ IVA)',
+    stat_operator: 'Operador', stat_machine: 'Máquina',
     by_client: 'Por Cliente',
     no_data: 'Sem dados', no_data_sub: 'Regista o primeiro serviço deste mês',
     no_services: 'Sem serviços', no_services_sub: 'Toca no botão + para registar',
@@ -18,7 +19,7 @@ const TRANSLATIONS = {
     form_start_time: 'Hora início', form_end_time: 'Hora fim',
     form_discount_hours: 'Horas a descontar', form_duration: 'Duração líquida (horas)',
     form_horimeter: 'Horímetro', form_horim_start: 'Leitura início (h)', form_horim_end: 'Leitura fim (h)',
-    form_billing: 'Faturação', form_price_hour: 'Preço/hora (€)', form_travel: 'Deslocação (€)',
+    form_billing: 'Faturação', form_operator_rate: 'Operador (€/h)', form_machine_rate: 'Máquina (€/h)', form_travel: 'Deslocação (€)',
     form_discount_value: 'Desconto (€)', form_payment_status: 'Estado pagamento',
     form_pending: 'Pendente', form_paid: 'Pago', form_total: 'Valor total (€)',
     form_tip: 'Valor adicional / gorjeta (€)', form_tip_placeholder: 'ex: 5.00',
@@ -45,7 +46,8 @@ const TRANSLATIONS = {
     settings_title: 'Definições', settings_backup: 'Backup & Restauro',
     settings_backup_download: '⬇ Descarregar Backup', settings_backup_restore: '⬆ Carregar Backup',
     settings_language: 'Idioma', settings_defaults: 'Valores por defeito',
-    settings_default_price: 'Preço/hora por defeito (€)', settings_default_travel: 'Deslocação por defeito (€)',
+    settings_default_operator_rate: 'Operador por defeito (€/h)', settings_default_machine_rate: 'Máquina por defeito (€/h)',
+    settings_default_travel: 'Deslocação por defeito (€)',
     settings_default_payment: 'Estado pagamento por defeito',
     settings_currency: 'Símbolo de moeda', settings_theme: 'Tema',
     settings_theme_dark: 'Escuro', settings_theme_light: 'Claro',
@@ -100,6 +102,7 @@ const TRANSLATIONS = {
     stat_pending: 'Pending', stat_billed: 'Total Billed', stat_horimetro: 'Hourmeter',
     stat_tips: 'Tips', stat_horimetro_sub: 'period delta',
     stat_net: 'Net (excl. VAT)', stat_gross: 'Gross (incl. VAT)',
+    stat_operator: 'Operator', stat_machine: 'Machine',
     by_client: 'By Client',
     no_data: 'No data', no_data_sub: 'Register the first service of this month',
     no_services: 'No services', no_services_sub: 'Tap the + button to register',
@@ -110,7 +113,7 @@ const TRANSLATIONS = {
     form_start_time: 'Start time', form_end_time: 'End time',
     form_discount_hours: 'Discount hours', form_duration: 'Net duration (hours)',
     form_horimeter: 'Hourmeter', form_horim_start: 'Start reading (h)', form_horim_end: 'End reading (h)',
-    form_billing: 'Billing', form_price_hour: 'Price/hour (€)', form_travel: 'Travel fee (€)',
+    form_billing: 'Billing', form_operator_rate: 'Operator (€/h)', form_machine_rate: 'Machine (€/h)', form_travel: 'Travel fee (€)',
     form_discount_value: 'Discount (€)', form_payment_status: 'Payment status',
     form_pending: 'Pending', form_paid: 'Paid', form_total: 'Total value (€)',
     form_tip: 'Additional value / tip (€)', form_tip_placeholder: 'e.g. 5.00',
@@ -137,7 +140,8 @@ const TRANSLATIONS = {
     settings_title: 'Settings', settings_backup: 'Backup & Restore',
     settings_backup_download: '⬇ Download Backup', settings_backup_restore: '⬆ Load Backup',
     settings_language: 'Language', settings_defaults: 'Default values',
-    settings_default_price: 'Default price/hour (€)', settings_default_travel: 'Default travel fee (€)',
+    settings_default_operator_rate: 'Default operator rate (€/h)', settings_default_machine_rate: 'Default machine rate (€/h)',
+    settings_default_travel: 'Default travel fee (€)',
     settings_default_payment: 'Default payment status',
     settings_currency: 'Currency symbol', settings_theme: 'Theme',
     settings_theme_dark: 'Dark', settings_theme_light: 'Light',
@@ -336,6 +340,18 @@ async function renderDashboard() {
       </div>` : '<div class="stat-block"></div>'}
     </div>
 
+    ${(s.total_operator > 0 || s.total_machine > 0) ? `
+    <div class="card-row" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+      <div class="stat-block">
+        <div class="stat-label">${t('stat_operator')}</div>
+        <div class="stat-value">${s.total_operator ? s.total_operator.toFixed(2) + ' ' + cur : '—'}</div>
+      </div>
+      <div class="stat-block">
+        <div class="stat-label">${t('stat_machine')}</div>
+        <div class="stat-value">${s.total_machine ? s.total_machine.toFixed(2) + ' ' + cur : '—'}</div>
+      </div>
+    </div>` : ''}
+
     ${byClient.length ? `
     <div class="card">
       <div class="section-title" style="margin-bottom:12px">${t('by_client')}</div>
@@ -434,10 +450,13 @@ function serviceCard(s) {
   if (s.hourmeter_start != null || s.hourmeter_end != null) {
     chips.push(`<span class="chip horim">⚙️ ${s.hourmeter_start ?? '?'} → ${s.hourmeter_end ?? '?'} h${s.hourmeter_delta != null ? ' (Δ' + parseFloat(s.hourmeter_delta).toFixed(1) + ')' : ''}</span>`);
   }
-  if (s.price_per_hour != null) {
-    let billing = `${s.price_per_hour}${cur}/h`;
+  const opRate   = s.operator_rate != null ? parseFloat(s.operator_rate) : 0;
+  const machRate = s.machine_rate  != null ? parseFloat(s.machine_rate)  : 0;
+  if (opRate || machRate) {
+    const rateStr = (opRate && machRate) ? `${opRate}+${machRate}${cur}/h` : `${opRate || machRate}${cur}/h`;
+    let billing = rateStr;
     if (s.travel_fee) billing += ` +${s.travel_fee}${cur}`;
-    if (s.discount) billing += ` -${s.discount}${cur} ${t('discount_abbr')}`;
+    if (s.discount)   billing += ` -${s.discount}${cur} ${t('discount_abbr')}`;
     chips.push(`<span class="chip billing">💶 ${billing}</span>`);
   }
   if (s.tip > 0) {
@@ -500,7 +519,8 @@ function serviceFormHtml(s = {}) {
 
   // Pre-fill from settings defaults when creating a new service
   const isNew = !s.id;
-  const defaultPricePerHour = isNew ? (s.price_per_hour ?? localStorage.getItem('default_price_per_hour') ?? '') : (s.price_per_hour ?? '');
+  const defaultOperatorRate = isNew ? (s.operator_rate ?? localStorage.getItem('default_operator_rate') ?? '') : (s.operator_rate ?? '');
+  const defaultMachineRate  = isNew ? (s.machine_rate  ?? localStorage.getItem('default_machine_rate')  ?? '') : (s.machine_rate  ?? '');
   const defaultTravelFee = isNew ? (s.travel_fee ?? localStorage.getItem('default_travel_fee') ?? '') : (s.travel_fee ?? '');
   const defaultPaid = isNew ? (s.paid ?? localStorage.getItem('default_paid') ?? '0') : (s.paid ?? '0');
 
@@ -577,13 +597,21 @@ function serviceFormHtml(s = {}) {
 
       <div class="form-row">
         <div class="form-group">
-          <label class="form-label">${t('form_price_hour')}</label>
-          <input type="number" class="form-control" id="f-price-per-hour" step="0.5" min="0" placeholder="ex: 25.00" value="${defaultPricePerHour}" oninput="calcTotal()">
+          <label class="form-label">${t('form_operator_rate')}</label>
+          <input type="number" class="form-control" id="f-operator-rate" step="0.5" min="0" placeholder="ex: 15.00" value="${defaultOperatorRate}" oninput="calcTotal()">
         </div>
+        <div class="form-group">
+          <label class="form-label">${t('form_machine_rate')}</label>
+          <input type="number" class="form-control" id="f-machine-rate" step="0.5" min="0" placeholder="ex: 15.00" value="${defaultMachineRate}" oninput="calcTotal()">
+        </div>
+      </div>
+
+      <div class="form-row">
         <div class="form-group">
           <label class="form-label">${t('form_travel')}</label>
           <input type="number" class="form-control" id="f-travel-fee" step="0.5" min="0" placeholder="ex: 10.00" value="${defaultTravelFee}" oninput="calcTotal()">
         </div>
+        <div class="form-group"></div>
       </div>
 
       <div class="form-row">
@@ -693,11 +721,13 @@ window.calcDuration = function() {
 window.calcTotal = function() {
   if (!calcTotal.manual) {
     const duration = parseFloat(document.getElementById('f-duration')?.value) || 0;
-    const pricePerHour = parseFloat(document.getElementById('f-price-per-hour')?.value) || 0;
-    if (pricePerHour) {
+    const operatorRate = parseFloat(document.getElementById('f-operator-rate')?.value) || 0;
+    const machineRate  = parseFloat(document.getElementById('f-machine-rate')?.value)  || 0;
+    const totalRate = operatorRate + machineRate;
+    if (totalRate) {
       const travelFee = parseFloat(document.getElementById('f-travel-fee')?.value) || 0;
       const discount = parseFloat(document.getElementById('f-discount')?.value) || 0;
-      const total = Math.max(0, (duration * pricePerHour) + travelFee - discount);
+      const total = Math.max(0, (duration * totalRate) + travelFee - discount);
       document.getElementById('f-value').value = total.toFixed(2);
     }
   }
@@ -752,7 +782,8 @@ function getFormData() {
     value: document.getElementById('f-value').value || null,
     hourmeter_start: document.getElementById('f-horim-start').value || null,
     hourmeter_end: document.getElementById('f-horim-end').value || null,
-    price_per_hour: document.getElementById('f-price-per-hour').value || null,
+    operator_rate: document.getElementById('f-operator-rate').value || null,
+    machine_rate:  document.getElementById('f-machine-rate').value  || null,
     travel_fee: document.getElementById('f-travel-fee').value || null,
     discount: document.getElementById('f-discount').value || null,
     paid: document.getElementById('f-paid').value === '1' ? 1 : 0,
@@ -903,7 +934,10 @@ window.generateInvoice = async function(serviceId) {
     : '';
   const descCell = descMain + descSub || '<span>—</span>';
 
-  const showRate     = s.price_per_hour != null;
+  const opRate    = s.operator_rate != null ? parseFloat(s.operator_rate) : 0;
+  const machRate  = s.machine_rate  != null ? parseFloat(s.machine_rate)  : 0;
+  const totalRate = opRate + machRate;
+  const showRate     = totalRate > 0;
   const showTravel   = travelAmt > 0;
   const showDiscount = discountAmt > 0;
 
@@ -1000,7 +1034,7 @@ td{padding:13px 10px;font-size:13px;border-bottom:1px solid #ebedf0;vertical-ali
       <td style="white-space:nowrap">${formatDate(s.date)}</td>
       <td>${descCell}</td>
       <td class="r">${s.duration_hours != null ? s.duration_hours + '\u00a0h' : '—'}</td>
-      ${showRate     ? `<td class="r">${fmt(s.price_per_hour)}</td>` : ''}
+      ${showRate     ? `<td class="r">${fmt(totalRate)}</td>` : ''}
       ${showTravel   ? `<td class="r">${fmt(travelAmt)}</td>`        : ''}
       ${showDiscount ? `<td class="r">-${fmt(discountAmt)}</td>`     : ''}
       <td class="r"><strong>${fmt(valueAmt)}</strong></td>
@@ -1483,6 +1517,7 @@ async function init() {
   // Migrate legacy localStorage keys (pre-v0.6)
   const lsKeyMigrations = {
     'default_preco_hora': 'default_price_per_hour',
+    'default_price_per_hour': 'default_operator_rate',
     'default_deslocacao': 'default_travel_fee',
     'default_pago': 'default_paid',
   };
@@ -1544,7 +1579,8 @@ async function renderSettings() {
   // Fetch app stats and version
   const [stats, version] = await Promise.all([api.get('/api/stats'), api.get('/api/version')]);
 
-  const defaultPrecoHora = localStorage.getItem('default_price_per_hour') || '';
+  const defaultOperatorRate = localStorage.getItem('default_operator_rate') || '';
+  const defaultMachineRate  = localStorage.getItem('default_machine_rate')  || '';
   const defaultDeslocacao = localStorage.getItem('default_travel_fee') || '';
   const defaultPago = localStorage.getItem('default_paid') || '0';
   const currency = getCurrency();
@@ -1584,15 +1620,23 @@ async function renderSettings() {
       <div class="section-title" style="margin-bottom:12px">${t('settings_defaults')}</div>
       <div class="form-row">
         <div class="form-group">
-          <label class="form-label">${t('settings_default_price')}</label>
-          <input type="number" class="form-control" step="0.5" min="0" value="${escapeHtml(defaultPrecoHora)}"
-                 oninput="saveSetting('default_price_per_hour', this.value)">
+          <label class="form-label">${t('settings_default_operator_rate')}</label>
+          <input type="number" class="form-control" step="0.5" min="0" value="${escapeHtml(defaultOperatorRate)}"
+                 oninput="saveSetting('default_operator_rate', this.value)">
         </div>
+        <div class="form-group">
+          <label class="form-label">${t('settings_default_machine_rate')}</label>
+          <input type="number" class="form-control" step="0.5" min="0" value="${escapeHtml(defaultMachineRate)}"
+                 oninput="saveSetting('default_machine_rate', this.value)">
+        </div>
+      </div>
+      <div class="form-row">
         <div class="form-group">
           <label class="form-label">${t('settings_default_travel')}</label>
           <input type="number" class="form-control" step="0.5" min="0" value="${escapeHtml(defaultDeslocacao)}"
                  oninput="saveSetting('default_travel_fee', this.value)">
         </div>
+        <div class="form-group"></div>
       </div>
       <div class="form-row">
         <div class="form-group">

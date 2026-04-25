@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.5.0] - 2026-04-25
+
+### Added
+- **Operator rate** and **Machine rate** fields in the billing section; total price/hour = operator + machine
+- Summary dashboard shows individual **Operator** and **Machine** cost totals for the selected period (operator rate × hours and machine rate × hours)
+- Settings: two separate default rate fields (Operator /h and Machine /h) replace the single price/hour default
+
+### Changed
+- Service cards show combined rate as `15+15€/h` when both rates are set, or a single rate if only one is used
+- CSV export now has `Operator/h` and `Machine/h` columns instead of `Price/h`
+- Invoice rate column shows the combined operator + machine rate
+
+### Migration
+- Existing services: old `price_per_hour` value is automatically carried over as `operator_rate`; `machine_rate` starts at 0
+
 ## [1.4.0] - 2026-04-22
 
 ### Added
