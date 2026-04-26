@@ -1,6 +1,6 @@
 # ServiLog
 
-> Self-hosted service log for machines and agricultural equipment — v1.6.0
+> Self-hosted service log for machines and agricultural equipment — v1.6.1
 
 <img width="677" height="486" alt="image" src="https://github.com/user-attachments/assets/40974a8e-a146-46a2-940a-817de2516ae3" />
 
@@ -22,7 +22,7 @@ Installable PWA with a mobile-first dark UI. Runs entirely in Docker, no cloud r
 | Payment tracking | Pending / Paid per service |
 | Tips | Counted in received, excluded from billed |
 | Attachments | Attach photos, videos, PDFs and documents to any service |
-| Clients | Name, address (with map picker), phone |
+| Clients | Name, address (with map picker), phone; edit client directly from the service form |
 | Map picker | Pick client address on an OpenStreetMap map — no API key required |
 | Summaries | Monthly and all-time, per client, net and gross; operator and machine cost breakdown |
 | Invoices | Printable invoice generated from any service |

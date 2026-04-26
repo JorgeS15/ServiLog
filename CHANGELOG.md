@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.6.1] - 2026-04-26
+
+### Added
+- **Edit client from service form**: when a client is selected in the service form, an "Edit client" button appears inline — opens the client editor without leaving the form context
+- **Reordered navigation**: menu order is now Summary → Services → Agenda → Clients → Settings
+
 ## [1.6.0] - 2026-04-26
 
 ### Added
