@@ -513,8 +513,9 @@ app.get('/api/backup/download', (req, res) => {
     parts.push(nlb, nb, dsb, f.data);
   }
 
+  const dateStr = new Date().toISOString().slice(0, 10);
   res.setHeader('Content-Type', 'application/octet-stream');
-  res.setHeader('Content-Disposition', 'attachment; filename="servilog-backup.slb"');
+  res.setHeader('Content-Disposition', `attachment; filename="servilog-backup-${dateStr}.slb"`);
   res.send(Buffer.concat(parts));
 });
 
@@ -528,6 +529,7 @@ app.post('/api/backup/restore',
 
     if (magic4 === 'SLB1') {
       try {
+        // Parse phase — fully into memory before touching any live files
         let off = 4;
         const dbSize = req.body.readUInt32LE(off); off += 4;
         const dbData = req.body.slice(off, off + dbSize); off += dbSize;
@@ -541,27 +543,52 @@ app.post('/api/backup/restore',
           const name = req.body.slice(off, off + nl).toString('utf8'); off += nl;
           const dl   = req.body.readUInt32LE(off); off += 4;
           const data = req.body.slice(off, off + dl); off += dl;
-          uploadFiles.push({ name, data });
+          uploadFiles.push({ name: path.basename(name), data });
         }
+
+        // Write phase — temp locations only
+        const tmpDb      = DB_PATH + '.restoring';
+        const tmpUploads = UPLOADS_DIR + '_restoring';
+        fs.writeFileSync(tmpDb, dbData);
+        fs.mkdirSync(tmpUploads, { recursive: true });
+        for (const f of uploadFiles) {
+          fs.writeFileSync(path.join(tmpUploads, f.name), f.data);
+        }
+
+        // Swap phase — all temp writes succeeded, now commit atomically
+        const oldUploads = UPLOADS_DIR + '_old_' + Date.now();
         db.close();
-        fs.writeFileSync(DB_PATH, dbData);
+        fs.renameSync(tmpDb, DB_PATH);
+        if (fs.existsSync(UPLOADS_DIR)) fs.renameSync(UPLOADS_DIR, oldUploads);
+        fs.renameSync(tmpUploads, UPLOADS_DIR);
         db = new Database(DB_PATH);
         runMigrations();
-        if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
-        for (const f of uploadFiles) {
-          fs.writeFileSync(path.join(UPLOADS_DIR, path.basename(f.name)), f.data);
-        }
+        try { fs.rmSync(oldUploads, { recursive: true, force: true }); } catch (_) {}
+
         res.json({ ok: true });
       } catch (e) {
+        // Clean up any temp files left behind
+        try { fs.unlinkSync(DB_PATH + '.restoring'); } catch (_) {}
+        try { fs.rmSync(UPLOADS_DIR + '_restoring', { recursive: true, force: true }); } catch (_) {}
+        // If DB was closed but not yet reopened, reopen what's there
+        if (!db.open) { try { db = new Database(DB_PATH); runMigrations(); } catch (_) {} }
         res.status(400).json({ error: 'Corrupt backup file' });
       }
     } else if (req.body.slice(0, 15).toString('utf8').startsWith('SQLite format 3')) {
       // Legacy .db backup — no pictures
-      db.close();
-      fs.writeFileSync(DB_PATH, req.body);
-      db = new Database(DB_PATH);
-      runMigrations();
-      res.json({ ok: true });
+      const tmpDb = DB_PATH + '.restoring';
+      try {
+        fs.writeFileSync(tmpDb, req.body);
+        db.close();
+        fs.renameSync(tmpDb, DB_PATH);
+        db = new Database(DB_PATH);
+        runMigrations();
+        res.json({ ok: true });
+      } catch (e) {
+        try { fs.unlinkSync(tmpDb); } catch (_) {}
+        if (!db.open) { try { db = new Database(DB_PATH); runMigrations(); } catch (_) {} }
+        res.status(400).json({ error: 'Restore failed' });
+      }
     } else {
       res.status(400).json({ error: 'Invalid file' });
     }

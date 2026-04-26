@@ -235,21 +235,25 @@ const state = {
 
 // ── API ───────────────────────────────────────────────────
 const api = {
-  async get(path) {
-    const r = await fetch(path);
+  async _handle(r) {
+    if (!r.ok) {
+      let msg = `HTTP ${r.status}`;
+      try { const e = await r.json(); if (e.error) msg = e.error; } catch (_) {}
+      throw new Error(msg);
+    }
     return r.json();
   },
-  async post(path, body) {
-    const r = await fetch(path, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
-    return r.json();
+  get(path) {
+    return fetch(path).then(r => api._handle(r));
   },
-  async put(path, body) {
-    const r = await fetch(path, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
-    return r.json();
+  post(path, body) {
+    return fetch(path, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) }).then(r => api._handle(r));
   },
-  async del(path) {
-    const r = await fetch(path, { method:'DELETE' });
-    return r.json();
+  put(path, body) {
+    return fetch(path, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) }).then(r => api._handle(r));
+  },
+  del(path) {
+    return fetch(path, { method:'DELETE' }).then(r => api._handle(r));
   },
 };
 
@@ -1748,7 +1752,9 @@ async function renderSettings() {
             ${t('map_pick')}
           </button>
         </div>
-        ${baseAddress ? `<div style="font-size:11px;color:var(--text3);margin-top:4px">${baseCoordsSet ? '📍 ' + t('settings_base_set') : '⚠ ' + t('map_drag_hint')}</div>` : ''}
+        <div id="base-address-hint" style="font-size:11px;color:var(--text3);margin-top:4px${baseAddress ? '' : ';display:none'}">
+          ${baseCoordsSet ? '📍 ' + t('settings_base_set') : '⚠ ' + t('map_drag_hint')}
+        </div>
       </div>
       <div class="form-row">
         <div class="form-group">
@@ -1892,6 +1898,8 @@ window.openBaseAddressPicker = function() {
     localStorage.setItem('base_lng', String(lng));
     const inp = document.getElementById('base-address-input');
     if (inp) inp.value = addr;
+    const hint = document.getElementById('base-address-hint');
+    if (hint) { hint.style.display = ''; hint.textContent = '📍 ' + t('settings_base_set'); }
   };
   openMapPicker('base-address-input');
 };

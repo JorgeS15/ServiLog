@@ -1,6 +1,6 @@
 # ServiLog
 
-> Self-hosted service log for machines and agricultural equipment — v1.4.0
+> Self-hosted service log for machines and agricultural equipment — v1.6.0
 
 <img width="677" height="486" alt="image" src="https://github.com/user-attachments/assets/40974a8e-a146-46a2-940a-817de2516ae3" />
 
@@ -16,14 +16,15 @@ Installable PWA with a mobile-first dark UI. Runs entirely in Docker, no cloud r
 | Scheduling | Plan future appointments with a Scheduled status |
 | Agenda | Monthly calendar with event chips, day detail panel, upcoming list |
 | Hour-meter | Manual start/end with automatic delta |
-| Billing | Hourly rate, travel, discount, auto-total |
+| Billing | Separate operator and machine hourly rates, travel fee, discount, auto-total |
+| Auto travel fee | Calculate road distance from your base to the client and apply a configurable fee formula |
 | VAT | Optional per-service VAT rate with live net/gross display |
 | Payment tracking | Pending / Paid per service |
 | Tips | Counted in received, excluded from billed |
 | Attachments | Attach photos, videos, PDFs and documents to any service |
 | Clients | Name, address (with map picker), phone |
 | Map picker | Pick client address on an OpenStreetMap map — no API key required |
-| Summaries | Monthly and all-time, per client, net and gross |
+| Summaries | Monthly and all-time, per client, net and gross; operator and machine cost breakdown |
 | Invoices | Printable invoice generated from any service |
 | Export | CSV download |
 | Settings | Full backup/restore (DB + files), language, theme, invoice details, storage stats |
