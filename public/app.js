@@ -104,6 +104,7 @@ const TRANSLATIONS = {
     toast_no_base_address: 'Define a morada base nas Definições',
     toast_no_client_address: 'O cliente não tem morada definida',
     toast_travel_calc_error: 'Erro ao calcular distância',
+    form_edit_client: '✎ Editar cliente',
   },
   en: {
     months: ['January','February','March','April','May','June','July','August','September','October','November','December'],
@@ -209,6 +210,7 @@ const TRANSLATIONS = {
     toast_no_base_address: 'Set your base address in Settings first',
     toast_no_client_address: 'This client has no address set',
     toast_travel_calc_error: 'Could not calculate distance',
+    form_edit_client: '✎ Edit client',
   },
 };
 
@@ -552,6 +554,7 @@ function serviceFormHtml(s = {}) {
 
   const serviceDate = s.date || today;
   const defaultStatus = s.status || (serviceDate > today ? 'scheduled' : 'completed');
+  const hasExistingClient = !!(s.client_id && state.clients.some(c => c.id == s.client_id));
 
   return `
     <div class="form-grid">
@@ -578,6 +581,7 @@ function serviceFormHtml(s = {}) {
             <option value="__new__">${t('form_new_client')}</option>
           </select>
           <input type="text" class="form-control" id="f-client-new" placeholder="${t('form_new_client_placeholder')}" style="margin-top:6px;display:none">
+          <button class="btn btn-ghost btn-sm" id="f-client-edit" type="button" style="margin-top:6px;display:${hasExistingClient ? 'inline-flex' : 'none'}" onclick="editClientFromService()">${t('form_edit_client')}</button>
         </div>
       </div>
 
@@ -730,8 +734,17 @@ function serviceFormHtml(s = {}) {
 window.onClientChange = function() {
   const sel = document.getElementById('f-client');
   const newInput = document.getElementById('f-client-new');
+  const editBtn = document.getElementById('f-client-edit');
+  const isExistingClient = sel.value && sel.value !== '__new__';
   newInput.style.display = sel.value === '__new__' ? 'block' : 'none';
+  if (editBtn) editBtn.style.display = isExistingClient ? 'inline-flex' : 'none';
   if (sel.value === '__new__') newInput.focus();
+};
+
+window.editClientFromService = function() {
+  const id = parseInt(document.getElementById('f-client').value);
+  if (!id) return;
+  editClient(id);
 };
 
 window.calcDuration = function() {
