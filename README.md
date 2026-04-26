@@ -1,6 +1,6 @@
 # ServiLog
 
-> Self-hosted service log for machines and agricultural equipment — v1.2.3
+> Self-hosted service log for machines and agricultural equipment — v1.6.1
 
 <img width="677" height="486" alt="image" src="https://github.com/user-attachments/assets/40974a8e-a146-46a2-940a-817de2516ae3" />
 
@@ -13,29 +13,24 @@ Installable PWA with a mobile-first dark UI. Runs entirely in Docker, no cloud r
 | | |
 |---|---|
 | Service records | Date, client, hours, hour-meter, notes |
+| Scheduling | Plan future appointments with a Scheduled status |
+| Agenda | Monthly calendar with event chips, day detail panel, upcoming list |
 | Hour-meter | Manual start/end with automatic delta |
-| Billing | Hourly rate, travel, discount, auto-total |
+| Billing | Separate operator and machine hourly rates, travel fee, discount, auto-total |
+| Auto travel fee | Calculate road distance from your base to the client and apply a configurable fee formula |
 | VAT | Optional per-service VAT rate with live net/gross display |
 | Payment tracking | Pending / Paid per service |
 | Tips | Counted in received, excluded from billed |
-| Photos | Attach photos to any service |
-| Clients | Name, address, phone |
-| Summaries | Monthly and all-time, per client, net and gross |
+| Attachments | Attach photos, videos, PDFs and documents to any service |
+| Clients | Name, address (with map picker), phone; edit client directly from the service form |
+| Map picker | Pick client address on an OpenStreetMap map — no API key required |
+| Summaries | Monthly and all-time, per client, net and gross; operator and machine cost breakdown |
 | Invoices | Printable invoice generated from any service |
 | Export | CSV download |
-| Settings | Full backup/restore (DB + photos), language, theme, invoice details |
+| Settings | Full backup/restore (DB + files), language, theme, invoice details, storage stats |
 | PWA | Installable on Android & iOS, works offline |
 
 ---
-
-## Roadmap
-Planned features for future releases:
-| Feature | Description |
-|---|---|
-| **Authentication & Users** | Built-in login system with user accounts and role-based access, eliminating the need for an external reverse proxy for auth |
-| ~~**Service Attachments**~~ ✅ v1.2.3 | ~~Upload and attach photos and videos directly to service records (receipts, damage photos, before/after shots)~~|
-| **Service Scheduling** | Schedule upcoming maintenance and services with due-date alerts based on calendar date or hour-meter readings |
-| ~~**Invoice Generator**~~ ✅ v1.2.3 | ~~Generate invoices based on the service data (hours, client, etc)~~ |
 
 ## Installation
 
@@ -64,7 +59,7 @@ Once you have a domain pointing to your server, you can install ServiLog as an a
 
 ## Backup
 
-Settings → **Download Backup** exports a single `.slb` file containing the SQLite database **and** all uploaded service photos.
+Settings → **Download Backup** exports a single `.slb` file containing the SQLite database **and** all uploaded files (photos, videos, documents).
 
 Restore by selecting the `.slb` file (or a legacy `.db` file) in Settings → **Load Backup**.
 

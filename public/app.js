@@ -2,12 +2,13 @@
 const TRANSLATIONS = {
   pt: {
     months: ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'],
-    nav_dashboard: 'Resumo', nav_lista: 'Serviços', nav_clientes: 'Clientes', nav_settings: 'Definições',
+    nav_dashboard: 'Resumo', nav_lista: 'Serviços', nav_clientes: 'Clientes', nav_settings: 'Definições', nav_agenda: 'Agenda',
     dashboard_title: 'Resumo', dashboard_monthly: 'Mensal', dashboard_alltime: 'Tudo',
     stat_services: 'Serviços', stat_hours: 'Horas Trab.', stat_received: 'Recebido',
     stat_pending: 'Pendente', stat_billed: 'Total Faturado', stat_horimetro: 'Horímetro',
     stat_tips: 'Gorjetas', stat_horimetro_sub: 'delta do período',
     stat_net: 'Líquido (s/ IVA)', stat_gross: 'Bruto (c/ IVA)',
+    stat_operator: 'Operador', stat_machine: 'Máquina',
     by_client: 'Por Cliente',
     no_data: 'Sem dados', no_data_sub: 'Regista o primeiro serviço deste mês',
     no_services: 'Sem serviços', no_services_sub: 'Toca no botão + para registar',
@@ -18,7 +19,7 @@ const TRANSLATIONS = {
     form_start_time: 'Hora início', form_end_time: 'Hora fim',
     form_discount_hours: 'Horas a descontar', form_duration: 'Duração líquida (horas)',
     form_horimeter: 'Horímetro', form_horim_start: 'Leitura início (h)', form_horim_end: 'Leitura fim (h)',
-    form_billing: 'Faturação', form_price_hour: 'Preço/hora (€)', form_travel: 'Deslocação (€)',
+    form_billing: 'Faturação', form_operator_rate: 'Operador (€/h)', form_machine_rate: 'Máquina (€/h)', form_travel: 'Deslocação (€)',
     form_discount_value: 'Desconto (€)', form_payment_status: 'Estado pagamento',
     form_pending: 'Pendente', form_paid: 'Pago', form_total: 'Valor total (€)',
     form_tip: 'Valor adicional / gorjeta (€)', form_tip_placeholder: 'ex: 5.00',
@@ -45,7 +46,8 @@ const TRANSLATIONS = {
     settings_title: 'Definições', settings_backup: 'Backup & Restauro',
     settings_backup_download: '⬇ Descarregar Backup', settings_backup_restore: '⬆ Carregar Backup',
     settings_language: 'Idioma', settings_defaults: 'Valores por defeito',
-    settings_default_price: 'Preço/hora por defeito (€)', settings_default_travel: 'Deslocação por defeito (€)',
+    settings_default_operator_rate: 'Operador por defeito (€/h)', settings_default_machine_rate: 'Máquina por defeito (€/h)',
+    settings_default_travel: 'Deslocação por defeito (€)',
     settings_default_payment: 'Estado pagamento por defeito',
     settings_currency: 'Símbolo de moeda', settings_theme: 'Tema',
     settings_theme_dark: 'Escuro', settings_theme_light: 'Claro',
@@ -54,10 +56,12 @@ const TRANSLATIONS = {
     settings_date_range: 'Período de dados', settings_version: 'Versão',
     tip_badge: 'gorjeta',
     serv_abbr: 'serv.', discount_abbr: 'desc.',
-    form_pictures: 'Fotos', form_pictures_add: 'Adicionar fotos',
-    form_pictures_loading: 'A carregar...', form_pictures_empty: 'Sem fotos',
-    toast_picture_uploaded: 'Foto adicionada ✓', toast_picture_deleted: 'Foto eliminada',
-    confirm_delete_picture: 'Eliminar esta foto?',
+    form_pictures: 'Anexos', form_pictures_add: 'Adicionar ficheiros',
+    form_pictures_loading: 'A carregar...', form_pictures_empty: 'Sem anexos',
+    toast_picture_uploaded: 'Ficheiro adicionado ✓', toast_picture_deleted: 'Ficheiro eliminado',
+    confirm_delete_picture: 'Eliminar este ficheiro?',
+    settings_total_attachments: 'Total de anexos', settings_uploads_size: 'Tamanho dos ficheiros',
+    settings_total_size: 'Tamanho total',
     settings_invoice: 'Dados para Faturas',
     invoice_issuer_name: 'Nome / Empresa', invoice_issuer_name_placeholder: 'ex: João Silva - Serviços Agrícolas',
     invoice_issuer_address: 'Morada', invoice_issuer_address_placeholder: 'ex: Rua Principal 10, 3000-000 Coimbra',
@@ -75,15 +79,42 @@ const TRANSLATIONS = {
     invoice_no_issuer: 'Configure os dados da fatura nas Definições antes de gerar uma fatura.',
     form_vat: 'IVA', form_vat_none: 'Sem IVA', form_vat_include: 'Com IVA',
     form_vat_rate: 'Taxa IVA (%)', form_vat_amount: 'Valor IVA', form_vat_gross: 'Total c/ IVA',
+    form_status: 'Estado', form_status_scheduled: 'Agendado', form_status_completed: 'Concluído',
+    tag_scheduled: 'Agendado',
+    agenda_title: 'Agenda', agenda_upcoming: 'Próximos', agenda_new_appt: '+ Agendar',
+    agenda_no_upcoming: 'Sem agendamentos', agenda_no_upcoming_sub: 'Cria um agendamento acima',
+    agenda_day_services: 'Serviços do dia', agenda_no_day: 'Sem serviços neste dia',
+    months_short: ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'],
+    weekdays_short: ['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'],
+    map_pick: '📍 Selecionar no mapa',
+    map_search_placeholder: 'Pesquisar morada...',
+    map_drag_hint: 'Clique no mapa ou arraste o pin para selecionar',
+    map_confirm: 'Confirmar morada',
+    map_my_location: 'A minha localização',
+    map_no_results: 'Sem resultados',
+    map_locating: 'A localizar...',
+    settings_travel_calc: 'Cálculo automático de deslocação',
+    settings_base_address: 'Morada base (ponto de partida)',
+    settings_base_address_placeholder: 'Seleciona no mapa ou escreve a morada',
+    settings_base_set: 'Morada base definida ✓',
+    settings_price_per_km: 'Preço por km (€)',
+    settings_fee_step: 'Arredondamento (€)',
+    settings_min_fee: 'Mínimo (€)',
+    form_calc_travel: '🚗 Calcular deslocação',
+    toast_no_base_address: 'Define a morada base nas Definições',
+    toast_no_client_address: 'O cliente não tem morada definida',
+    toast_travel_calc_error: 'Erro ao calcular distância',
+    form_edit_client: '✎ Editar cliente',
   },
   en: {
     months: ['January','February','March','April','May','June','July','August','September','October','November','December'],
-    nav_dashboard: 'Summary', nav_lista: 'Services', nav_clientes: 'Clients', nav_settings: 'Settings',
+    nav_dashboard: 'Summary', nav_lista: 'Services', nav_clientes: 'Clients', nav_settings: 'Settings', nav_agenda: 'Agenda',
     dashboard_title: 'Summary', dashboard_monthly: 'Monthly', dashboard_alltime: 'All Time',
     stat_services: 'Services', stat_hours: 'Work Hours', stat_received: 'Received',
     stat_pending: 'Pending', stat_billed: 'Total Billed', stat_horimetro: 'Hourmeter',
     stat_tips: 'Tips', stat_horimetro_sub: 'period delta',
     stat_net: 'Net (excl. VAT)', stat_gross: 'Gross (incl. VAT)',
+    stat_operator: 'Operator', stat_machine: 'Machine',
     by_client: 'By Client',
     no_data: 'No data', no_data_sub: 'Register the first service of this month',
     no_services: 'No services', no_services_sub: 'Tap the + button to register',
@@ -94,7 +125,7 @@ const TRANSLATIONS = {
     form_start_time: 'Start time', form_end_time: 'End time',
     form_discount_hours: 'Discount hours', form_duration: 'Net duration (hours)',
     form_horimeter: 'Hourmeter', form_horim_start: 'Start reading (h)', form_horim_end: 'End reading (h)',
-    form_billing: 'Billing', form_price_hour: 'Price/hour (€)', form_travel: 'Travel fee (€)',
+    form_billing: 'Billing', form_operator_rate: 'Operator (€/h)', form_machine_rate: 'Machine (€/h)', form_travel: 'Travel fee (€)',
     form_discount_value: 'Discount (€)', form_payment_status: 'Payment status',
     form_pending: 'Pending', form_paid: 'Paid', form_total: 'Total value (€)',
     form_tip: 'Additional value / tip (€)', form_tip_placeholder: 'e.g. 5.00',
@@ -121,7 +152,8 @@ const TRANSLATIONS = {
     settings_title: 'Settings', settings_backup: 'Backup & Restore',
     settings_backup_download: '⬇ Download Backup', settings_backup_restore: '⬆ Load Backup',
     settings_language: 'Language', settings_defaults: 'Default values',
-    settings_default_price: 'Default price/hour (€)', settings_default_travel: 'Default travel fee (€)',
+    settings_default_operator_rate: 'Default operator rate (€/h)', settings_default_machine_rate: 'Default machine rate (€/h)',
+    settings_default_travel: 'Default travel fee (€)',
     settings_default_payment: 'Default payment status',
     settings_currency: 'Currency symbol', settings_theme: 'Theme',
     settings_theme_dark: 'Dark', settings_theme_light: 'Light',
@@ -130,10 +162,12 @@ const TRANSLATIONS = {
     settings_date_range: 'Data range', settings_version: 'Version',
     tip_badge: 'tip',
     serv_abbr: 'svc.', discount_abbr: 'disc.',
-    form_pictures: 'Pictures', form_pictures_add: 'Add pictures',
-    form_pictures_loading: 'Loading...', form_pictures_empty: 'No pictures',
-    toast_picture_uploaded: 'Picture added ✓', toast_picture_deleted: 'Picture deleted',
-    confirm_delete_picture: 'Delete this picture?',
+    form_pictures: 'Attachments', form_pictures_add: 'Add files',
+    form_pictures_loading: 'Loading...', form_pictures_empty: 'No attachments',
+    toast_picture_uploaded: 'File added ✓', toast_picture_deleted: 'File deleted',
+    confirm_delete_picture: 'Delete this file?',
+    settings_total_attachments: 'Total attachments', settings_uploads_size: 'Files size',
+    settings_total_size: 'Total size',
     settings_invoice: 'Invoice Details',
     invoice_issuer_name: 'Name / Business', invoice_issuer_name_placeholder: 'e.g. John Smith - Farm Services',
     invoice_issuer_address: 'Address', invoice_issuer_address_placeholder: 'e.g. 10 Main St, Springfield',
@@ -151,6 +185,32 @@ const TRANSLATIONS = {
     invoice_no_issuer: 'Please configure your invoice details in Settings before generating an invoice.',
     form_vat: 'VAT', form_vat_none: 'No VAT', form_vat_include: 'Include VAT',
     form_vat_rate: 'VAT rate (%)', form_vat_amount: 'VAT amount', form_vat_gross: 'Gross total (w/ VAT)',
+    form_status: 'Status', form_status_scheduled: 'Scheduled', form_status_completed: 'Completed',
+    tag_scheduled: 'Scheduled',
+    agenda_title: 'Agenda', agenda_upcoming: 'Upcoming', agenda_new_appt: '+ Schedule',
+    agenda_no_upcoming: 'No appointments', agenda_no_upcoming_sub: 'Create one using the button above',
+    agenda_day_services: 'Services on this day', agenda_no_day: 'No services on this day',
+    months_short: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
+    weekdays_short: ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],
+    map_pick: '📍 Pick on map',
+    map_search_placeholder: 'Search address...',
+    map_drag_hint: 'Click the map or drag the pin to select',
+    map_confirm: 'Confirm address',
+    map_my_location: 'My location',
+    map_no_results: 'No results',
+    map_locating: 'Locating...',
+    settings_travel_calc: 'Auto travel fee',
+    settings_base_address: 'Base address (departure point)',
+    settings_base_address_placeholder: 'Pick on map or type address',
+    settings_base_set: 'Base address set ✓',
+    settings_price_per_km: 'Price per km (€)',
+    settings_fee_step: 'Rounding step (€)',
+    settings_min_fee: 'Minimum fee (€)',
+    form_calc_travel: '🚗 Calculate travel',
+    toast_no_base_address: 'Set your base address in Settings first',
+    toast_no_client_address: 'This client has no address set',
+    toast_travel_calc_error: 'Could not calculate distance',
+    form_edit_client: '✎ Edit client',
   },
 };
 
@@ -171,25 +231,31 @@ const state = {
   editingId: null,
   lang: localStorage.getItem('lang') || 'pt',
   globalView: false,
+  calendarSelectedDay: null,
+  calendarServices: [],
 };
 
 // ── API ───────────────────────────────────────────────────
 const api = {
-  async get(path) {
-    const r = await fetch(path);
+  async _handle(r) {
+    if (!r.ok) {
+      let msg = `HTTP ${r.status}`;
+      try { const e = await r.json(); if (e.error) msg = e.error; } catch (_) {}
+      throw new Error(msg);
+    }
     return r.json();
   },
-  async post(path, body) {
-    const r = await fetch(path, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
-    return r.json();
+  get(path) {
+    return fetch(path).then(r => api._handle(r));
   },
-  async put(path, body) {
-    const r = await fetch(path, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
-    return r.json();
+  post(path, body) {
+    return fetch(path, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) }).then(r => api._handle(r));
   },
-  async del(path) {
-    const r = await fetch(path, { method:'DELETE' });
-    return r.json();
+  put(path, body) {
+    return fetch(path, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) }).then(r => api._handle(r));
+  },
+  del(path) {
+    return fetch(path, { method:'DELETE' }).then(r => api._handle(r));
   },
 };
 
@@ -226,6 +292,7 @@ async function renderView(view) {
   else if (view === 'list') await renderList();
   else if (view === 'clients') await renderClients();
   else if (view === 'settings') await renderSettings();
+  else if (view === 'agenda') await renderAgenda();
 }
 
 // ── Dashboard ─────────────────────────────────────────────
@@ -300,6 +367,18 @@ async function renderDashboard() {
         <div class="stat-value accent">${s.total_tips.toFixed(2)} ${cur}</div>
       </div>` : '<div class="stat-block"></div>'}
     </div>
+
+    ${(s.total_operator > 0 || s.total_machine > 0) ? `
+    <div class="card-row" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+      <div class="stat-block">
+        <div class="stat-label">${t('stat_operator')}</div>
+        <div class="stat-value">${s.total_operator ? s.total_operator.toFixed(2) + ' ' + cur : '—'}</div>
+      </div>
+      <div class="stat-block">
+        <div class="stat-label">${t('stat_machine')}</div>
+        <div class="stat-value">${s.total_machine ? s.total_machine.toFixed(2) + ' ' + cur : '—'}</div>
+      </div>
+    </div>` : ''}
 
     ${byClient.length ? `
     <div class="card">
@@ -399,10 +478,13 @@ function serviceCard(s) {
   if (s.hourmeter_start != null || s.hourmeter_end != null) {
     chips.push(`<span class="chip horim">⚙️ ${s.hourmeter_start ?? '?'} → ${s.hourmeter_end ?? '?'} h${s.hourmeter_delta != null ? ' (Δ' + parseFloat(s.hourmeter_delta).toFixed(1) + ')' : ''}</span>`);
   }
-  if (s.price_per_hour != null) {
-    let billing = `${s.price_per_hour}${cur}/h`;
+  const opRate   = s.operator_rate != null ? parseFloat(s.operator_rate) : 0;
+  const machRate = s.machine_rate  != null ? parseFloat(s.machine_rate)  : 0;
+  if (opRate || machRate) {
+    const rateStr = (opRate && machRate) ? `${opRate}+${machRate}${cur}/h` : `${opRate || machRate}${cur}/h`;
+    let billing = rateStr;
     if (s.travel_fee) billing += ` +${s.travel_fee}${cur}`;
-    if (s.discount) billing += ` -${s.discount}${cur} ${t('discount_abbr')}`;
+    if (s.discount)   billing += ` -${s.discount}${cur} ${t('discount_abbr')}`;
     chips.push(`<span class="chip billing">💶 ${billing}</span>`);
   }
   if (s.tip > 0) {
@@ -421,9 +503,12 @@ function serviceCard(s) {
         : parseFloat(s.value))
     : null;
 
-  const paymentTag = grossValue != null
-    ? `<div class="payment-tag ${s.paid ? 'paid' : 'pending'}">${s.paid ? t('tag_paid') : t('tag_pending')}</div>`
-    : '';
+  const isScheduled = s.status === 'scheduled';
+  const statusTag = isScheduled
+    ? `<div class="payment-tag scheduled">${t('tag_scheduled')}</div>`
+    : grossValue != null
+      ? `<div class="payment-tag ${s.paid ? 'paid' : 'pending'}">${s.paid ? t('tag_paid') : t('tag_pending')}</div>`
+      : '';
 
   return `
     <div class="service-item" data-id="${s.id}">
@@ -435,7 +520,7 @@ function serviceCard(s) {
         </div>
         <div style="text-align:right;flex-shrink:0">
           ${grossValue != null ? `<div class="service-value">${grossValue.toFixed(2)} ${cur}</div>` : ''}
-          ${paymentTag}
+          ${statusTag}
         </div>
       </div>
       ${chips.length ? `<div class="service-chips">${chips.join('')}</div>` : ''}
@@ -462,18 +547,33 @@ function serviceFormHtml(s = {}) {
 
   // Pre-fill from settings defaults when creating a new service
   const isNew = !s.id;
-  const defaultPricePerHour = isNew ? (s.price_per_hour ?? localStorage.getItem('default_price_per_hour') ?? '') : (s.price_per_hour ?? '');
+  const defaultOperatorRate = isNew ? (s.operator_rate ?? localStorage.getItem('default_operator_rate') ?? '') : (s.operator_rate ?? '');
+  const defaultMachineRate  = isNew ? (s.machine_rate  ?? localStorage.getItem('default_machine_rate')  ?? '') : (s.machine_rate  ?? '');
   const defaultTravelFee = isNew ? (s.travel_fee ?? localStorage.getItem('default_travel_fee') ?? '') : (s.travel_fee ?? '');
   const defaultPaid = isNew ? (s.paid ?? localStorage.getItem('default_paid') ?? '0') : (s.paid ?? '0');
+
+  const serviceDate = s.date || today;
+  const defaultStatus = s.status || (serviceDate > today ? 'scheduled' : 'completed');
+  const hasExistingClient = !!(s.client_id && state.clients.some(c => c.id == s.client_id));
 
   return `
     <div class="form-grid">
       <div class="form-row">
         <div class="form-group">
           <label class="form-label">${t('form_date')}</label>
-          <input type="date" class="form-control" id="f-date" value="${s.date || today}" required>
+          <input type="date" class="form-control" id="f-date" value="${serviceDate}" required onchange="onDateChange(${isNew ? 'true' : 'false'})">
         </div>
         <div class="form-group">
+          <label class="form-label">${t('form_status')}</label>
+          <select class="form-control" id="f-status">
+            <option value="completed" ${defaultStatus === 'completed' ? 'selected' : ''}>${t('form_status_completed')}</option>
+            <option value="scheduled" ${defaultStatus === 'scheduled' ? 'selected' : ''}>${t('form_status_scheduled')}</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group" style="grid-column:1/-1">
           <label class="form-label">${t('form_client')}</label>
           <select class="form-control" id="f-client" onchange="onClientChange()">
             <option value="">${t('form_no_client')}</option>
@@ -481,6 +581,7 @@ function serviceFormHtml(s = {}) {
             <option value="__new__">${t('form_new_client')}</option>
           </select>
           <input type="text" class="form-control" id="f-client-new" placeholder="${t('form_new_client_placeholder')}" style="margin-top:6px;display:none">
+          <button class="btn btn-ghost btn-sm" id="f-client-edit" type="button" style="margin-top:6px;display:${hasExistingClient ? 'inline-flex' : 'none'}" onclick="editClientFromService()">${t('form_edit_client')}</button>
         </div>
       </div>
 
@@ -526,13 +627,25 @@ function serviceFormHtml(s = {}) {
 
       <div class="form-row">
         <div class="form-group">
-          <label class="form-label">${t('form_price_hour')}</label>
-          <input type="number" class="form-control" id="f-price-per-hour" step="0.5" min="0" placeholder="ex: 25.00" value="${defaultPricePerHour}" oninput="calcTotal()">
+          <label class="form-label">${t('form_operator_rate')}</label>
+          <input type="number" class="form-control" id="f-operator-rate" step="0.5" min="0" placeholder="ex: 15.00" value="${defaultOperatorRate}" oninput="calcTotal()">
         </div>
         <div class="form-group">
-          <label class="form-label">${t('form_travel')}</label>
-          <input type="number" class="form-control" id="f-travel-fee" step="0.5" min="0" placeholder="ex: 10.00" value="${defaultTravelFee}" oninput="calcTotal()">
+          <label class="form-label">${t('form_machine_rate')}</label>
+          <input type="number" class="form-control" id="f-machine-rate" step="0.5" min="0" placeholder="ex: 15.00" value="${defaultMachineRate}" oninput="calcTotal()">
         </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">${t('form_travel')}</label>
+          <div style="display:flex;gap:6px">
+            <input type="number" class="form-control" id="f-travel-fee" step="0.5" min="0" placeholder="ex: 10.00" value="${defaultTravelFee}" oninput="calcTotal()">
+            <button type="button" class="btn btn-ghost btn-sm" id="btn-calc-travel"
+                    onclick="calcTravelFeeFromClient()" title="${t('form_calc_travel')}" style="white-space:nowrap">🚗</button>
+          </div>
+        </div>
+        <div class="form-group"></div>
       </div>
 
       <div class="form-row">
@@ -601,7 +714,7 @@ function serviceFormHtml(s = {}) {
       </div>
       <label class="btn btn-secondary btn-sm" style="cursor:pointer;width:fit-content">
         📷 ${t('form_pictures_add')}
-        <input type="file" accept="image/*" multiple style="display:none" onchange="uploadPictures(this, ${s.id})">
+        <input type="file" accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx" multiple style="display:none" onchange="uploadPictures(this, ${s.id})">
       </label>
       ` : ''}
 
@@ -621,8 +734,17 @@ function serviceFormHtml(s = {}) {
 window.onClientChange = function() {
   const sel = document.getElementById('f-client');
   const newInput = document.getElementById('f-client-new');
+  const editBtn = document.getElementById('f-client-edit');
+  const isExistingClient = sel.value && sel.value !== '__new__';
   newInput.style.display = sel.value === '__new__' ? 'block' : 'none';
+  if (editBtn) editBtn.style.display = isExistingClient ? 'inline-flex' : 'none';
   if (sel.value === '__new__') newInput.focus();
+};
+
+window.editClientFromService = function() {
+  const id = parseInt(document.getElementById('f-client').value);
+  if (!id) return;
+  editClient(id);
 };
 
 window.calcDuration = function() {
@@ -642,15 +764,45 @@ window.calcDuration = function() {
 window.calcTotal = function() {
   if (!calcTotal.manual) {
     const duration = parseFloat(document.getElementById('f-duration')?.value) || 0;
-    const pricePerHour = parseFloat(document.getElementById('f-price-per-hour')?.value) || 0;
-    if (pricePerHour) {
+    const operatorRate = parseFloat(document.getElementById('f-operator-rate')?.value) || 0;
+    const machineRate  = parseFloat(document.getElementById('f-machine-rate')?.value)  || 0;
+    const totalRate = operatorRate + machineRate;
+    if (totalRate) {
       const travelFee = parseFloat(document.getElementById('f-travel-fee')?.value) || 0;
       const discount = parseFloat(document.getElementById('f-discount')?.value) || 0;
-      const total = Math.max(0, (duration * pricePerHour) + travelFee - discount);
+      const total = Math.max(0, (duration * totalRate) + travelFee - discount);
       document.getElementById('f-value').value = total.toFixed(2);
     }
   }
   updateVatDisplay();
+};
+
+window.calcTravelFeeFromClient = async function() {
+  const btn = document.getElementById('btn-calc-travel');
+  if (btn) btn.disabled = true;
+  try {
+    const clientId = document.getElementById('f-client')?.value;
+    const client = state.clients.find(c => String(c.id) === String(clientId));
+    if (!client?.address) { toast(t('toast_no_client_address'), 'error'); return; }
+
+    const base = await getBaseCoords();
+    if (!base) { toast(t('toast_no_base_address'), 'warn'); return; }
+
+    const result = await geocodeAddress(client.address);
+    if (!result) { toast(t('toast_travel_calc_error'), 'error'); return; }
+
+    const clientLat = parseFloat(result.lat), clientLng = parseFloat(result.lon);
+    const distKm = await getRoadDistanceKm(base.lat, base.lng, clientLat, clientLng);
+    const fee = applyTravelFeeFormula(distKm);
+
+    const feeInput = document.getElementById('f-travel-fee');
+    if (feeInput) { feeInput.value = fee.toFixed(2); calcTotal.manual = false; calcTotal(); }
+    toast(`🚗 ${distKm.toFixed(1)} km → ${fee.toFixed(2)} ${getCurrency()}`, 'success');
+  } catch (_) {
+    toast(t('toast_travel_calc_error'), 'error');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
 };
 
 window.onVatChange = function() {
@@ -701,7 +853,8 @@ function getFormData() {
     value: document.getElementById('f-value').value || null,
     hourmeter_start: document.getElementById('f-horim-start').value || null,
     hourmeter_end: document.getElementById('f-horim-end').value || null,
-    price_per_hour: document.getElementById('f-price-per-hour').value || null,
+    operator_rate: document.getElementById('f-operator-rate').value || null,
+    machine_rate:  document.getElementById('f-machine-rate').value  || null,
     travel_fee: document.getElementById('f-travel-fee').value || null,
     discount: document.getElementById('f-discount').value || null,
     paid: document.getElementById('f-paid').value === '1' ? 1 : 0,
@@ -709,6 +862,7 @@ function getFormData() {
     vat_rate: document.getElementById('f-vat-enabled').value === '1'
       ? (parseFloat(document.getElementById('f-vat-rate').value) || 23)
       : null,
+    status: document.getElementById('f-status')?.value || 'completed',
   };
 }
 
@@ -766,12 +920,22 @@ window.loadPictures = async function(serviceId) {
     grid.innerHTML = `<span class="pictures-empty">${t('form_pictures_empty')}</span>`;
     return;
   }
-  grid.innerHTML = attachments.map(a => `
-    <div class="picture-thumb">
-      <img src="/api/attachments/${a.id}" alt="${escapeHtml(a.original_name || '')}" loading="lazy" onclick="viewPicture(${a.id})">
-      <button class="picture-thumb-del" onclick="deletePicture(${a.id}, ${serviceId})" title="Delete">✕</button>
-    </div>
-  `).join('');
+  grid.innerHTML = attachments.map(a => {
+    const mime = a.mime_type || '';
+    const isImage = mime.startsWith('image/');
+    const isVideo = mime.startsWith('video/');
+    const isPdf   = mime === 'application/pdf';
+    const icon = isVideo ? '🎬' : isPdf ? '📄' : '📎';
+    const name  = escapeHtml(a.original_name || 'file');
+    const inner = isImage
+      ? `<img src="/api/attachments/${a.id}" alt="${name}" loading="lazy">`
+      : `<div class="file-thumb-icon">${icon}<span class="file-thumb-name">${name}</span></div>`;
+    return `
+      <div class="picture-thumb${isImage ? '' : ' file-thumb'}" onclick="viewPicture(${a.id})" title="${name}">
+        ${inner}
+        <button class="picture-thumb-del" onclick="event.stopPropagation();deletePicture(${a.id}, ${serviceId})" title="Delete">✕</button>
+      </div>`;
+  }).join('');
 };
 
 window.uploadPictures = async function(input, serviceId) {
@@ -841,7 +1005,10 @@ window.generateInvoice = async function(serviceId) {
     : '';
   const descCell = descMain + descSub || '<span>—</span>';
 
-  const showRate     = s.price_per_hour != null;
+  const opRate    = s.operator_rate != null ? parseFloat(s.operator_rate) : 0;
+  const machRate  = s.machine_rate  != null ? parseFloat(s.machine_rate)  : 0;
+  const totalRate = opRate + machRate;
+  const showRate     = totalRate > 0;
   const showTravel   = travelAmt > 0;
   const showDiscount = discountAmt > 0;
 
@@ -938,7 +1105,7 @@ td{padding:13px 10px;font-size:13px;border-bottom:1px solid #ebedf0;vertical-ali
       <td style="white-space:nowrap">${formatDate(s.date)}</td>
       <td>${descCell}</td>
       <td class="r">${s.duration_hours != null ? s.duration_hours + '\u00a0h' : '—'}</td>
-      ${showRate     ? `<td class="r">${fmt(s.price_per_hour)}</td>` : ''}
+      ${showRate     ? `<td class="r">${fmt(totalRate)}</td>` : ''}
       ${showTravel   ? `<td class="r">${fmt(travelAmt)}</td>`        : ''}
       ${showDiscount ? `<td class="r">-${fmt(discountAmt)}</td>`     : ''}
       <td class="r"><strong>${fmt(valueAmt)}</strong></td>
@@ -974,6 +1141,396 @@ function newService() {
   openModal(t('form_new_service'), serviceFormHtml());
 }
 
+window.onDateChange = function(isNew) {
+  if (!isNew) return;
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const dateVal = document.getElementById('f-date')?.value;
+  const statusEl = document.getElementById('f-status');
+  if (!dateVal || !statusEl) return;
+  statusEl.value = dateVal > todayStr ? 'scheduled' : 'completed';
+};
+
+// ── Agenda / Calendar ─────────────────────────────────────
+async function renderAgenda() {
+  const el = document.getElementById('view-agenda');
+  const [monthServices, upcoming] = await Promise.all([
+    api.get(`/api/services?month=${state.month}&year=${state.year}`),
+    api.get('/api/appointments/upcoming'),
+  ]);
+  state.calendarServices = monthServices;
+
+  const byDay = {};
+  for (const s of monthServices) {
+    if (!byDay[s.date]) byDay[s.date] = [];
+    byDay[s.date].push(s);
+  }
+
+  el.innerHTML = `
+    <div class="section-header">
+      <span class="section-title">${t('agenda_title')}</span>
+      <div style="display:flex;gap:6px;align-items:center">
+        <button class="btn btn-sm btn-primary" onclick="scheduleNew()">${t('agenda_new_appt')}</button>
+        <div class="month-picker">
+          <button id="agenda-prev">‹</button>
+          <span class="month-label">${t('months_short')[state.month-1]} ${state.year}</span>
+          <button id="agenda-next">›</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="padding:10px">
+      ${renderCalendarGrid(state.year, state.month, byDay, state.calendarSelectedDay)}
+    </div>
+
+    <div id="day-detail-panel"></div>
+
+    <div class="card" style="margin-top:12px">
+      <div class="section-title" style="margin-bottom:12px">${t('agenda_upcoming')}</div>
+      ${renderUpcomingList(upcoming)}
+    </div>
+  `;
+
+  document.getElementById('agenda-prev').onclick = () => {
+    state.month--; if (state.month < 1) { state.month = 12; state.year--; }
+    state.calendarSelectedDay = null;
+    renderAgenda();
+  };
+  document.getElementById('agenda-next').onclick = () => {
+    state.month++; if (state.month > 12) { state.month = 1; state.year++; }
+    state.calendarSelectedDay = null;
+    renderAgenda();
+  };
+
+  el.querySelectorAll('.upcoming-item').forEach(item => {
+    item.addEventListener('click', () => editService(parseInt(item.dataset.id)));
+  });
+
+  if (state.calendarSelectedDay) {
+    const dayServices = state.calendarServices.filter(s => s.date === state.calendarSelectedDay);
+    renderDayPanel(state.calendarSelectedDay, dayServices);
+  }
+}
+
+function renderCalendarGrid(year, month, byDay, selectedDay) {
+  const firstDay = new Date(year, month - 1, 1);
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const today = new Date().toISOString().slice(0, 10);
+
+  // Mon-first offset: JS getDay() is 0=Sun,1=Mon..6=Sat → (day+6)%7 → Mon=0
+  const startOffset = (firstDay.getDay() + 6) % 7;
+
+  const cells = [];
+  for (let i = 0; i < startOffset; i++) {
+    cells.push(`<div class="cal-cell cal-empty"></div>`);
+  }
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const services = byDay[dateStr] || [];
+    const isToday = dateStr === today;
+    const isSelected = dateStr === selectedDay;
+
+    const MAX_CHIPS = 2;
+    const chips = services.slice(0, MAX_CHIPS).map(s => {
+      const label = escapeHtml((s.client_name || s.description || '—').slice(0, 12));
+      const cls = s.status === 'scheduled' ? 'cal-event-scheduled' : 'cal-event-completed';
+      return `<div class="cal-event ${cls}" onclick="event.stopPropagation();editService(${s.id})">${label}</div>`;
+    }).join('');
+    const overflow = services.length > MAX_CHIPS
+      ? `<div class="cal-event-more">+${services.length - MAX_CHIPS}</div>`
+      : '';
+
+    const classes = ['cal-cell',
+      isToday ? 'cal-today' : '',
+      isSelected ? 'cal-selected' : '',
+    ].filter(Boolean).join(' ');
+
+    cells.push(`
+      <div class="${classes}" data-date="${dateStr}" onclick="selectCalDay('${dateStr}')">
+        <span class="cal-day-num">${d}</span>
+        ${chips}${overflow}
+      </div>`);
+  }
+
+  const totalCells = cells.length;
+  const remainder = totalCells % 7;
+  if (remainder !== 0) {
+    for (let i = 0; i < 7 - remainder; i++) cells.push(`<div class="cal-cell cal-empty"></div>`);
+  }
+
+  const headers = t('weekdays_short').map(d => `<div class="cal-header-cell">${d}</div>`).join('');
+  return `<div class="cal-weekdays">${headers}</div><div class="cal-days">${cells.join('')}</div>`;
+}
+
+window.selectCalDay = function(dateStr) {
+  state.calendarSelectedDay = dateStr;
+  document.querySelectorAll('.cal-cell').forEach(c => {
+    c.classList.toggle('cal-selected', c.dataset.date === dateStr);
+  });
+  const services = state.calendarServices.filter(s => s.date === dateStr);
+  renderDayPanel(dateStr, services);
+};
+
+function renderDayPanel(dateStr, services) {
+  const panel = document.getElementById('day-detail-panel');
+  if (!panel) return;
+  panel.innerHTML = `
+    <div class="card" style="margin-top:10px">
+      <div class="section-title" style="margin-bottom:10px">
+        ${t('agenda_day_services')} — ${formatDate(dateStr)}
+      </div>
+      ${services.length === 0
+        ? `<div class="empty-sub" style="color:var(--text3);padding:12px 0">${t('agenda_no_day')}</div>`
+        : services.map(s => serviceCard(s)).join('')
+      }
+    </div>
+  `;
+  panel.querySelectorAll('.service-item').forEach(item => {
+    item.addEventListener('click', () => editService(parseInt(item.dataset.id)));
+  });
+}
+
+function renderUpcomingList(upcoming) {
+  if (!upcoming.length) {
+    return `<div class="empty-sub" style="color:var(--text3);padding:4px 0">${t('agenda_no_upcoming')}</div>`;
+  }
+  const groups = {};
+  for (const s of upcoming) {
+    if (!groups[s.date]) groups[s.date] = [];
+    groups[s.date].push(s);
+  }
+  return Object.entries(groups).map(([date, services]) => `
+    <div class="upcoming-group">
+      <div class="upcoming-date-label">${formatDate(date)}</div>
+      ${services.map(s => `
+        <div class="upcoming-item service-item" data-id="${s.id}" style="cursor:pointer">
+          <div class="service-top">
+            <div>
+              <div class="service-client">${escapeHtml(s.client_name || '—')}</div>
+              ${s.description ? `<div class="service-description">${escapeHtml(s.description)}</div>` : ''}
+              ${s.start_time ? `<div class="service-date">${s.start_time}${s.end_time ? ' – ' + s.end_time : ''}</div>` : ''}
+            </div>
+            <div class="payment-tag scheduled">${t('tag_scheduled')}</div>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `).join('');
+}
+
+window.scheduleNew = function() {
+  const date = state.calendarSelectedDay || new Date().toISOString().slice(0, 10);
+  openModal(t('form_new_service'), serviceFormHtml({ date, status: 'scheduled' }));
+};
+
+// ── Map picker ────────────────────────────────────────────
+const mapPicker = { map: null, marker: null, targetId: null, resolvedAddress: '', lat: null, lng: null, onConfirm: null };
+
+window.openMapPicker = function(targetInputId) {
+  mapPicker.targetId = targetInputId;
+  mapPicker.resolvedAddress = '';
+  mapPicker.lat = null;
+  mapPicker.lng = null;
+
+  const overlay = document.getElementById('map-picker-overlay');
+  overlay.classList.remove('hidden');
+
+  // Update i18n strings in the static HTML
+  document.getElementById('map-search-input').placeholder = t('map_search_placeholder');
+  document.getElementById('map-resolved-address').textContent = t('map_drag_hint');
+  overlay.querySelector('.map-picker-footer .btn-primary').textContent = t('map_confirm');
+  document.getElementById('map-search-results').innerHTML = '';
+  document.getElementById('map-search-input').value = '';
+
+  requestAnimationFrame(() => {
+    if (!mapPicker.map) {
+      // Default center: Portugal
+      mapPicker.map = L.map('map-leaflet').setView([39.5, -8.0], 6);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© <a href="https://www.openstreetmap.org">OpenStreetMap</a>',
+        maxZoom: 19,
+      }).addTo(mapPicker.map);
+
+      mapPicker.marker = L.marker([39.5, -8.0], { draggable: true }).addTo(mapPicker.map);
+      mapPicker.marker.on('dragend', () => {
+        const { lat, lng } = mapPicker.marker.getLatLng();
+        reverseGeocode(lat, lng);
+      });
+      mapPicker.map.on('click', e => {
+        mapPicker.marker.setLatLng(e.latlng);
+        reverseGeocode(e.latlng.lat, e.latlng.lng);
+      });
+    } else {
+      mapPicker.map.invalidateSize();
+    }
+
+    // If there's an existing address, try to show it on the map
+    const existing = document.getElementById(targetInputId)?.value?.trim();
+    if (existing) geocodeForMap(existing);
+  });
+};
+
+async function reverseGeocode(lat, lng) {
+  mapPicker.lat = lat;
+  mapPicker.lng = lng;
+  const hint = document.getElementById('map-resolved-address');
+  hint.textContent = t('map_locating');
+  try {
+    const r = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`,
+      { headers: { 'Accept-Language': state.lang === 'pt' ? 'pt' : 'en' } }
+    );
+    const data = await r.json();
+    const addr = buildAddressString(data.address) || data.display_name || `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+    mapPicker.resolvedAddress = addr;
+    hint.textContent = addr;
+  } catch (_) {
+    const coords = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+    mapPicker.resolvedAddress = coords;
+    hint.textContent = coords;
+  }
+}
+
+function buildAddressString(a) {
+  if (!a) return '';
+  const parts = [];
+  if (a.road) parts.push(a.house_number ? `${a.road} ${a.house_number}` : a.road);
+  const city = a.city || a.town || a.village || a.municipality || a.county;
+  if (city) parts.push(city);
+  if (a.postcode) parts.push(a.postcode);
+  if (a.country && parts.length < 2) parts.push(a.country);
+  return parts.join(', ');
+}
+
+async function geocodeAddress(query) {
+  try {
+    const r = await fetch(
+      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`,
+      { headers: { 'Accept-Language': state.lang === 'pt' ? 'pt' : 'en' } }
+    );
+    const data = await r.json();
+    return data[0] || null;
+  } catch (_) { return null; }
+}
+
+async function geocodeForMap(query) {
+  const result = await geocodeAddress(query);
+  if (result) {
+    const lat = parseFloat(result.lat);
+    const lon = parseFloat(result.lon);
+    mapPicker.map.setView([lat, lon], 15);
+    mapPicker.marker.setLatLng([lat, lon]);
+    mapPicker.lat = lat;
+    mapPicker.lng = lon;
+    mapPicker.resolvedAddress = query;
+    document.getElementById('map-resolved-address').textContent = query;
+  }
+}
+
+let mapSearchTimeout;
+window.onMapSearch = function(query) {
+  clearTimeout(mapSearchTimeout);
+  const results = document.getElementById('map-search-results');
+  if (!query.trim()) { results.innerHTML = ''; return; }
+  mapSearchTimeout = setTimeout(async () => {
+    try {
+      const r = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=5&addressdetails=1`,
+        { headers: { 'Accept-Language': state.lang === 'pt' ? 'pt' : 'en' } }
+      );
+      const data = await r.json();
+      results.innerHTML = data.length
+        ? data.map(item => `
+            <div class="map-search-result" onclick="selectMapResult(${item.lat},${item.lon})">
+              ${escapeHtml(item.display_name)}
+            </div>`).join('')
+        : `<div class="map-search-result map-no-result">${t('map_no_results')}</div>`;
+    } catch (_) {}
+  }, 400);
+};
+
+window.selectMapResult = function(lat, lon) {
+  const latlng = [parseFloat(lat), parseFloat(lon)];
+  mapPicker.map.setView(latlng, 16);
+  mapPicker.marker.setLatLng(latlng);
+  document.getElementById('map-search-results').innerHTML = '';
+  document.getElementById('map-search-input').value = '';
+  reverseGeocode(lat, lon);
+};
+
+window.useMyLocation = function() {
+  if (!navigator.geolocation) { toast('Geolocation not supported', 'error'); return; }
+  document.getElementById('map-resolved-address').textContent = t('map_locating');
+  navigator.geolocation.getCurrentPosition(pos => {
+    const { latitude, longitude } = pos.coords;
+    mapPicker.map.setView([latitude, longitude], 16);
+    mapPicker.marker.setLatLng([latitude, longitude]);
+    reverseGeocode(latitude, longitude);
+  }, () => toast(t('map_locating'), 'error'));
+};
+
+window.confirmMapPicker = function() {
+  if (mapPicker.resolvedAddress && mapPicker.targetId) {
+    const input = document.getElementById(mapPicker.targetId);
+    if (input) { input.value = mapPicker.resolvedAddress; input.dispatchEvent(new Event('input')); }
+  }
+  if (mapPicker.onConfirm && mapPicker.lat != null) {
+    mapPicker.onConfirm(mapPicker.lat, mapPicker.lng, mapPicker.resolvedAddress);
+  }
+  mapPicker.onConfirm = null;
+  closeMapPicker();
+};
+
+window.closeMapPicker = function() {
+  document.getElementById('map-picker-overlay').classList.add('hidden');
+  document.getElementById('map-search-results').innerHTML = '';
+};
+
+// ── Travel fee distance helpers ───────────────────────────
+
+function haversineKm(lat1, lng1, lat2, lng2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat/2)**2
+          + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLng/2)**2;
+  return R * 2 * Math.asin(Math.sqrt(a));
+}
+
+async function getRoadDistanceKm(lat1, lng1, lat2, lng2) {
+  try {
+    const r = await fetch(
+      `https://router.project-osrm.org/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?overview=false`
+    );
+    const d = await r.json();
+    if (d.code === 'Ok' && d.routes?.length) return d.routes[0].distance / 1000;
+  } catch (_) {}
+  return haversineKm(lat1, lng1, lat2, lng2);
+}
+
+function applyTravelFeeFormula(distKm) {
+  const pricePerKm = parseFloat(localStorage.getItem('travel_price_per_km') || '1');
+  const step       = parseFloat(localStorage.getItem('travel_fee_step')     || '5');
+  const minFee     = parseFloat(localStorage.getItem('travel_min_fee')      || '20');
+  const raw        = distKm * pricePerKm;
+  const stepped    = Math.ceil(raw / step) * step;
+  return Math.max(minFee, stepped);
+}
+
+async function getBaseCoords() {
+  const cachedLat = parseFloat(localStorage.getItem('base_lat'));
+  const cachedLng = parseFloat(localStorage.getItem('base_lng'));
+  if (!isNaN(cachedLat) && !isNaN(cachedLng)) return { lat: cachedLat, lng: cachedLng };
+  const addr = (localStorage.getItem('base_address') || '').trim();
+  if (!addr) return null;
+  const result = await geocodeAddress(addr);
+  if (!result) return null;
+  const lat = parseFloat(result.lat), lng = parseFloat(result.lon);
+  localStorage.setItem('base_lat', String(lat));
+  localStorage.setItem('base_lng', String(lng));
+  return { lat, lng };
+}
+
 // ── Clients ───────────────────────────────────────────────
 async function renderClients() {
   const el = document.getElementById('view-clients');
@@ -996,6 +1553,7 @@ async function renderClients() {
       <div class="form-group">
         <label class="form-label">${t('client_address')}</label>
         <input type="text" class="form-control" id="new-client-address" placeholder="${t('client_address_placeholder')}">
+        <button class="btn btn-ghost btn-sm" style="margin-top:6px" type="button" onclick="openMapPicker('new-client-address')">${t('map_pick')}</button>
       </div>
       <button class="btn btn-primary" onclick="addClient()" style="width:100%">${t('client_add')}</button>
     </div>
@@ -1056,6 +1614,7 @@ window.editClient = function(id) {
     <div class="form-group">
       <label class="form-label">${t('client_address')}</label>
       <input type="text" class="form-control" id="edit-client-address" value="${escapeHtml(c.address || '')}" placeholder="${t('client_address_placeholder')}">
+      <button class="btn btn-ghost btn-sm" style="margin-top:6px" type="button" onclick="openMapPicker('edit-client-address')">${t('map_pick')}</button>
     </div>
     <div style="display:flex;gap:8px;margin-top:8px">
       <button class="btn btn-secondary" style="flex:1" onclick="closeModal()">${t('form_cancel')}</button>
@@ -1089,6 +1648,7 @@ async function init() {
   // Migrate legacy localStorage keys (pre-v0.6)
   const lsKeyMigrations = {
     'default_preco_hora': 'default_price_per_hour',
+    'default_price_per_hour': 'default_operator_rate',
     'default_deslocacao': 'default_travel_fee',
     'default_pago': 'default_paid',
   };
@@ -1107,7 +1667,7 @@ async function init() {
   state.clients = await api.get('/api/clients');
 
   // Nav — apply translations and attach click handlers
-  const navKeyMap = { dashboard: 'nav_dashboard', list: 'nav_lista', clients: 'nav_clientes', settings: 'nav_settings' };
+  const navKeyMap = { dashboard: 'nav_dashboard', list: 'nav_lista', clients: 'nav_clientes', settings: 'nav_settings', agenda: 'nav_agenda' };
   document.querySelectorAll('.nav-btn').forEach(btn => {
     const key = navKeyMap[btn.dataset.view];
     if (key) btn.querySelector('span').textContent = t(key);
@@ -1150,7 +1710,13 @@ async function renderSettings() {
   // Fetch app stats and version
   const [stats, version] = await Promise.all([api.get('/api/stats'), api.get('/api/version')]);
 
-  const defaultPrecoHora = localStorage.getItem('default_price_per_hour') || '';
+  const defaultOperatorRate = localStorage.getItem('default_operator_rate') || '';
+  const defaultMachineRate  = localStorage.getItem('default_machine_rate')  || '';
+  const baseAddress      = localStorage.getItem('base_address')       || '';
+  const baseCoordsSet    = !!(localStorage.getItem('base_lat'));
+  const travelPricePerKm = localStorage.getItem('travel_price_per_km') || '1';
+  const travelFeeStep    = localStorage.getItem('travel_fee_step')     || '5';
+  const travelMinFee     = localStorage.getItem('travel_min_fee')      || '20';
   const defaultDeslocacao = localStorage.getItem('default_travel_fee') || '';
   const defaultPago = localStorage.getItem('default_paid') || '0';
   const currency = getCurrency();
@@ -1185,20 +1751,68 @@ async function renderSettings() {
       </div>
     </div>
 
+    <!-- Auto Travel Fee -->
+    <div class="card" style="margin-bottom:12px">
+      <div class="section-title" style="margin-bottom:12px">${t('settings_travel_calc')}</div>
+      <div class="form-group" style="margin-bottom:10px">
+        <label class="form-label">${t('settings_base_address')}</label>
+        <div style="display:flex;gap:6px;align-items:center">
+          <input type="text" class="form-control" id="base-address-input"
+                 placeholder="${t('settings_base_address_placeholder')}"
+                 value="${escapeHtml(baseAddress)}"
+                 oninput="localStorage.setItem('base_address',this.value);localStorage.removeItem('base_lat');localStorage.removeItem('base_lng')">
+          <button class="btn btn-ghost btn-sm" onclick="openBaseAddressPicker()" style="white-space:nowrap">
+            ${t('map_pick')}
+          </button>
+        </div>
+        <div id="base-address-hint" style="font-size:11px;color:var(--text3);margin-top:4px${baseAddress ? '' : ';display:none'}">
+          ${baseCoordsSet ? '📍 ' + t('settings_base_set') : '⚠ ' + t('map_drag_hint')}
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">${t('settings_price_per_km')}</label>
+          <input type="number" class="form-control" step="0.1" min="0" value="${escapeHtml(travelPricePerKm)}"
+                 oninput="saveSetting('travel_price_per_km', this.value)">
+        </div>
+        <div class="form-group">
+          <label class="form-label">${t('settings_fee_step')}</label>
+          <input type="number" class="form-control" step="1" min="1" value="${escapeHtml(travelFeeStep)}"
+                 oninput="saveSetting('travel_fee_step', this.value)">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">${t('settings_min_fee')}</label>
+          <input type="number" class="form-control" step="1" min="0" value="${escapeHtml(travelMinFee)}"
+                 oninput="saveSetting('travel_min_fee', this.value)">
+        </div>
+        <div class="form-group"></div>
+      </div>
+    </div>
+
     <!-- Default Values -->
     <div class="card" style="margin-bottom:12px">
       <div class="section-title" style="margin-bottom:12px">${t('settings_defaults')}</div>
       <div class="form-row">
         <div class="form-group">
-          <label class="form-label">${t('settings_default_price')}</label>
-          <input type="number" class="form-control" step="0.5" min="0" value="${escapeHtml(defaultPrecoHora)}"
-                 oninput="saveSetting('default_price_per_hour', this.value)">
+          <label class="form-label">${t('settings_default_operator_rate')}</label>
+          <input type="number" class="form-control" step="0.5" min="0" value="${escapeHtml(defaultOperatorRate)}"
+                 oninput="saveSetting('default_operator_rate', this.value)">
         </div>
+        <div class="form-group">
+          <label class="form-label">${t('settings_default_machine_rate')}</label>
+          <input type="number" class="form-control" step="0.5" min="0" value="${escapeHtml(defaultMachineRate)}"
+                 oninput="saveSetting('default_machine_rate', this.value)">
+        </div>
+      </div>
+      <div class="form-row">
         <div class="form-group">
           <label class="form-label">${t('settings_default_travel')}</label>
           <input type="number" class="form-control" step="0.5" min="0" value="${escapeHtml(defaultDeslocacao)}"
                  oninput="saveSetting('default_travel_fee', this.value)">
         </div>
+        <div class="form-group"></div>
       </div>
       <div class="form-row">
         <div class="form-group">
@@ -1264,22 +1878,19 @@ async function renderSettings() {
     <!-- Data Statistics -->
     <div class="card" style="margin-bottom:12px">
       <div class="section-title" style="margin-bottom:12px">${t('settings_data_stats')}</div>
-      <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)">
-        <span class="stat-label">${t('settings_total_services')}</span>
-        <span>${stats.totalServices}</span>
-      </div>
-      <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)">
-        <span class="stat-label">${t('settings_total_clients')}</span>
-        <span>${stats.totalClients}</span>
-      </div>
-      <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)">
-        <span class="stat-label">${t('settings_db_size')}</span>
-        <span>${formatBytes(stats.dbSizeBytes)}</span>
-      </div>
-      <div style="display:flex;justify-content:space-between;padding:6px 0">
-        <span class="stat-label">${t('settings_date_range')}</span>
-        <span>${stats.dateRange && stats.dateRange.first ? stats.dateRange.first + ' → ' + stats.dateRange.last : '—'}</span>
-      </div>
+      ${[
+        [t('settings_total_services'), stats.totalServices],
+        [t('settings_total_clients'),  stats.totalClients],
+        [t('settings_total_attachments'), stats.totalAttachments],
+        [t('settings_db_size'),        formatBytes(stats.dbSizeBytes)],
+        [t('settings_uploads_size'),   formatBytes(stats.uploadsSizeBytes)],
+        [t('settings_total_size'),     formatBytes((stats.dbSizeBytes || 0) + (stats.uploadsSizeBytes || 0))],
+        [t('settings_date_range'),     stats.dateRange?.first ? stats.dateRange.first + ' → ' + stats.dateRange.last : '—'],
+      ].map(([label, value], i, arr) => `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;${i < arr.length-1 ? 'border-bottom:1px solid var(--border)' : ''}">
+          <span class="stat-label">${label}</span>
+          <span style="font-size:13px">${value}</span>
+        </div>`).join('')}
     </div>
 
     <!-- Version -->
@@ -1293,6 +1904,19 @@ async function renderSettings() {
 }
 
 // ── Settings helpers ──────────────────────────────────────
+window.openBaseAddressPicker = function() {
+  mapPicker.onConfirm = (lat, lng, addr) => {
+    localStorage.setItem('base_address', addr);
+    localStorage.setItem('base_lat', String(lat));
+    localStorage.setItem('base_lng', String(lng));
+    const inp = document.getElementById('base-address-input');
+    if (inp) inp.value = addr;
+    const hint = document.getElementById('base-address-hint');
+    if (hint) { hint.style.display = ''; hint.textContent = '📍 ' + t('settings_base_set'); }
+  };
+  openMapPicker('base-address-input');
+};
+
 window.saveSetting = function(key, value) {
   localStorage.setItem(key, value);
 };
@@ -1300,7 +1924,7 @@ window.saveSetting = function(key, value) {
 window.setLang = function(lang) {
   state.lang = lang;
   localStorage.setItem('lang', lang);
-  const navKeyMap = { dashboard: 'nav_dashboard', list: 'nav_lista', clients: 'nav_clientes', settings: 'nav_settings' };
+  const navKeyMap = { dashboard: 'nav_dashboard', list: 'nav_lista', clients: 'nav_clientes', settings: 'nav_settings', agenda: 'nav_agenda' };
   document.querySelectorAll('.nav-btn').forEach(btn => {
     const key = navKeyMap[btn.dataset.view];
     if (key) btn.querySelector('span').textContent = t(key);

@@ -1,5 +1,67 @@
 # Changelog
 
+## [1.6.1] - 2026-04-26
+
+### Added
+- **Edit client from service form**: when a client is selected in the service form, an "Edit client" button appears inline — opens the client editor without leaving the form context
+- **Reordered navigation**: menu order is now Summary → Services → Agenda → Clients → Settings
+
+## [1.6.0] - 2026-04-26
+
+### Added
+- **Auto travel fee**: Settings → "Auto travel fee" card — configure base address (with map picker), price/km, rounding step, and minimum fee
+- Service form: 🚗 button next to the travel fee field; calculates road distance from base to client address (OSRM routing API, straight-line Haversine fallback) and applies `fee = max(min, ceil(dist × €/km ÷ step) × step)`
+- Base address coordinates cached in localStorage after first geocode; cleared when address is manually edited
+- Map picker now captures and exposes lat/lng to caller via optional `onConfirm` callback
+
+### Fixed
+- Backup filename now includes the date (e.g. `servilog-backup-2026-04-26.slb`) instead of a generic name
+- Backup restore is now atomic: changes are written to temp paths first and swapped in one step — a failed restore can no longer corrupt the live database or uploads folder
+- API calls now properly check HTTP status and surface server-side error messages to the user instead of silently failing
+- Base address hint in Settings updates immediately after confirming the map picker, without needing a page reload
+
+## [1.5.0] - 2026-04-25
+
+### Added
+- **Operator rate** and **Machine rate** fields in the billing section; total price/hour = operator + machine
+- Summary dashboard shows individual **Operator** and **Machine** cost totals for the selected period (operator rate × hours and machine rate × hours)
+- Settings: two separate default rate fields (Operator /h and Machine /h) replace the single price/hour default
+
+### Changed
+- Service cards show combined rate as `15+15€/h` when both rates are set, or a single rate if only one is used
+- CSV export now has `Operator/h` and `Machine/h` columns instead of `Price/h`
+- Invoice rate column shows the combined operator + machine rate
+
+### Migration
+- Existing services: old `price_per_hour` value is automatically carried over as `operator_rate`; `machine_rate` starts at 0
+
+## [1.4.0] - 2026-04-22
+
+### Added
+- **Map picker** for client address: "📍 Pick on map" button opens an OpenStreetMap panel (Leaflet.js, no API key required)
+  - Click or drag the pin → address auto-filled via Nominatim reverse geocoding
+  - Address search box with live results and 400 ms debounce
+  - "My location" button uses the device GPS
+  - Pre-centers on the existing address when re-opened
+- **Agenda calendar**: day cells now show full event chips (client name, colour-coded orange/blue) instead of dots; clicking a chip opens the service directly; "+N" overflow indicator for busy days
+- **File attachments**: services now accept any file type — images, video (MP4, MOV, WebM), PDF, Word, Excel — up to 100 MB; non-image files display a 🎬 / 📄 / 📎 icon
+
+### Fixed
+- Storage statistics now correctly report uploads folder size separately from the SQLite database, plus a combined total — previously only the DB file was counted
+
+### Changed
+- Attachment section renamed from "Fotos / Photos" to "Anexos / Attachments"
+
+## [1.3.0] - 2026-04-22
+
+### Added
+- Agenda tab: monthly calendar grid with dot indicators, day detail panel, upcoming appointments list
+- Appointment scheduling: services now have a `status` field (`completed` | `scheduled`)
+- Scheduled services shown with a blue "Scheduled" badge on service cards and in all views
+- Service form auto-defaults status to "Scheduled" when a future date is selected
+- New API endpoint: `GET /api/appointments/upcoming` — returns scheduled services with date ≥ today
+- Dashboard summary and CSV export exclude scheduled (unbilled) services from financial aggregations
+
 ## [1.2.3] - 2026-04-20
 
 ### Added

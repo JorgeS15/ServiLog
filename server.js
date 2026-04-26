@@ -117,6 +117,15 @@ function runMigrations() {
 
   // v1.2.2 — VAT rate
   tryAlter(`ALTER TABLE services ADD COLUMN vat_rate REAL DEFAULT NULL`);
+
+  // v1.3.0 — scheduling status
+  tryAlter(`ALTER TABLE services ADD COLUMN status TEXT DEFAULT 'completed'`);
+
+  // v1.5.0 — split price_per_hour into operator_rate + machine_rate
+  tryAlter(`ALTER TABLE services ADD COLUMN operator_rate REAL DEFAULT 0`);
+  tryAlter(`ALTER TABLE services ADD COLUMN machine_rate REAL DEFAULT 0`);
+  db.prepare(`UPDATE services SET operator_rate = COALESCE(price_per_hour, 0)
+    WHERE price_per_hour IS NOT NULL AND operator_rate = 0`).run();
 }
 runMigrations();
 
@@ -174,7 +183,7 @@ app.delete('/api/clients/:id', (req, res) => {
 
 // ── Services ──────────────────────────────────────────────
 app.get('/api/services', (req, res) => {
-  const { month, year, client_id } = req.query;
+  const { month, year, client_id, status } = req.query;
   let query = `
     SELECT s.*, c.name as client_name,
            COUNT(a.id) as attachment_count
@@ -192,8 +201,25 @@ app.get('/api/services', (req, res) => {
     query += ` AND s.client_id = ?`;
     params.push(client_id);
   }
+  if (status) {
+    query += ` AND s.status = ?`;
+    params.push(status);
+  }
   query += ` GROUP BY s.id ORDER BY s.date DESC, s.start_time DESC`;
   const rows = db.prepare(query).all(...params);
+  res.json(rows);
+});
+
+app.get('/api/appointments/upcoming', (req, res) => {
+  const today = new Date().toISOString().slice(0, 10);
+  const rows = db.prepare(`
+    SELECT s.id, s.date, s.start_time, s.end_time, s.description,
+           s.status, c.name as client_name
+    FROM services s
+    LEFT JOIN clients c ON s.client_id = c.id
+    WHERE s.status = 'scheduled' AND s.date >= ?
+    ORDER BY s.date ASC, s.start_time ASC
+  `).all(today);
   res.json(rows);
 });
 
@@ -220,9 +246,10 @@ function calcDuration(start_time, end_time, duration_hours, discount_hours) {
   return parseFloat(duration.toFixed(4));
 }
 
-function calcValueAuto(duration, price_per_hour, travel_fee, discount) {
-  if (!price_per_hour || !duration) return null;
-  let total = parseFloat(price_per_hour) * parseFloat(duration);
+function calcValueAuto(duration, operator_rate, machine_rate, travel_fee, discount) {
+  const totalRate = (parseFloat(operator_rate) || 0) + (parseFloat(machine_rate) || 0);
+  if (!totalRate || !duration) return null;
+  let total = totalRate * parseFloat(duration);
   if (travel_fee) total += parseFloat(travel_fee);
   if (discount) total = Math.max(0, total - parseFloat(discount));
   return parseFloat(total.toFixed(2));
@@ -233,7 +260,7 @@ app.post('/api/services', (req, res) => {
     date, start_time, end_time, duration_hours, discount_hours,
     client_id, description, value,
     hourmeter_start, hourmeter_end,
-    price_per_hour, travel_fee, discount, paid, tip, vat_rate
+    operator_rate, machine_rate, travel_fee, discount, paid, tip, vat_rate, status
   } = req.body;
 
   if (!date) return res.status(400).json({ error: 'Date is required' });
@@ -244,14 +271,14 @@ app.post('/api/services', (req, res) => {
   }
 
   const duration = calcDuration(start_time, end_time, duration_hours, discount_hours);
-  const finalValue = value ? parseFloat(value) : calcValueAuto(duration, price_per_hour, travel_fee, discount);
+  const finalValue = value ? parseFloat(value) : calcValueAuto(duration, operator_rate, machine_rate, travel_fee, discount);
 
   const result = db.prepare(`
     INSERT INTO services
       (date, start_time, end_time, duration_hours, discount_hours, client_id, description, value,
        hourmeter_start, hourmeter_end, hourmeter_delta,
-       price_per_hour, travel_fee, discount, paid, tip, vat_rate)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+       operator_rate, machine_rate, travel_fee, discount, paid, tip, vat_rate, status)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
   `).run(
     date, start_time || null, end_time || null,
     duration,
@@ -261,12 +288,14 @@ app.post('/api/services', (req, res) => {
     hourmeter_start != null ? parseFloat(hourmeter_start) : null,
     hourmeter_end != null ? parseFloat(hourmeter_end) : null,
     delta,
-    price_per_hour ? parseFloat(price_per_hour) : null,
+    operator_rate ? parseFloat(operator_rate) : 0,
+    machine_rate  ? parseFloat(machine_rate)  : 0,
     travel_fee ? parseFloat(travel_fee) : null,
     discount ? parseFloat(discount) : null,
     paid ? 1 : 0,
     tip ? parseFloat(tip) : 0,
-    vat_rate != null && vat_rate !== '' ? parseFloat(vat_rate) : null
+    vat_rate != null && vat_rate !== '' ? parseFloat(vat_rate) : null,
+    status === 'scheduled' ? 'scheduled' : 'completed'
   );
 
   res.json({ id: result.lastInsertRowid });
@@ -277,7 +306,7 @@ app.put('/api/services/:id', (req, res) => {
     date, start_time, end_time, duration_hours, discount_hours,
     client_id, description, value,
     hourmeter_start, hourmeter_end,
-    price_per_hour, travel_fee, discount, paid, tip, vat_rate
+    operator_rate, machine_rate, travel_fee, discount, paid, tip, vat_rate, status
   } = req.body;
 
   let delta = null;
@@ -286,14 +315,14 @@ app.put('/api/services/:id', (req, res) => {
   }
 
   const duration = calcDuration(start_time, end_time, duration_hours, discount_hours);
-  const finalValue = value ? parseFloat(value) : calcValueAuto(duration, price_per_hour, travel_fee, discount);
+  const finalValue = value ? parseFloat(value) : calcValueAuto(duration, operator_rate, machine_rate, travel_fee, discount);
 
   db.prepare(`
     UPDATE services SET
       date=?, start_time=?, end_time=?, duration_hours=?, discount_hours=?,
       client_id=?, description=?, value=?,
       hourmeter_start=?, hourmeter_end=?, hourmeter_delta=?,
-      price_per_hour=?, travel_fee=?, discount=?, paid=?, tip=?, vat_rate=?
+      operator_rate=?, machine_rate=?, travel_fee=?, discount=?, paid=?, tip=?, vat_rate=?, status=?
     WHERE id=?
   `).run(
     date, start_time || null, end_time || null,
@@ -304,12 +333,14 @@ app.put('/api/services/:id', (req, res) => {
     hourmeter_start != null ? parseFloat(hourmeter_start) : null,
     hourmeter_end != null ? parseFloat(hourmeter_end) : null,
     delta,
-    price_per_hour ? parseFloat(price_per_hour) : null,
+    operator_rate ? parseFloat(operator_rate) : 0,
+    machine_rate  ? parseFloat(machine_rate)  : 0,
     travel_fee ? parseFloat(travel_fee) : null,
     discount ? parseFloat(discount) : null,
     paid ? 1 : 0,
     tip ? parseFloat(tip) : 0,
     vat_rate != null && vat_rate !== '' ? parseFloat(vat_rate) : null,
+    status === 'scheduled' ? 'scheduled' : 'completed',
     req.params.id
   );
 
@@ -333,15 +364,24 @@ app.get('/api/services/:id/attachments', (req, res) => {
 });
 
 app.post('/api/services/:id/attachments',
-  express.raw({ type: ['image/*', 'application/octet-stream'], limit: '20mb' }),
+  express.raw({ type: '*/*', limit: '100mb' }),
   (req, res) => {
     const service = db.prepare('SELECT id FROM services WHERE id = ?').get(req.params.id);
     if (!service) return res.status(404).json({ error: 'Service not found' });
     if (!Buffer.isBuffer(req.body) || req.body.length === 0) return res.status(400).json({ error: 'Empty file' });
 
-    const originalName = req.query.name ? decodeURIComponent(req.query.name) : 'photo';
+    const originalName = req.query.name ? decodeURIComponent(req.query.name) : 'file';
     const mimeType = (req.headers['content-type'] || 'application/octet-stream').split(';')[0].trim();
-    const extMap = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/gif': 'gif', 'image/webp': 'webp', 'image/heic': 'heic', 'image/heif': 'heif' };
+    const extMap = {
+      'image/jpeg': 'jpg', 'image/png': 'png', 'image/gif': 'gif',
+      'image/webp': 'webp', 'image/heic': 'heic', 'image/heif': 'heif',
+      'video/mp4': 'mp4', 'video/quicktime': 'mov', 'video/x-msvideo': 'avi',
+      'video/webm': 'webm', 'application/pdf': 'pdf',
+      'application/msword': 'doc',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+      'application/vnd.ms-excel': 'xls',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
+    };
     const ext = extMap[mimeType] || originalName.split('.').pop() || 'bin';
     const filename = `${req.params.id}_${Date.now()}_${Math.random().toString(36).slice(2,8)}.${ext}`;
 
@@ -376,10 +416,10 @@ app.delete('/api/attachments/:id', (req, res) => {
 // When month+year are absent, returns all-time totals (global view)
 app.get('/api/summary', (req, res) => {
   const { month, year } = req.query;
-  let where = '1=1';
+  let where = `(status = 'completed' OR status IS NULL)`;
   const params = [];
   if (month && year) {
-    where = `strftime('%Y-%m', date) = ?`;
+    where = `strftime('%Y-%m', date) = ? AND (status = 'completed' OR status IS NULL)`;
     params.push(`${year}-${month.padStart(2,'0')}`);
   }
 
@@ -392,7 +432,9 @@ app.get('/api/summary', (req, res) => {
       ROUND(SUM(CASE WHEN paid=1 THEN COALESCE(value,0)*(1+COALESCE(vat_rate,0)/100.0) + COALESCE(tip,0) ELSE 0 END),2) as total_received,
       ROUND(SUM(CASE WHEN (paid=0 OR paid IS NULL) AND value IS NOT NULL THEN value*(1+COALESCE(vat_rate,0)/100.0) ELSE 0 END),2) as total_pending,
       ROUND(SUM(hourmeter_delta),2) as total_hourmeter,
-      ROUND(SUM(COALESCE(tip,0)),2) as total_tips
+      ROUND(SUM(COALESCE(tip,0)),2) as total_tips,
+      ROUND(SUM(COALESCE(operator_rate,0) * COALESCE(duration_hours,0)),2) as total_operator,
+      ROUND(SUM(COALESCE(machine_rate,0)  * COALESCE(duration_hours,0)),2) as total_machine
     FROM services WHERE ${where}
   `).get(...params);
 
@@ -419,24 +461,26 @@ app.get('/api/export/csv', (req, res) => {
            ROUND(s.duration_hours,2) as duration_hours,
            c.name as client,
            s.description,
-           s.price_per_hour, s.travel_fee, s.discount,
+           s.operator_rate, s.machine_rate, s.travel_fee, s.discount,
            s.value, s.paid,
            ROUND(s.tip,2) as tip,
            s.hourmeter_start, s.hourmeter_end,
-           ROUND(s.hourmeter_delta,2) as hourmeter_delta
+           ROUND(s.hourmeter_delta,2) as hourmeter_delta,
+           COALESCE(s.status,'completed') as status
     FROM services s
     LEFT JOIN clients c ON s.client_id = c.id
     ORDER BY s.date DESC
   `).all();
 
-  const header = 'Date,Start,End,Discount(h),Duration(h),Client,Description,Price/h,Travel,Discount(€),Value(€),Paid,Tip(€),Hourmeter.Start,Hourmeter.End,Hourmeter.Delta\n';
+  const header = 'Date,Start,End,Discount(h),Duration(h),Client,Description,Operator/h,Machine/h,Travel,Discount(€),Value(€),Paid,Tip(€),Hourmeter.Start,Hourmeter.End,Hourmeter.Delta,Status\n';
   const csv = header + rows.map(r =>
     [r.date, r.start_time||'', r.end_time||'', r.discount_hours||0, r.duration_hours||'',
      `"${r.client||''}"`, `"${r.description||''}"`,
-     r.price_per_hour||'', r.travel_fee||'', r.discount||'',
+     r.operator_rate||0, r.machine_rate||0, r.travel_fee||'', r.discount||'',
      r.value||'', r.paid ? 'Yes' : 'No',
      r.tip||0,
-     r.hourmeter_start||'', r.hourmeter_end||'', r.hourmeter_delta||'']
+     r.hourmeter_start||'', r.hourmeter_end||'', r.hourmeter_delta||'',
+     r.status]
     .join(',')
   ).join('\n');
 
@@ -469,8 +513,9 @@ app.get('/api/backup/download', (req, res) => {
     parts.push(nlb, nb, dsb, f.data);
   }
 
+  const dateStr = new Date().toISOString().slice(0, 10);
   res.setHeader('Content-Type', 'application/octet-stream');
-  res.setHeader('Content-Disposition', 'attachment; filename="servilog-backup.slb"');
+  res.setHeader('Content-Disposition', `attachment; filename="servilog-backup-${dateStr}.slb"`);
   res.send(Buffer.concat(parts));
 });
 
@@ -484,6 +529,7 @@ app.post('/api/backup/restore',
 
     if (magic4 === 'SLB1') {
       try {
+        // Parse phase — fully into memory before touching any live files
         let off = 4;
         const dbSize = req.body.readUInt32LE(off); off += 4;
         const dbData = req.body.slice(off, off + dbSize); off += dbSize;
@@ -497,27 +543,52 @@ app.post('/api/backup/restore',
           const name = req.body.slice(off, off + nl).toString('utf8'); off += nl;
           const dl   = req.body.readUInt32LE(off); off += 4;
           const data = req.body.slice(off, off + dl); off += dl;
-          uploadFiles.push({ name, data });
+          uploadFiles.push({ name: path.basename(name), data });
         }
+
+        // Write phase — temp locations only
+        const tmpDb      = DB_PATH + '.restoring';
+        const tmpUploads = UPLOADS_DIR + '_restoring';
+        fs.writeFileSync(tmpDb, dbData);
+        fs.mkdirSync(tmpUploads, { recursive: true });
+        for (const f of uploadFiles) {
+          fs.writeFileSync(path.join(tmpUploads, f.name), f.data);
+        }
+
+        // Swap phase — all temp writes succeeded, now commit atomically
+        const oldUploads = UPLOADS_DIR + '_old_' + Date.now();
         db.close();
-        fs.writeFileSync(DB_PATH, dbData);
+        fs.renameSync(tmpDb, DB_PATH);
+        if (fs.existsSync(UPLOADS_DIR)) fs.renameSync(UPLOADS_DIR, oldUploads);
+        fs.renameSync(tmpUploads, UPLOADS_DIR);
         db = new Database(DB_PATH);
         runMigrations();
-        if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
-        for (const f of uploadFiles) {
-          fs.writeFileSync(path.join(UPLOADS_DIR, path.basename(f.name)), f.data);
-        }
+        try { fs.rmSync(oldUploads, { recursive: true, force: true }); } catch (_) {}
+
         res.json({ ok: true });
       } catch (e) {
+        // Clean up any temp files left behind
+        try { fs.unlinkSync(DB_PATH + '.restoring'); } catch (_) {}
+        try { fs.rmSync(UPLOADS_DIR + '_restoring', { recursive: true, force: true }); } catch (_) {}
+        // If DB was closed but not yet reopened, reopen what's there
+        if (!db.open) { try { db = new Database(DB_PATH); runMigrations(); } catch (_) {} }
         res.status(400).json({ error: 'Corrupt backup file' });
       }
     } else if (req.body.slice(0, 15).toString('utf8').startsWith('SQLite format 3')) {
       // Legacy .db backup — no pictures
-      db.close();
-      fs.writeFileSync(DB_PATH, req.body);
-      db = new Database(DB_PATH);
-      runMigrations();
-      res.json({ ok: true });
+      const tmpDb = DB_PATH + '.restoring';
+      try {
+        fs.writeFileSync(tmpDb, req.body);
+        db.close();
+        fs.renameSync(tmpDb, DB_PATH);
+        db = new Database(DB_PATH);
+        runMigrations();
+        res.json({ ok: true });
+      } catch (e) {
+        try { fs.unlinkSync(tmpDb); } catch (_) {}
+        if (!db.open) { try { db = new Database(DB_PATH); runMigrations(); } catch (_) {} }
+        res.status(400).json({ error: 'Restore failed' });
+      }
     } else {
       res.status(400).json({ error: 'Invalid file' });
     }
@@ -528,10 +599,17 @@ app.post('/api/backup/restore',
 app.get('/api/stats', (req, res) => {
   const totalServices = db.prepare('SELECT COUNT(*) as n FROM services').get().n;
   const totalClients = db.prepare('SELECT COUNT(*) as n FROM clients').get().n;
+  const totalAttachments = db.prepare('SELECT COUNT(*) as n FROM service_attachments').get().n;
   const dateRange = db.prepare('SELECT MIN(date) as first, MAX(date) as last FROM services').get();
   let dbSizeBytes = 0;
+  let uploadsSizeBytes = 0;
   try { dbSizeBytes = fs.statSync(DB_PATH).size; } catch (_) {}
-  res.json({ totalServices, totalClients, dbSizeBytes, dateRange });
+  try {
+    for (const name of fs.readdirSync(UPLOADS_DIR)) {
+      try { uploadsSizeBytes += fs.statSync(path.join(UPLOADS_DIR, name)).size; } catch (_) {}
+    }
+  } catch (_) {}
+  res.json({ totalServices, totalClients, totalAttachments, dbSizeBytes, uploadsSizeBytes, dateRange });
 });
 
 app.listen(PORT, () => console.log(`ServiLog running on port ${PORT}`));
