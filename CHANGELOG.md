@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.6.0] - 2026-04-26
+
+### Added
+- **Auto travel fee**: Settings → "Auto travel fee" card — configure base address (with map picker), price/km, rounding step, and minimum fee
+- Service form: 🚗 button next to the travel fee field; calculates road distance from base to client address (OSRM routing API, straight-line Haversine fallback) and applies `fee = max(min, ceil(dist × €/km ÷ step) × step)`
+- Base address coordinates cached in localStorage after first geocode; cleared when address is manually edited
+- Map picker now captures and exposes lat/lng to caller via optional `onConfirm` callback
+
 ## [1.5.0] - 2026-04-25
 
 ### Added

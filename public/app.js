@@ -93,6 +93,17 @@ const TRANSLATIONS = {
     map_my_location: 'A minha localização',
     map_no_results: 'Sem resultados',
     map_locating: 'A localizar...',
+    settings_travel_calc: 'Cálculo automático de deslocação',
+    settings_base_address: 'Morada base (ponto de partida)',
+    settings_base_address_placeholder: 'Seleciona no mapa ou escreve a morada',
+    settings_base_set: 'Morada base definida ✓',
+    settings_price_per_km: 'Preço por km (€)',
+    settings_fee_step: 'Arredondamento (€)',
+    settings_min_fee: 'Mínimo (€)',
+    form_calc_travel: '🚗 Calcular deslocação',
+    toast_no_base_address: 'Define a morada base nas Definições',
+    toast_no_client_address: 'O cliente não tem morada definida',
+    toast_travel_calc_error: 'Erro ao calcular distância',
   },
   en: {
     months: ['January','February','March','April','May','June','July','August','September','October','November','December'],
@@ -187,6 +198,17 @@ const TRANSLATIONS = {
     map_my_location: 'My location',
     map_no_results: 'No results',
     map_locating: 'Locating...',
+    settings_travel_calc: 'Auto travel fee',
+    settings_base_address: 'Base address (departure point)',
+    settings_base_address_placeholder: 'Pick on map or type address',
+    settings_base_set: 'Base address set ✓',
+    settings_price_per_km: 'Price per km (€)',
+    settings_fee_step: 'Rounding step (€)',
+    settings_min_fee: 'Minimum fee (€)',
+    form_calc_travel: '🚗 Calculate travel',
+    toast_no_base_address: 'Set your base address in Settings first',
+    toast_no_client_address: 'This client has no address set',
+    toast_travel_calc_error: 'Could not calculate distance',
   },
 };
 
@@ -609,7 +631,11 @@ function serviceFormHtml(s = {}) {
       <div class="form-row">
         <div class="form-group">
           <label class="form-label">${t('form_travel')}</label>
-          <input type="number" class="form-control" id="f-travel-fee" step="0.5" min="0" placeholder="ex: 10.00" value="${defaultTravelFee}" oninput="calcTotal()">
+          <div style="display:flex;gap:6px">
+            <input type="number" class="form-control" id="f-travel-fee" step="0.5" min="0" placeholder="ex: 10.00" value="${defaultTravelFee}" oninput="calcTotal()">
+            <button type="button" class="btn btn-ghost btn-sm" id="btn-calc-travel"
+                    onclick="calcTravelFeeFromClient()" title="${t('form_calc_travel')}" style="white-space:nowrap">🚗</button>
+          </div>
         </div>
         <div class="form-group"></div>
       </div>
@@ -732,6 +758,34 @@ window.calcTotal = function() {
     }
   }
   updateVatDisplay();
+};
+
+window.calcTravelFeeFromClient = async function() {
+  const btn = document.getElementById('btn-calc-travel');
+  if (btn) btn.disabled = true;
+  try {
+    const clientId = document.getElementById('f-client')?.value;
+    const client = state.clients.find(c => String(c.id) === String(clientId));
+    if (!client?.address) { toast(t('toast_no_client_address'), 'error'); return; }
+
+    const base = await getBaseCoords();
+    if (!base) { toast(t('toast_no_base_address'), 'warn'); return; }
+
+    const result = await geocodeAddress(client.address);
+    if (!result) { toast(t('toast_travel_calc_error'), 'error'); return; }
+
+    const clientLat = parseFloat(result.lat), clientLng = parseFloat(result.lon);
+    const distKm = await getRoadDistanceKm(base.lat, base.lng, clientLat, clientLng);
+    const fee = applyTravelFeeFormula(distKm);
+
+    const feeInput = document.getElementById('f-travel-fee');
+    if (feeInput) { feeInput.value = fee.toFixed(2); calcTotal.manual = false; calcTotal(); }
+    toast(`🚗 ${distKm.toFixed(1)} km → ${fee.toFixed(2)} ${getCurrency()}`, 'success');
+  } catch (_) {
+    toast(t('toast_travel_calc_error'), 'error');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
 };
 
 window.onVatChange = function() {
@@ -1253,11 +1307,13 @@ window.scheduleNew = function() {
 };
 
 // ── Map picker ────────────────────────────────────────────
-const mapPicker = { map: null, marker: null, targetId: null, resolvedAddress: '' };
+const mapPicker = { map: null, marker: null, targetId: null, resolvedAddress: '', lat: null, lng: null, onConfirm: null };
 
 window.openMapPicker = function(targetInputId) {
   mapPicker.targetId = targetInputId;
   mapPicker.resolvedAddress = '';
+  mapPicker.lat = null;
+  mapPicker.lng = null;
 
   const overlay = document.getElementById('map-picker-overlay');
   overlay.classList.remove('hidden');
@@ -1298,6 +1354,8 @@ window.openMapPicker = function(targetInputId) {
 };
 
 async function reverseGeocode(lat, lng) {
+  mapPicker.lat = lat;
+  mapPicker.lng = lng;
   const hint = document.getElementById('map-resolved-address');
   hint.textContent = t('map_locating');
   try {
@@ -1327,22 +1385,29 @@ function buildAddressString(a) {
   return parts.join(', ');
 }
 
-async function geocodeForMap(query) {
+async function geocodeAddress(query) {
   try {
     const r = await fetch(
       `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`,
       { headers: { 'Accept-Language': state.lang === 'pt' ? 'pt' : 'en' } }
     );
     const data = await r.json();
-    if (data[0]) {
-      const lat = parseFloat(data[0].lat);
-      const lon = parseFloat(data[0].lon);
-      mapPicker.map.setView([lat, lon], 15);
-      mapPicker.marker.setLatLng([lat, lon]);
-      mapPicker.resolvedAddress = query;
-      document.getElementById('map-resolved-address').textContent = query;
-    }
-  } catch (_) {}
+    return data[0] || null;
+  } catch (_) { return null; }
+}
+
+async function geocodeForMap(query) {
+  const result = await geocodeAddress(query);
+  if (result) {
+    const lat = parseFloat(result.lat);
+    const lon = parseFloat(result.lon);
+    mapPicker.map.setView([lat, lon], 15);
+    mapPicker.marker.setLatLng([lat, lon]);
+    mapPicker.lat = lat;
+    mapPicker.lng = lon;
+    mapPicker.resolvedAddress = query;
+    document.getElementById('map-resolved-address').textContent = query;
+  }
 }
 
 let mapSearchTimeout;
@@ -1392,6 +1457,10 @@ window.confirmMapPicker = function() {
     const input = document.getElementById(mapPicker.targetId);
     if (input) { input.value = mapPicker.resolvedAddress; input.dispatchEvent(new Event('input')); }
   }
+  if (mapPicker.onConfirm && mapPicker.lat != null) {
+    mapPicker.onConfirm(mapPicker.lat, mapPicker.lng, mapPicker.resolvedAddress);
+  }
+  mapPicker.onConfirm = null;
   closeMapPicker();
 };
 
@@ -1399,6 +1468,51 @@ window.closeMapPicker = function() {
   document.getElementById('map-picker-overlay').classList.add('hidden');
   document.getElementById('map-search-results').innerHTML = '';
 };
+
+// ── Travel fee distance helpers ───────────────────────────
+
+function haversineKm(lat1, lng1, lat2, lng2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat/2)**2
+          + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLng/2)**2;
+  return R * 2 * Math.asin(Math.sqrt(a));
+}
+
+async function getRoadDistanceKm(lat1, lng1, lat2, lng2) {
+  try {
+    const r = await fetch(
+      `https://router.project-osrm.org/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?overview=false`
+    );
+    const d = await r.json();
+    if (d.code === 'Ok' && d.routes?.length) return d.routes[0].distance / 1000;
+  } catch (_) {}
+  return haversineKm(lat1, lng1, lat2, lng2);
+}
+
+function applyTravelFeeFormula(distKm) {
+  const pricePerKm = parseFloat(localStorage.getItem('travel_price_per_km') || '1');
+  const step       = parseFloat(localStorage.getItem('travel_fee_step')     || '5');
+  const minFee     = parseFloat(localStorage.getItem('travel_min_fee')      || '20');
+  const raw        = distKm * pricePerKm;
+  const stepped    = Math.ceil(raw / step) * step;
+  return Math.max(minFee, stepped);
+}
+
+async function getBaseCoords() {
+  const cachedLat = parseFloat(localStorage.getItem('base_lat'));
+  const cachedLng = parseFloat(localStorage.getItem('base_lng'));
+  if (!isNaN(cachedLat) && !isNaN(cachedLng)) return { lat: cachedLat, lng: cachedLng };
+  const addr = (localStorage.getItem('base_address') || '').trim();
+  if (!addr) return null;
+  const result = await geocodeAddress(addr);
+  if (!result) return null;
+  const lat = parseFloat(result.lat), lng = parseFloat(result.lon);
+  localStorage.setItem('base_lat', String(lat));
+  localStorage.setItem('base_lng', String(lng));
+  return { lat, lng };
+}
 
 // ── Clients ───────────────────────────────────────────────
 async function renderClients() {
@@ -1581,6 +1695,11 @@ async function renderSettings() {
 
   const defaultOperatorRate = localStorage.getItem('default_operator_rate') || '';
   const defaultMachineRate  = localStorage.getItem('default_machine_rate')  || '';
+  const baseAddress      = localStorage.getItem('base_address')       || '';
+  const baseCoordsSet    = !!(localStorage.getItem('base_lat'));
+  const travelPricePerKm = localStorage.getItem('travel_price_per_km') || '1';
+  const travelFeeStep    = localStorage.getItem('travel_fee_step')     || '5';
+  const travelMinFee     = localStorage.getItem('travel_min_fee')      || '20';
   const defaultDeslocacao = localStorage.getItem('default_travel_fee') || '';
   const defaultPago = localStorage.getItem('default_paid') || '0';
   const currency = getCurrency();
@@ -1612,6 +1731,44 @@ async function renderSettings() {
       <div style="display:flex;gap:8px">
         <button class="btn btn-sm ${state.lang === 'pt' ? 'btn-primary' : 'btn-secondary'}" onclick="setLang('pt')">PT</button>
         <button class="btn btn-sm ${state.lang === 'en' ? 'btn-primary' : 'btn-secondary'}" onclick="setLang('en')">EN</button>
+      </div>
+    </div>
+
+    <!-- Auto Travel Fee -->
+    <div class="card" style="margin-bottom:12px">
+      <div class="section-title" style="margin-bottom:12px">${t('settings_travel_calc')}</div>
+      <div class="form-group" style="margin-bottom:10px">
+        <label class="form-label">${t('settings_base_address')}</label>
+        <div style="display:flex;gap:6px;align-items:center">
+          <input type="text" class="form-control" id="base-address-input"
+                 placeholder="${t('settings_base_address_placeholder')}"
+                 value="${escapeHtml(baseAddress)}"
+                 oninput="localStorage.setItem('base_address',this.value);localStorage.removeItem('base_lat');localStorage.removeItem('base_lng')">
+          <button class="btn btn-ghost btn-sm" onclick="openBaseAddressPicker()" style="white-space:nowrap">
+            ${t('map_pick')}
+          </button>
+        </div>
+        ${baseAddress ? `<div style="font-size:11px;color:var(--text3);margin-top:4px">${baseCoordsSet ? '📍 ' + t('settings_base_set') : '⚠ ' + t('map_drag_hint')}</div>` : ''}
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">${t('settings_price_per_km')}</label>
+          <input type="number" class="form-control" step="0.1" min="0" value="${escapeHtml(travelPricePerKm)}"
+                 oninput="saveSetting('travel_price_per_km', this.value)">
+        </div>
+        <div class="form-group">
+          <label class="form-label">${t('settings_fee_step')}</label>
+          <input type="number" class="form-control" step="1" min="1" value="${escapeHtml(travelFeeStep)}"
+                 oninput="saveSetting('travel_fee_step', this.value)">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">${t('settings_min_fee')}</label>
+          <input type="number" class="form-control" step="1" min="0" value="${escapeHtml(travelMinFee)}"
+                 oninput="saveSetting('travel_min_fee', this.value)">
+        </div>
+        <div class="form-group"></div>
       </div>
     </div>
 
@@ -1728,6 +1885,17 @@ async function renderSettings() {
 }
 
 // ── Settings helpers ──────────────────────────────────────
+window.openBaseAddressPicker = function() {
+  mapPicker.onConfirm = (lat, lng, addr) => {
+    localStorage.setItem('base_address', addr);
+    localStorage.setItem('base_lat', String(lat));
+    localStorage.setItem('base_lng', String(lng));
+    const inp = document.getElementById('base-address-input');
+    if (inp) inp.value = addr;
+  };
+  openMapPicker('base-address-input');
+};
+
 window.saveSetting = function(key, value) {
   localStorage.setItem(key, value);
 };
