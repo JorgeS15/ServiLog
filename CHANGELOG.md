@@ -8,6 +8,12 @@
 - Base address coordinates cached in localStorage after first geocode; cleared when address is manually edited
 - Map picker now captures and exposes lat/lng to caller via optional `onConfirm` callback
 
+### Fixed
+- Backup filename now includes the date (e.g. `servilog-backup-2026-04-26.slb`) instead of a generic name
+- Backup restore is now atomic: changes are written to temp paths first and swapped in one step — a failed restore can no longer corrupt the live database or uploads folder
+- API calls now properly check HTTP status and surface server-side error messages to the user instead of silently failing
+- Base address hint in Settings updates immediately after confirming the map picker, without needing a page reload
+
 ## [1.5.0] - 2026-04-25
 
 ### Added
