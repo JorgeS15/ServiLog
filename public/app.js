@@ -535,7 +535,12 @@ function formatDate(d) {
 }
 
 function escapeHtml(str) {
-  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 // ── Service form ──────────────────────────────────────────
@@ -1570,7 +1575,7 @@ async function renderClients() {
             </div>
             <div style="display:flex;gap:6px;flex-shrink:0">
               <button class="btn btn-secondary btn-sm" onclick="editClient(${c.id})">${t('client_edit')}</button>
-              <button class="btn btn-danger btn-sm" onclick="deleteClient(${c.id}, '${escapeHtml(c.name)}')">${t('client_remove')}</button>
+              <button class="btn btn-danger btn-sm" data-cid="${c.id}" data-cname="${escapeHtml(c.name)}" onclick="deleteClient(+this.dataset.cid, this.dataset.cname)">${t('client_remove')}</button>
             </div>
           </div>
         `).join('')

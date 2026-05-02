@@ -2,6 +2,7 @@ const express = require('express');
 const Database = require('better-sqlite3');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const pkg = require('./package.json');
 
 const app = express();
@@ -128,6 +129,40 @@ function runMigrations() {
     WHERE price_per_hour IS NOT NULL AND operator_rate = 0`).run();
 }
 runMigrations();
+
+// ── Security headers ──────────────────────────────────────
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  next();
+});
+
+// ── Optional password protection ──────────────────────────
+// Set APP_PASSWORD env var to require HTTP Basic Auth on all routes.
+const APP_PASSWORD = process.env.APP_PASSWORD;
+if (APP_PASSWORD) {
+  const pwdBuf = Buffer.from(APP_PASSWORD);
+  app.use((req, res, next) => {
+    const auth = req.headers.authorization || '';
+    if (!auth.startsWith('Basic ')) {
+      res.setHeader('WWW-Authenticate', 'Basic realm="ServiLog"');
+      return res.status(401).send('Unauthorized');
+    }
+    const decoded = Buffer.from(auth.slice(6), 'base64').toString();
+    const pass = decoded.slice(decoded.indexOf(':') + 1);
+    const passBuf = Buffer.from(pass);
+    const valid = passBuf.length === pwdBuf.length &&
+      crypto.timingSafeEqual(passBuf, pwdBuf);
+    if (!valid) {
+      res.setHeader('WWW-Authenticate', 'Basic realm="ServiLog"');
+      return res.status(401).send('Unauthorized');
+    }
+    next();
+  });
+} else {
+  console.warn('[ServiLog] WARNING: APP_PASSWORD is not set. The app is unprotected.');
+}
 
 app.use(express.json());
 
@@ -363,6 +398,17 @@ app.get('/api/services/:id/attachments', (req, res) => {
   res.json(rows);
 });
 
+const ALLOWED_MIME_TYPES = {
+  'image/jpeg': 'jpg', 'image/png': 'png', 'image/gif': 'gif',
+  'image/webp': 'webp', 'image/heic': 'heic', 'image/heif': 'heif',
+  'video/mp4': 'mp4', 'video/quicktime': 'mov', 'video/x-msvideo': 'avi',
+  'video/webm': 'webm', 'application/pdf': 'pdf',
+  'application/msword': 'doc',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+  'application/vnd.ms-excel': 'xls',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
+};
+
 app.post('/api/services/:id/attachments',
   express.raw({ type: '*/*', limit: '100mb' }),
   (req, res) => {
@@ -371,18 +417,13 @@ app.post('/api/services/:id/attachments',
     if (!Buffer.isBuffer(req.body) || req.body.length === 0) return res.status(400).json({ error: 'Empty file' });
 
     const originalName = req.query.name ? decodeURIComponent(req.query.name) : 'file';
-    const mimeType = (req.headers['content-type'] || 'application/octet-stream').split(';')[0].trim();
-    const extMap = {
-      'image/jpeg': 'jpg', 'image/png': 'png', 'image/gif': 'gif',
-      'image/webp': 'webp', 'image/heic': 'heic', 'image/heif': 'heif',
-      'video/mp4': 'mp4', 'video/quicktime': 'mov', 'video/x-msvideo': 'avi',
-      'video/webm': 'webm', 'application/pdf': 'pdf',
-      'application/msword': 'doc',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
-      'application/vnd.ms-excel': 'xls',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
-    };
-    const ext = extMap[mimeType] || originalName.split('.').pop() || 'bin';
+    const mimeType = (req.headers['content-type'] || 'application/octet-stream').split(';')[0].trim().toLowerCase();
+
+    if (!ALLOWED_MIME_TYPES[mimeType]) {
+      return res.status(400).json({ error: 'File type not allowed' });
+    }
+
+    const ext = ALLOWED_MIME_TYPES[mimeType];
     const filename = `${req.params.id}_${Date.now()}_${Math.random().toString(36).slice(2,8)}.${ext}`;
 
     fs.writeFileSync(path.join(UPLOADS_DIR, filename), req.body);
@@ -395,12 +436,16 @@ app.post('/api/services/:id/attachments',
   }
 );
 
+// Unsafe MIME types that browsers may execute — always force download instead.
+const UNSAFE_MIME_RE = /^(text\/html|text\/javascript|application\/javascript|application\/xhtml\+xml|image\/svg\+xml)/i;
+
 app.get('/api/attachments/:id', (req, res) => {
   const a = db.prepare('SELECT * FROM service_attachments WHERE id = ?').get(req.params.id);
   if (!a) return res.status(404).json({ error: 'Not found' });
   const filePath = path.join(UPLOADS_DIR, a.filename);
   if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'File not found' });
-  res.setHeader('Content-Type', a.mime_type || 'application/octet-stream');
+  const mime = a.mime_type || 'application/octet-stream';
+  res.setHeader('Content-Type', UNSAFE_MIME_RE.test(mime) ? 'application/octet-stream' : mime);
   res.sendFile(path.resolve(filePath));
 });
 
@@ -454,6 +499,17 @@ app.get('/api/summary', (req, res) => {
 });
 
 // ── Export CSV ─────────────────────────────────────────────
+function csvCell(v) {
+  if (v === null || v === undefined) return '';
+  const s = String(v);
+  // Prefix formula-trigger characters to prevent spreadsheet injection
+  const safe = /^[=+\-@\t\r]/.test(s) ? `'${s}` : s;
+  if (safe.includes(',') || safe.includes('"') || safe.includes('\n') || safe.includes('\r')) {
+    return `"${safe.replace(/"/g, '""')}"`;
+  }
+  return safe;
+}
+
 app.get('/api/export/csv', (req, res) => {
   const rows = db.prepare(`
     SELECT s.date, s.start_time, s.end_time,
@@ -475,13 +531,13 @@ app.get('/api/export/csv', (req, res) => {
   const header = 'Date,Start,End,Discount(h),Duration(h),Client,Description,Operator/h,Machine/h,Travel,Discount(€),Value(€),Paid,Tip(€),Hourmeter.Start,Hourmeter.End,Hourmeter.Delta,Status\n';
   const csv = header + rows.map(r =>
     [r.date, r.start_time||'', r.end_time||'', r.discount_hours||0, r.duration_hours||'',
-     `"${r.client||''}"`, `"${r.description||''}"`,
+     r.client||'', r.description||'',
      r.operator_rate||0, r.machine_rate||0, r.travel_fee||'', r.discount||'',
      r.value||'', r.paid ? 'Yes' : 'No',
      r.tip||0,
      r.hourmeter_start||'', r.hourmeter_end||'', r.hourmeter_delta||'',
      r.status]
-    .join(',')
+    .map(csvCell).join(',')
   ).join('\n');
 
   res.setHeader('Content-Type', 'text/csv');
