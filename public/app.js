@@ -105,6 +105,8 @@ const TRANSLATIONS = {
     toast_no_client_address: 'O cliente não tem morada definida',
     toast_travel_calc_error: 'Erro ao calcular distância',
     form_edit_client: '✎ Editar cliente',
+    settings_session: 'Sessão',
+    settings_logout: 'Terminar sessão',
   },
   en: {
     months: ['January','February','March','April','May','June','July','August','September','October','November','December'],
@@ -211,6 +213,8 @@ const TRANSLATIONS = {
     toast_no_client_address: 'This client has no address set',
     toast_travel_calc_error: 'Could not calculate distance',
     form_edit_client: '✎ Edit client',
+    settings_session: 'Session',
+    settings_logout: 'Sign out',
   },
 };
 
@@ -1899,11 +1903,25 @@ async function renderSettings() {
     </div>
 
     <!-- Version -->
-    <div class="card">
+    <div class="card" style="margin-bottom:12px">
       <div style="display:flex;justify-content:space-between;align-items:center">
         <span class="stat-label">${t('settings_version')}</span>
         <span>ServiLog v${version.version}</span>
       </div>
+    </div>
+
+    <!-- Session / Logout -->
+    <div class="card">
+      <div class="section-title" style="margin-bottom:12px">${t('settings_session')}</div>
+      <form method="POST" action="/logout">
+        <button type="submit" class="btn btn-secondary btn-sm">
+          <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" style="vertical-align:-2px;margin-right:5px">
+            <path d="M13 3h4a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1h-4"/>
+            <polyline points="9 15 14 10 9 5"/>
+            <line x1="14" y1="10" x2="3" y2="10"/>
+          </svg>${t('settings_logout')}
+        </button>
+      </form>
     </div>
   `;
 }

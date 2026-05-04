@@ -138,33 +138,76 @@ app.use((req, res, next) => {
   next();
 });
 
-// ── Optional password protection ──────────────────────────
-// Set APP_PASSWORD env var to require HTTP Basic Auth on all routes.
+// ── Session-based auth ────────────────────────────────────
+// Set APP_PASSWORD env var to enable password protection.
+// Sessions are HMAC-signed cookies; they expire on server restart.
 const APP_PASSWORD = process.env.APP_PASSWORD;
+const SESSION_SECRET = crypto.randomBytes(32).toString('hex');
+
+function makeSessionToken() {
+  return crypto.createHmac('sha256', SESSION_SECRET).update(APP_PASSWORD).digest('hex');
+}
+
+function parseCookies(req) {
+  const cookies = {};
+  for (const part of (req.headers.cookie || '').split(';')) {
+    const idx = part.indexOf('=');
+    if (idx < 0) continue;
+    try {
+      cookies[decodeURIComponent(part.slice(0, idx).trim())] =
+        decodeURIComponent(part.slice(idx + 1).trim());
+    } catch (_) {}
+  }
+  return cookies;
+}
+
+function isAuthenticated(req) {
+  if (!APP_PASSWORD) return true;
+  return parseCookies(req).servilog_session === makeSessionToken();
+}
+
+// Routes always accessible (login page assets)
+const PUBLIC_PATHS = new Set(['/login', '/favicon.ico']);
+
 if (APP_PASSWORD) {
-  const pwdBuf = Buffer.from(APP_PASSWORD);
   app.use((req, res, next) => {
-    const auth = req.headers.authorization || '';
-    if (!auth.startsWith('Basic ')) {
-      res.setHeader('WWW-Authenticate', 'Basic realm="ServiLog"');
-      return res.status(401).send('Unauthorized');
-    }
-    const decoded = Buffer.from(auth.slice(6), 'base64').toString();
-    const pass = decoded.slice(decoded.indexOf(':') + 1);
-    const passBuf = Buffer.from(pass);
-    const valid = passBuf.length === pwdBuf.length &&
-      crypto.timingSafeEqual(passBuf, pwdBuf);
-    if (!valid) {
-      res.setHeader('WWW-Authenticate', 'Basic realm="ServiLog"');
-      return res.status(401).send('Unauthorized');
-    }
-    next();
+    if (PUBLIC_PATHS.has(req.path)) return next();
+    if (isAuthenticated(req)) return next();
+    if (req.path.startsWith('/api/')) return res.status(401).json({ error: 'Unauthorized' });
+    res.redirect('/login');
   });
 } else {
   console.warn('[ServiLog] WARNING: APP_PASSWORD is not set. The app is unprotected.');
 }
 
 app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
+
+// ── Login / Logout ────────────────────────────────────────
+app.get('/login', (req, res) => {
+  if (!APP_PASSWORD || isAuthenticated(req)) return res.redirect('/');
+  res.sendFile(path.join(__dirname, 'public', 'login.html'));
+});
+
+app.post('/login', (req, res) => {
+  const submitted = String(req.body.password || '');
+  const pwdBuf = Buffer.from(APP_PASSWORD || '');
+  const subBuf = Buffer.from(submitted);
+  const valid = APP_PASSWORD &&
+    subBuf.length === pwdBuf.length &&
+    crypto.timingSafeEqual(subBuf, pwdBuf);
+  if (!valid) return res.redirect('/login?error=1');
+  const token = makeSessionToken();
+  res.setHeader('Set-Cookie',
+    `servilog_session=${token}; HttpOnly; SameSite=Strict; Path=/`);
+  res.redirect('/');
+});
+
+app.post('/logout', (req, res) => {
+  res.setHeader('Set-Cookie',
+    'servilog_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0');
+  res.redirect(APP_PASSWORD ? '/login' : '/');
+});
 
 // Serve sw.js dynamically so cache version matches package.json — forces cache bust on every release
 const swTemplate = fs.readFileSync(path.join(__dirname, 'public', 'sw.js'), 'utf8');
