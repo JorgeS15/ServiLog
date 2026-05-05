@@ -17,7 +17,12 @@ const UPLOADS_DIR = path.join(dataDir, 'uploads');
 if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 
 // Use let so the restore endpoint can close and reopen the connection
-let db = new Database(DB_PATH);
+function openDb(p) {
+  const instance = new Database(p);
+  instance.pragma('foreign_keys = ON');
+  return instance;
+}
+let db = openDb(DB_PATH);
 
 // Init schema (fresh installs get English names directly)
 db.exec(`
@@ -131,7 +136,19 @@ function runMigrations() {
 runMigrations();
 
 // ── Security headers ──────────────────────────────────────
+const CSP = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline' https://unpkg.com",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "font-src 'self' https://fonts.gstatic.com",
+  "img-src 'self' data: blob: https://*.tile.openstreetmap.org",
+  "connect-src 'self' https://nominatim.openstreetmap.org https://router.project-osrm.org",
+  "frame-ancestors 'none'",
+  "base-uri 'self'",
+].join('; ');
+
 app.use((req, res, next) => {
+  res.setHeader('Content-Security-Policy', CSP);
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'SAMEORIGIN');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
@@ -189,14 +206,38 @@ app.get('/login', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'login.html'));
 });
 
+// Simple in-memory brute-force guard: max 10 failures per IP per 15 min window
+const loginAttempts = new Map();
+function isRateLimited(ip) {
+  const now = Date.now();
+  const entry = loginAttempts.get(ip);
+  if (!entry || now > entry.resetAt) return false;
+  return entry.count >= 10;
+}
+function recordFailure(ip) {
+  const now = Date.now();
+  const entry = loginAttempts.get(ip);
+  if (!entry || now > entry.resetAt) {
+    loginAttempts.set(ip, { count: 1, resetAt: now + 15 * 60 * 1000 });
+  } else {
+    entry.count++;
+  }
+}
+function clearAttempts(ip) { loginAttempts.delete(ip); }
+
 app.post('/login', (req, res) => {
+  const ip = req.socket.remoteAddress || '';
+  if (isRateLimited(ip)) {
+    return res.status(429).redirect('/login?error=2');
+  }
   const submitted = String(req.body.password || '');
   const pwdBuf = Buffer.from(APP_PASSWORD || '');
   const subBuf = Buffer.from(submitted);
   const valid = APP_PASSWORD &&
     subBuf.length === pwdBuf.length &&
     crypto.timingSafeEqual(subBuf, pwdBuf);
-  if (!valid) return res.redirect('/login?error=1');
+  if (!valid) { recordFailure(ip); return res.redirect('/login?error=1'); }
+  clearAttempts(ip);
   const token = makeSessionToken();
   res.setHeader('Set-Cookie',
     `servilog_session=${token}; HttpOnly; SameSite=Strict; Path=/`);
@@ -245,9 +286,10 @@ app.put('/api/clients/:id', (req, res) => {
   const { name, phone, address } = req.body;
   if (!name?.trim()) return res.status(400).json({ error: 'Name is required' });
   try {
-    db.prepare('UPDATE clients SET name=?, phone=?, address=? WHERE id=?').run(
+    const result = db.prepare('UPDATE clients SET name=?, phone=?, address=? WHERE id=?').run(
       name.trim(), phone?.trim() || null, address?.trim() || null, req.params.id
     );
+    if (result.changes === 0) return res.status(404).json({ error: 'Client not found' });
     res.json({ ok: true });
   } catch (e) {
     res.status(409).json({ error: 'Client already exists' });
@@ -660,7 +702,7 @@ app.post('/api/backup/restore',
         fs.renameSync(tmpDb, DB_PATH);
         if (fs.existsSync(UPLOADS_DIR)) fs.renameSync(UPLOADS_DIR, oldUploads);
         fs.renameSync(tmpUploads, UPLOADS_DIR);
-        db = new Database(DB_PATH);
+        db = openDb(DB_PATH);
         runMigrations();
         try { fs.rmSync(oldUploads, { recursive: true, force: true }); } catch (_) {}
 
@@ -670,7 +712,7 @@ app.post('/api/backup/restore',
         try { fs.unlinkSync(DB_PATH + '.restoring'); } catch (_) {}
         try { fs.rmSync(UPLOADS_DIR + '_restoring', { recursive: true, force: true }); } catch (_) {}
         // If DB was closed but not yet reopened, reopen what's there
-        if (!db.open) { try { db = new Database(DB_PATH); runMigrations(); } catch (_) {} }
+        if (!db.open) { try { db = openDb(DB_PATH); runMigrations(); } catch (_) {} }
         res.status(400).json({ error: 'Corrupt backup file' });
       }
     } else if (req.body.slice(0, 15).toString('utf8').startsWith('SQLite format 3')) {
@@ -680,12 +722,12 @@ app.post('/api/backup/restore',
         fs.writeFileSync(tmpDb, req.body);
         db.close();
         fs.renameSync(tmpDb, DB_PATH);
-        db = new Database(DB_PATH);
+        db = openDb(DB_PATH);
         runMigrations();
         res.json({ ok: true });
       } catch (e) {
         try { fs.unlinkSync(tmpDb); } catch (_) {}
-        if (!db.open) { try { db = new Database(DB_PATH); runMigrations(); } catch (_) {} }
+        if (!db.open) { try { db = openDb(DB_PATH); runMigrations(); } catch (_) {} }
         res.status(400).json({ error: 'Restore failed' });
       }
     } else {
