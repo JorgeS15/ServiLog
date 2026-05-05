@@ -393,7 +393,7 @@ async function renderDashboard() {
       <div class="section-title" style="margin-bottom:12px">${t('by_client')}</div>
       ${byClient.map(c => `
         <div class="client-row">
-          <div class="client-row-name">${c.name || '—'}</div>
+          <div class="client-row-name">${escapeHtml(c.name || '—')}</div>
           <div class="client-row-stats">
             <div class="client-row-stat"><strong>${c.services}</strong> ${t('serv_abbr')}</div>
             <div class="client-row-stat"><strong>${c.hours || '—'}</strong> h</div>
@@ -523,7 +523,7 @@ function serviceCard(s) {
       <div class="service-top">
         <div>
           <div class="service-date">${formatDate(s.date)}</div>
-          <div class="service-client">${s.client_name || '—'}</div>
+          <div class="service-client">${escapeHtml(s.client_name || '—')}</div>
           ${s.description ? `<div class="service-description">${escapeHtml(s.description)}</div>` : ''}
         </div>
         <div style="text-align:right;flex-shrink:0">
@@ -960,6 +960,11 @@ window.uploadPictures = async function(input, serviceId) {
       headers: { 'Content-Type': file.type || 'application/octet-stream' },
       body: file,
     });
+    if (!r.ok) {
+      let msg = `Upload failed (${r.status})`;
+      try { const e = await r.json(); if (e.error) msg = e.error; } catch (_) {}
+      toast(msg, 'error'); input.value = ''; return;
+    }
     const result = await r.json();
     if (result.error) { toast(result.error, 'error'); input.value = ''; return; }
   }
