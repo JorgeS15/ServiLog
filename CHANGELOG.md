@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.7.1] - 2026-05-05
+
+### Security
+- **XSS fix**: client name was rendered without escaping in the service card and dashboard by-client list — a malicious name could execute arbitrary JavaScript; wrapped with `escapeHtml()` in both places
+- **Content-Security-Policy**: CSP header now sent on every response, restricting scripts to `self` + unpkg (Leaflet), API connections to `self` + Nominatim/OSRM, and images to OSM tile servers
+- **Login rate limiting**: `/login` now enforces a max of 10 failed attempts per IP per 15-minute window and returns 429 on further attempts
+- **Foreign keys enforced**: `PRAGMA foreign_keys = ON` is now applied on every database open (initial start and all backup restore paths via new `openDb()` helper)
+- **PUT /api/clients/:id**: now returns 404 when the target client does not exist instead of silently succeeding with zero rows changed
+- **File upload error handling**: `uploadPictures` now checks `r.ok` before parsing the response as JSON, ensuring non-JSON error responses (e.g. from a reverse proxy) are surfaced as user-readable messages
+
+### Changed
+- Docker image now includes a `HEALTHCHECK` (`wget` on `/api/version` every 30 s, 5 s timeout) — lets Docker and orchestrators detect silent crashes
+- Dependency versions pinned to exact releases (`express 4.22.1`, `better-sqlite3 9.6.0`) for reproducible Docker builds
+
 ## [1.7.0] - 2026-05-05
 
 ### Added

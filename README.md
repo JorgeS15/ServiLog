@@ -1,6 +1,6 @@
 # ServiLog
 
-> Self-hosted service log for machines and agricultural equipment — v1.7.0
+> Self-hosted service log for machines and agricultural equipment — v1.7.1
 
 <img width="677" height="486" alt="image" src="https://github.com/user-attachments/assets/40974a8e-a146-46a2-940a-817de2516ae3" />
 
@@ -90,6 +90,20 @@ services:
 When set, all routes (UI and API) require an authenticated session. Sessions are signed with HMAC-SHA256 and stored in an `HttpOnly; SameSite=Strict` cookie. Sign out is available at the bottom of the Settings page.
 
 If `APP_PASSWORD` is not set, the app is open to anyone who can reach the port — suitable for local-network use, but **not recommended for public exposure**.
+
+### Security hardening built in
+
+| Measure | Detail |
+|---|---|
+| **Login rate limiting** | Max 10 failed attempts per IP per 15-minute window; further attempts receive a 429 response |
+| **Session cookies** | `HttpOnly; SameSite=Strict` — inaccessible to JavaScript and not sent on cross-site requests |
+| **Content-Security-Policy** | Restricts scripts to `self` + unpkg (Leaflet CDN), API connections to `self` + Nominatim/OSRM, images to OSM tiles — limits XSS exfiltration vectors |
+| **XSS prevention** | All user data rendered into HTML is escaped through `escapeHtml()` (covers `&`, `<`, `>`, `"`, `'`) |
+| **SQL injection** | Every query uses parameterised statements — no string interpolation into SQL |
+| **File upload allowlist** | Attachments restricted to an explicit MIME type list; unsafe types (HTML, SVG, JS) are force-downloaded as `application/octet-stream` |
+| **CSV injection** | Export prefixes formula-trigger characters (`=`, `+`, `-`, `@`) to prevent spreadsheet formula execution |
+| **Foreign key integrity** | SQLite `PRAGMA foreign_keys = ON` enforced on every database open |
+| **Security headers** | `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Content-Security-Policy` on every response |
 
 For additional hardening when self-hosting publicly, consider putting a reverse proxy (e.g. Caddy, Nginx) with HTTPS in front of the container.
 
