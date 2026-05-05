@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#e8a020">
+  <title>ServiLog</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;800&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:      #0f1117;
+      --bg2:     #171a23;
+      --bg3:     #1e2130;
+      --border:  #2a2e40;
+      --accent:  #e8a020;
+      --accent2: #c47a10;
+      --text:    #e8eaf0;
+      --text2:   #8890aa;
+      --red:     #e74c3c;
+      --radius:  10px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Barlow', sans-serif;
+      font-size: 15px;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100dvh;
+      padding: 16px;
+      padding-top: calc(16px + env(safe-area-inset-top, 0px));
+      padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    }
+
+    .wrap {
+      width: 100%;
+      max-width: 360px;
+    }
+
+    /* ── Brand ── */
+    .brand {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 34px;
+      font-weight: 800;
+      color: var(--accent);
+      letter-spacing: 0.06em;
+      margin-bottom: 36px;
+      user-select: none;
+    }
+
+    /* ── Card ── */
+    .card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px 24px 24px;
+    }
+
+    .card-title {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text2);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      text-align: center;
+      margin-bottom: 22px;
+    }
+
+    /* ── Error banner ── */
+    .error {
+      background: rgba(231, 76, 60, 0.10);
+      border: 1px solid rgba(231, 76, 60, 0.35);
+      border-radius: 8px;
+      color: var(--red);
+      font-size: 13px;
+      padding: 10px 12px;
+      margin-bottom: 16px;
+      display: none;
+    }
+    .error.visible { display: block; }
+
+    /* ── Form ── */
+    label {
+      display: block;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text2);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 6px;
+    }
+
+    .input-wrap {
+      position: relative;
+      margin-bottom: 20px;
+    }
+
+    .input-wrap input {
+      width: 100%;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-family: 'Barlow', sans-serif;
+      font-size: 15px;
+      padding: 11px 42px 11px 13px;
+      outline: none;
+      transition: border-color .15s, box-shadow .15s;
+    }
+    .input-wrap input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(232,160,32,.15);
+    }
+
+    .toggle-pw {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      color: var(--text2);
+      cursor: pointer;
+      padding: 4px;
+      display: flex;
+      align-items: center;
+      transition: color .15s;
+    }
+    .toggle-pw:hover { color: var(--text); }
+
+    /* ── Submit ── */
+    .btn-login {
+      width: 100%;
+      background: var(--accent);
+      color: #000;
+      border: none;
+      border-radius: 8px;
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      padding: 12px;
+      cursor: pointer;
+      transition: background .15s, transform .1s, box-shadow .15s;
+      box-shadow: 0 4px 16px rgba(232,160,32,.25);
+    }
+    .btn-login:hover  { background: var(--accent2); }
+    .btn-login:active { transform: scale(.97); box-shadow: none; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+
+    <div class="brand">
+      <svg width="38" height="38" viewBox="0 0 28 28" fill="none">
+        <rect x="2"  y="16" width="24" height="8" rx="2" fill="#e8a020"/>
+        <rect x="6"  y="10" width="16" height="7" rx="1" fill="#c47a10"/>
+        <rect x="10" y="6"  width="8"  height="5" rx="1" fill="#e8a020"/>
+        <rect x="2"  y="20" width="4"  height="4" rx="2" fill="#0f1117"/>
+        <rect x="22" y="20" width="4"  height="4" rx="2" fill="#0f1117"/>
+        <rect x="1"  y="18" width="3"  height="2" rx="1" fill="#888"
+              transform="rotate(-15 1 18)"/>
+      </svg>
+      SERVILOG
+    </div>
+
+    <div class="card">
+      <div class="card-title">Sign In</div>
+
+      <div id="error-msg" class="error">Incorrect password. Please try again.</div>
+
+      <form method="POST" action="/login" autocomplete="on">
+        <label for="password">Password</label>
+        <div class="input-wrap">
+          <input type="password" id="password" name="password"
+                 autocomplete="current-password" autofocus
+                 placeholder="Enter your password">
+          <button type="button" class="toggle-pw" id="toggle-pw-btn"
+                  aria-label="Show / hide password"
+                  onclick="togglePw()">
+            <svg id="eye-svg" width="18" height="18" viewBox="0 0 20 20"
+                 fill="none" stroke="currentColor" stroke-width="1.6"
+                 stroke-linecap="round" stroke-linejoin="round">
+              <path d="M1 10s3.6-7 9-7 9 7 9 7-3.6 7-9 7-9-7-9-7z"/>
+              <circle cx="10" cy="10" r="3"/>
+            </svg>
+          </button>
+        </div>
+
+        <button type="submit" class="btn-login">Sign In</button>
+      </form>
+    </div>
+
+  </div>
+
+  <script>
+    // Show error on bad password (server redirects back with ?error=1)
+    if (new URLSearchParams(location.search).get('error')) {
+      document.getElementById('error-msg').classList.add('visible');
+    }
+
+    // Eye-open SVG paths
+    const EYE_OPEN   = '<path d="M1 10s3.6-7 9-7 9 7 9 7-3.6 7-9 7-9-7-9-7z"/><circle cx="10" cy="10" r="3"/>';
+    const EYE_CLOSED = '<line x1="3" y1="3" x2="17" y2="17"/>'
+                     + '<path d="M7.1 7.4A5.5 5.5 0 0 0 4.2 10s3.6 6 5.8 6.5M12.9 12.5A5.5 5.5 0 0 0 15.8 10S12.2 4 10 3.5"/>'
+                     + '<path d="M1 10s.8 1.5 2.3 3M19 10s-.8-1.5-2.2-3"/>';
+
+    function togglePw() {
+      const inp = document.getElementById('password');
+      const svg = document.getElementById('eye-svg');
+      if (inp.type === 'password') {
+        inp.type = 'text';
+        svg.innerHTML = EYE_CLOSED;
+      } else {
+        inp.type = 'password';
+        svg.innerHTML = EYE_OPEN;
+      }
+    }
+  </script>
+</body>
+</html>
