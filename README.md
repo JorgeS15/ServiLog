@@ -1,6 +1,6 @@
 # ServiLog
 
-> Self-hosted service log for machines and agricultural equipment — v1.6.1
+> Self-hosted service log for machines and agricultural equipment — v1.7.0
 
 <img width="677" height="486" alt="image" src="https://github.com/user-attachments/assets/40974a8e-a146-46a2-940a-817de2516ae3" />
 
@@ -69,7 +69,29 @@ Manual backup: copy `./data/` — restore by replacing the folder and restarting
 
 ## Security
 
-ServiLog has no built-in authentication. If you expose it outside your local network, put a reverse proxy with authentication in front of it (e.g. Caddy `basicauth`, Nginx, Authelia).
+ServiLog supports built-in password protection via the `APP_PASSWORD` environment variable. Set it in `docker-compose.yml` to enable a login page:
+
+```yaml
+services:
+  servilog:
+    image: ghcr.io/jorges15/servilog:latest
+    container_name: servilog
+    restart: unless-stopped
+    volumes:
+      - ./data:/data
+    environment:
+      - DB_PATH=/data/tracker.db
+      - PORT=3000
+      - APP_PASSWORD=your-strong-password
+    ports:
+      - "3000:3000"
+```
+
+When set, all routes (UI and API) require an authenticated session. Sessions are signed with HMAC-SHA256 and stored in an `HttpOnly; SameSite=Strict` cookie. Sign out is available at the bottom of the Settings page.
+
+If `APP_PASSWORD` is not set, the app is open to anyone who can reach the port — suitable for local-network use, but **not recommended for public exposure**.
+
+For additional hardening when self-hosting publicly, consider putting a reverse proxy (e.g. Caddy, Nginx) with HTTPS in front of the container.
 
 ---
 
