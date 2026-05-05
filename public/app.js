@@ -242,6 +242,10 @@ const state = {
 // ── API ───────────────────────────────────────────────────
 const api = {
   async _handle(r) {
+    if (r.status === 401) {
+      window.location.href = '/login';
+      throw new Error('Session expired');
+    }
     if (!r.ok) {
       let msg = `HTTP ${r.status}`;
       try { const e = await r.json(); if (e.error) msg = e.error; } catch (_) {}
