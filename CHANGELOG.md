@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.7.0] - 2026-05-05
+
+### Added
+- **Login page**: a styled login screen (dark theme, ServiLog branding) replaces the browser's Basic Auth prompt when `APP_PASSWORD` is set. Set the env var in `docker-compose.yml` to enable it — leave it unset for open/local-network use
+- **Session cookies**: sessions are HMAC-SHA256 signed, `HttpOnly`, `SameSite=Strict`; they expire automatically on server restart
+
+### Security
+- **Authentication**: new session-based auth system; set `APP_PASSWORD` env var to protect all routes
+- **XSS — escapeHtml**: `escapeHtml()` now also escapes `"` and `'`, closing attribute-injection and JS string-injection vectors
+- **XSS — onclick handler**: client name in the delete button is passed via `data-*` attributes instead of being interpolated into a JS string literal, eliminating the stored-XSS risk
+- **Security headers**: `X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN`, and `Referrer-Policy: strict-origin-when-cross-origin` are now sent on every response
+- **CSV injection**: export now uses a `csvCell()` helper that properly quotes all fields and prefixes formula-trigger characters (`=`, `+`, `-`, `@`) with `'`
+- **File upload allowlist**: the attachment endpoint now rejects any MIME type not in an explicit allowlist (400 error); previously unknown types fell through to a filename-extension guess
+- **Attachment serving**: stored MIME types that browsers can execute (`text/html`, `text/javascript`, `image/svg+xml`, etc.) are remapped to `application/octet-stream` when serving downloads
+- **Session expiry handling**: API 401 responses now redirect to `/login` instead of surfacing an error in the UI
+
 ## [1.6.1] - 2026-04-26
 
 ### Added
