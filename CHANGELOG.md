@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.7.3] - 2026-05-11
+
+### Fixed
+- **Map interface broken**: added `https://unpkg.com` to the `style-src` CSP directive — Leaflet's CSS is loaded from `unpkg.com` and was being blocked, stripping all map styles and controls
+
 ## [1.7.2] - 2026-05-11
 
 ### Fixed
