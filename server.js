@@ -143,6 +143,8 @@ const CSP = [
   "font-src 'self' https://fonts.gstatic.com",
   "img-src 'self' data: blob: https://*.tile.openstreetmap.org",
   "connect-src 'self' https://nominatim.openstreetmap.org https://router.project-osrm.org",
+  "manifest-src 'self'",
+  "worker-src 'self'",
   "frame-ancestors 'none'",
   "base-uri 'self'",
 ].join('; ');
@@ -150,7 +152,7 @@ const CSP = [
 app.use((req, res, next) => {
   res.setHeader('Content-Security-Policy', CSP);
   res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   next();
 });

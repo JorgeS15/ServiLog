@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.7.2] - 2026-05-11
+
+### Fixed
+- **PWA install restored**: added `manifest-src 'self'` and `worker-src 'self'` CSP directives — Chrome/Chromium require these explicitly and do not reliably inherit from `default-src` under a strict CSP; their absence in v1.7.1 silently broke the "Add to Home Screen" install prompt
+- **Contradicting frame policy**: corrected `X-Frame-Options` from `SAMEORIGIN` to `DENY` to align with the existing `frame-ancestors 'none'` CSP directive (browsers already honoured `none`; the old value was dead code)
+
 ## [1.7.1] - 2026-05-05
 
 ### Security
