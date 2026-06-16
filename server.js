@@ -185,8 +185,8 @@ function isAuthenticated(req) {
   return parseCookies(req).servilog_session === makeSessionToken();
 }
 
-// Routes always accessible (login page assets)
-const PUBLIC_PATHS = new Set(['/login', '/favicon.ico']);
+// Routes always accessible (login page assets + healthcheck endpoint)
+const PUBLIC_PATHS = new Set(['/login', '/favicon.ico', '/api/version']);
 
 if (APP_PASSWORD) {
   app.use((req, res, next) => {
@@ -566,7 +566,8 @@ app.get('/api/summary', (req, res) => {
       ROUND(SUM(hourmeter_delta),2) as total_hourmeter,
       ROUND(SUM(COALESCE(tip,0)),2) as total_tips,
       ROUND(SUM(COALESCE(operator_rate,0) * COALESCE(duration_hours,0)),2) as total_operator,
-      ROUND(SUM(COALESCE(machine_rate,0)  * COALESCE(duration_hours,0)),2) as total_machine
+      ROUND(SUM(COALESCE(machine_rate,0)  * COALESCE(duration_hours,0)),2) as total_machine,
+      ROUND(AVG(CASE WHEN duration_hours IS NOT NULL THEN duration_hours END),2) as avg_duration
     FROM services WHERE ${where}
   `).get(...params);
 
