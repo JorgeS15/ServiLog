@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.7.4] - 2026-06-16
+
+### Fixed
+- **Unhealthy container**: `/api/version` is now always accessible without authentication — previously the auth middleware returned 401 to Docker's healthcheck `wget` when `APP_PASSWORD` was set, causing the container to be flagged as unhealthy in Portainer
+
+### Added
+- **Mean Time / Service stat**: the Summary dashboard now shows the average service duration (in hours) alongside the total work hours, for both monthly and all-time views
+
 ## [1.7.3] - 2026-05-11
 
 ### Fixed
