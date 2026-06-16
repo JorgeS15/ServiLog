@@ -5,6 +5,7 @@ const TRANSLATIONS = {
     nav_dashboard: 'Resumo', nav_lista: 'Serviços', nav_clientes: 'Clientes', nav_settings: 'Definições', nav_agenda: 'Agenda',
     dashboard_title: 'Resumo', dashboard_monthly: 'Mensal', dashboard_alltime: 'Tudo',
     stat_services: 'Serviços', stat_hours: 'Horas Trab.', stat_received: 'Recebido',
+    stat_avg_duration: 'Tempo Médio / Serviço',
     stat_pending: 'Pendente', stat_billed: 'Total Faturado', stat_horimetro: 'Horímetro',
     stat_tips: 'Gorjetas', stat_horimetro_sub: 'delta do período',
     stat_net: 'Líquido (s/ IVA)', stat_gross: 'Bruto (c/ IVA)',
@@ -113,6 +114,7 @@ const TRANSLATIONS = {
     nav_dashboard: 'Summary', nav_lista: 'Services', nav_clientes: 'Clients', nav_settings: 'Settings', nav_agenda: 'Agenda',
     dashboard_title: 'Summary', dashboard_monthly: 'Monthly', dashboard_alltime: 'All Time',
     stat_services: 'Services', stat_hours: 'Work Hours', stat_received: 'Received',
+    stat_avg_duration: 'Mean Time / Service',
     stat_pending: 'Pending', stat_billed: 'Total Billed', stat_horimetro: 'Hourmeter',
     stat_tips: 'Tips', stat_horimetro_sub: 'period delta',
     stat_net: 'Net (excl. VAT)', stat_gross: 'Gross (incl. VAT)',
@@ -339,6 +341,14 @@ async function renderDashboard() {
         <div class="stat-label">${t('stat_hours')}</div>
         <div class="stat-value">${s.total_hours != null ? s.total_hours + ' h' : '—'}</div>
       </div>
+    </div>
+
+    <div class="card-row" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+      <div class="stat-block">
+        <div class="stat-label">${t('stat_avg_duration')}</div>
+        <div class="stat-value">${s.avg_duration != null ? s.avg_duration + ' h' : '—'}</div>
+      </div>
+      <div class="stat-block"></div>
     </div>
 
     <div class="card-row" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
