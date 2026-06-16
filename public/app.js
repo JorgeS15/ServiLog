@@ -6,6 +6,7 @@ const TRANSLATIONS = {
     dashboard_title: 'Resumo', dashboard_monthly: 'Mensal', dashboard_alltime: 'Tudo',
     stat_services: 'Serviços', stat_hours: 'Horas Trab.', stat_received: 'Recebido',
     stat_avg_duration: 'Tempo Médio / Serviço',
+    settings_extra_stats: 'Estatísticas adicionais', settings_extra_stats_sub: 'Mostra estatísticas extra no Resumo (tempo médio por serviço, etc.)',
     stat_pending: 'Pendente', stat_billed: 'Total Faturado', stat_horimetro: 'Horímetro',
     stat_tips: 'Gorjetas', stat_horimetro_sub: 'delta do período',
     stat_net: 'Líquido (s/ IVA)', stat_gross: 'Bruto (c/ IVA)',
@@ -115,6 +116,7 @@ const TRANSLATIONS = {
     dashboard_title: 'Summary', dashboard_monthly: 'Monthly', dashboard_alltime: 'All Time',
     stat_services: 'Services', stat_hours: 'Work Hours', stat_received: 'Received',
     stat_avg_duration: 'Mean Time / Service',
+    settings_extra_stats: 'Additional statistics', settings_extra_stats_sub: 'Show extra stats on the Summary (mean time per service, etc.)',
     stat_pending: 'Pending', stat_billed: 'Total Billed', stat_horimetro: 'Hourmeter',
     stat_tips: 'Tips', stat_horimetro_sub: 'period delta',
     stat_net: 'Net (excl. VAT)', stat_gross: 'Gross (incl. VAT)',
@@ -343,13 +345,14 @@ async function renderDashboard() {
       </div>
     </div>
 
+    ${localStorage.getItem('extra_stats') === '1' ? `
     <div class="card-row" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
       <div class="stat-block">
         <div class="stat-label">${t('stat_avg_duration')}</div>
         <div class="stat-value">${s.avg_duration != null ? s.avg_duration + ' h' : '—'}</div>
       </div>
       <div class="stat-block"></div>
-    </div>
+    </div>` : ''}
 
     <div class="card-row" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
       <div class="stat-block">
@@ -1900,6 +1903,22 @@ async function renderSettings() {
       <div style="display:flex;gap:8px">
         <button class="btn btn-sm ${theme === 'dark' ? 'btn-primary' : 'btn-secondary'}" onclick="setTheme('dark')">${t('settings_theme_dark')}</button>
         <button class="btn btn-sm ${theme === 'light' ? 'btn-primary' : 'btn-secondary'}" onclick="setTheme('light')">${t('settings_theme_light')}</button>
+      </div>
+    </div>
+
+    <!-- Extra Stats -->
+    <div class="card" style="margin-bottom:12px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+        <div>
+          <div class="section-title">${t('settings_extra_stats')}</div>
+          <div style="font-size:12px;color:var(--text3);margin-top:2px">${t('settings_extra_stats_sub')}</div>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="extra-stats-toggle"
+                 ${localStorage.getItem('extra_stats') === '1' ? 'checked' : ''}
+                 onchange="saveSetting('extra_stats', this.checked ? '1' : '0'); renderDashboard && navigate('dashboard')">
+          <span class="toggle-slider"></span>
+        </label>
       </div>
     </div>
 
