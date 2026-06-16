@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.7.5] - 2026-06-16
+
+### Added
+- **Additional statistics toggle**: new option in Settings to show extra stats on the Summary dashboard; off by default so the dashboard stays clean. Currently includes mean time per service; more stats can be added here in the future
+
 ## [1.7.4] - 2026-06-16
 
 ### Fixed
