@@ -17,7 +17,12 @@ const UPLOADS_DIR = path.join(dataDir, 'uploads');
 if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 
 // Use let so the restore endpoint can close and reopen the connection
-let db = new Database(DB_PATH);
+function openDb(p) {
+  const instance = new Database(p);
+  instance.pragma('foreign_keys = ON');
+  return instance;
+}
+let db = openDb(DB_PATH);
 
 // Init schema (fresh installs get English names directly)
 db.exec(`
@@ -131,9 +136,23 @@ function runMigrations() {
 runMigrations();
 
 // ── Security headers ──────────────────────────────────────
+const CSP = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline' https://unpkg.com",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com",
+  "font-src 'self' https://fonts.gstatic.com",
+  "img-src 'self' data: blob: https://*.tile.openstreetmap.org",
+  "connect-src 'self' https://nominatim.openstreetmap.org https://router.project-osrm.org",
+  "manifest-src 'self'",
+  "worker-src 'self'",
+  "frame-ancestors 'none'",
+  "base-uri 'self'",
+].join('; ');
+
 app.use((req, res, next) => {
+  res.setHeader('Content-Security-Policy', CSP);
   res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   next();
 });
@@ -166,8 +185,8 @@ function isAuthenticated(req) {
   return parseCookies(req).servilog_session === makeSessionToken();
 }
 
-// Routes always accessible (login page assets)
-const PUBLIC_PATHS = new Set(['/login', '/favicon.ico']);
+// Routes always accessible (login page assets + healthcheck endpoint)
+const PUBLIC_PATHS = new Set(['/login', '/favicon.ico', '/api/version']);
 
 if (APP_PASSWORD) {
   app.use((req, res, next) => {
@@ -189,17 +208,42 @@ app.get('/login', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'login.html'));
 });
 
+// Simple in-memory brute-force guard: max 10 failures per IP per 15 min window
+const loginAttempts = new Map();
+function isRateLimited(ip) {
+  const now = Date.now();
+  const entry = loginAttempts.get(ip);
+  if (!entry || now > entry.resetAt) return false;
+  return entry.count >= 10;
+}
+function recordFailure(ip) {
+  const now = Date.now();
+  const entry = loginAttempts.get(ip);
+  if (!entry || now > entry.resetAt) {
+    loginAttempts.set(ip, { count: 1, resetAt: now + 15 * 60 * 1000 });
+  } else {
+    entry.count++;
+  }
+}
+function clearAttempts(ip) { loginAttempts.delete(ip); }
+
 app.post('/login', (req, res) => {
+  const ip = req.socket.remoteAddress || '';
+  if (isRateLimited(ip)) {
+    return res.status(429).redirect('/login?error=2');
+  }
   const submitted = String(req.body.password || '');
   const pwdBuf = Buffer.from(APP_PASSWORD || '');
   const subBuf = Buffer.from(submitted);
   const valid = APP_PASSWORD &&
     subBuf.length === pwdBuf.length &&
     crypto.timingSafeEqual(subBuf, pwdBuf);
-  if (!valid) return res.redirect('/login?error=1');
+  if (!valid) { recordFailure(ip); return res.redirect('/login?error=1'); }
+  clearAttempts(ip);
   const token = makeSessionToken();
+  const secure = process.env.HTTPS === 'true' ? '; Secure' : '';
   res.setHeader('Set-Cookie',
-    `servilog_session=${token}; HttpOnly; SameSite=Strict; Path=/`);
+    `servilog_session=${token}; HttpOnly; SameSite=Strict; Path=/${secure}`);
   res.redirect('/');
 });
 
@@ -245,9 +289,10 @@ app.put('/api/clients/:id', (req, res) => {
   const { name, phone, address } = req.body;
   if (!name?.trim()) return res.status(400).json({ error: 'Name is required' });
   try {
-    db.prepare('UPDATE clients SET name=?, phone=?, address=? WHERE id=?').run(
+    const result = db.prepare('UPDATE clients SET name=?, phone=?, address=? WHERE id=?').run(
       name.trim(), phone?.trim() || null, address?.trim() || null, req.params.id
     );
+    if (result.changes === 0) return res.status(404).json({ error: 'Client not found' });
     res.json({ ok: true });
   } catch (e) {
     res.status(409).json({ error: 'Client already exists' });
@@ -311,6 +356,13 @@ app.get('/api/services/:id', (req, res) => {
   res.json(row);
 });
 
+// Parse a numeric field and clamp it to >= 0; returns null for empty/missing values.
+function parseNonNeg(v) {
+  if (v == null || v === '') return null;
+  const n = parseFloat(v);
+  return isNaN(n) ? null : Math.max(0, n);
+}
+
 // Client already sends net duration_hours (deduction applied) — trust it if provided.
 // Only apply discount_hours when computing from start_time/end_time.
 function calcDuration(start_time, end_time, duration_hours, discount_hours) {
@@ -360,18 +412,18 @@ app.post('/api/services', (req, res) => {
   `).run(
     date, start_time || null, end_time || null,
     duration,
-    discount_hours ? parseFloat(discount_hours) : 0,
+    parseNonNeg(discount_hours) ?? 0,
     client_id || null, description || null,
     finalValue,
-    hourmeter_start != null ? parseFloat(hourmeter_start) : null,
-    hourmeter_end != null ? parseFloat(hourmeter_end) : null,
-    delta,
-    operator_rate ? parseFloat(operator_rate) : 0,
-    machine_rate  ? parseFloat(machine_rate)  : 0,
-    travel_fee ? parseFloat(travel_fee) : null,
-    discount ? parseFloat(discount) : null,
+    parseNonNeg(hourmeter_start),
+    parseNonNeg(hourmeter_end),
+    delta != null ? Math.max(0, delta) : null,
+    parseNonNeg(operator_rate) ?? 0,
+    parseNonNeg(machine_rate)  ?? 0,
+    parseNonNeg(travel_fee),
+    parseNonNeg(discount),
     paid ? 1 : 0,
-    tip ? parseFloat(tip) : 0,
+    parseNonNeg(tip) ?? 0,
     vat_rate != null && vat_rate !== '' ? parseFloat(vat_rate) : null,
     status === 'scheduled' ? 'scheduled' : 'completed'
   );
@@ -405,18 +457,18 @@ app.put('/api/services/:id', (req, res) => {
   `).run(
     date, start_time || null, end_time || null,
     duration,
-    discount_hours ? parseFloat(discount_hours) : 0,
+    parseNonNeg(discount_hours) ?? 0,
     client_id || null, description || null,
     finalValue,
-    hourmeter_start != null ? parseFloat(hourmeter_start) : null,
-    hourmeter_end != null ? parseFloat(hourmeter_end) : null,
-    delta,
-    operator_rate ? parseFloat(operator_rate) : 0,
-    machine_rate  ? parseFloat(machine_rate)  : 0,
-    travel_fee ? parseFloat(travel_fee) : null,
-    discount ? parseFloat(discount) : null,
+    parseNonNeg(hourmeter_start),
+    parseNonNeg(hourmeter_end),
+    delta != null ? Math.max(0, delta) : null,
+    parseNonNeg(operator_rate) ?? 0,
+    parseNonNeg(machine_rate)  ?? 0,
+    parseNonNeg(travel_fee),
+    parseNonNeg(discount),
     paid ? 1 : 0,
-    tip ? parseFloat(tip) : 0,
+    parseNonNeg(tip) ?? 0,
     vat_rate != null && vat_rate !== '' ? parseFloat(vat_rate) : null,
     status === 'scheduled' ? 'scheduled' : 'completed',
     req.params.id
@@ -522,7 +574,8 @@ app.get('/api/summary', (req, res) => {
       ROUND(SUM(hourmeter_delta),2) as total_hourmeter,
       ROUND(SUM(COALESCE(tip,0)),2) as total_tips,
       ROUND(SUM(COALESCE(operator_rate,0) * COALESCE(duration_hours,0)),2) as total_operator,
-      ROUND(SUM(COALESCE(machine_rate,0)  * COALESCE(duration_hours,0)),2) as total_machine
+      ROUND(SUM(COALESCE(machine_rate,0)  * COALESCE(duration_hours,0)),2) as total_machine,
+      ROUND(AVG(CASE WHEN duration_hours IS NOT NULL THEN duration_hours END),2) as avg_duration
     FROM services WHERE ${where}
   `).get(...params);
 
@@ -636,11 +689,16 @@ app.post('/api/backup/restore',
           return res.status(400).json({ error: 'Invalid backup: bad database' });
         }
         const fileCount = req.body.readUInt32LE(off); off += 4;
+        if (fileCount > 100000) throw new Error('Too many files');
         const uploadFiles = [];
         for (let i = 0; i < fileCount; i++) {
+          if (off + 4 > req.body.length) throw new Error('Truncated');
           const nl   = req.body.readUInt32LE(off); off += 4;
+          if (off + nl > req.body.length) throw new Error('Truncated');
           const name = req.body.slice(off, off + nl).toString('utf8'); off += nl;
+          if (off + 4 > req.body.length) throw new Error('Truncated');
           const dl   = req.body.readUInt32LE(off); off += 4;
+          if (off + dl > req.body.length) throw new Error('Truncated');
           const data = req.body.slice(off, off + dl); off += dl;
           uploadFiles.push({ name: path.basename(name), data });
         }
@@ -660,7 +718,7 @@ app.post('/api/backup/restore',
         fs.renameSync(tmpDb, DB_PATH);
         if (fs.existsSync(UPLOADS_DIR)) fs.renameSync(UPLOADS_DIR, oldUploads);
         fs.renameSync(tmpUploads, UPLOADS_DIR);
-        db = new Database(DB_PATH);
+        db = openDb(DB_PATH);
         runMigrations();
         try { fs.rmSync(oldUploads, { recursive: true, force: true }); } catch (_) {}
 
@@ -670,7 +728,7 @@ app.post('/api/backup/restore',
         try { fs.unlinkSync(DB_PATH + '.restoring'); } catch (_) {}
         try { fs.rmSync(UPLOADS_DIR + '_restoring', { recursive: true, force: true }); } catch (_) {}
         // If DB was closed but not yet reopened, reopen what's there
-        if (!db.open) { try { db = new Database(DB_PATH); runMigrations(); } catch (_) {} }
+        if (!db.open) { try { db = openDb(DB_PATH); runMigrations(); } catch (_) {} }
         res.status(400).json({ error: 'Corrupt backup file' });
       }
     } else if (req.body.slice(0, 15).toString('utf8').startsWith('SQLite format 3')) {
@@ -680,12 +738,12 @@ app.post('/api/backup/restore',
         fs.writeFileSync(tmpDb, req.body);
         db.close();
         fs.renameSync(tmpDb, DB_PATH);
-        db = new Database(DB_PATH);
+        db = openDb(DB_PATH);
         runMigrations();
         res.json({ ok: true });
       } catch (e) {
         try { fs.unlinkSync(tmpDb); } catch (_) {}
-        if (!db.open) { try { db = new Database(DB_PATH); runMigrations(); } catch (_) {} }
+        if (!db.open) { try { db = openDb(DB_PATH); runMigrations(); } catch (_) {} }
         res.status(400).json({ error: 'Restore failed' });
       }
     } else {

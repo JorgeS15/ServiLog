@@ -1,5 +1,67 @@
 # Changelog
 
+## [1.7.8] - 2026-06-17
+
+### Changed
+- **Dockerfile**: switched from `npm install --production` to `npm ci --omit=dev` for reproducible, lock-file-enforced dependency installs; added `package-lock.json` to the COPY step
+- **`.dockerignore`**: added — prevents `node_modules/`, `data/`, `.git/`, database files, and backups from being sent to the Docker build context
+- **README**: corrected version badge to v1.7.8
+
+## [1.7.7] - 2026-06-17
+
+### Fixed
+- **Negative numeric values**: all numeric service fields (operator rate, machine rate, travel fee, discount, tip, discount hours, hourmeter readings) are now clamped to ≥ 0 via a shared `parseNonNeg()` helper — negative values submitted via the API are silently floored to zero
+
+### Changed
+- **docker-compose.yml**: `APP_PASSWORD` is now included and active by default with a placeholder value (`change-me`); `HTTPS=true` is present but commented out. New installs will have password protection enabled out of the box
+
+## [1.7.6] - 2026-06-17
+
+### Security
+- **Backup restore bounds checking**: the `.slb` parser now validates every offset and length before reading, and caps `fileCount` at 100 000 — a malformed file could previously cause the parse loop to spin or read past the buffer
+- **Cookie `Secure` flag**: session cookies now include `Secure` when the `HTTPS=true` environment variable is set, preventing transmission over plain HTTP on HTTPS deployments
+
+### Changed
+- **README**: updated to v1.7.6, added `HTTPS=true` env var documentation, documented the `Secure` cookie flag in the security hardening table, added "Additional statistics" feature row
+
+## [1.7.5] - 2026-06-16
+
+### Added
+- **Additional statistics toggle**: new option in Settings to show extra stats on the Summary dashboard; off by default so the dashboard stays clean. Currently includes mean time per service; more stats can be added here in the future
+
+## [1.7.4] - 2026-06-16
+
+### Fixed
+- **Unhealthy container**: `/api/version` is now always accessible without authentication — previously the auth middleware returned 401 to Docker's healthcheck `wget` when `APP_PASSWORD` was set, causing the container to be flagged as unhealthy in Portainer
+
+### Added
+- **Mean Time / Service stat**: the Summary dashboard now shows the average service duration (in hours) alongside the total work hours, for both monthly and all-time views
+
+## [1.7.3] - 2026-05-11
+
+### Fixed
+- **Map interface broken**: added `https://unpkg.com` to the `style-src` CSP directive — Leaflet's CSS is loaded from `unpkg.com` and was being blocked, stripping all map styles and controls
+
+## [1.7.2] - 2026-05-11
+
+### Fixed
+- **PWA install restored**: added `manifest-src 'self'` and `worker-src 'self'` CSP directives — Chrome/Chromium require these explicitly and do not reliably inherit from `default-src` under a strict CSP; their absence in v1.7.1 silently broke the "Add to Home Screen" install prompt
+- **Contradicting frame policy**: corrected `X-Frame-Options` from `SAMEORIGIN` to `DENY` to align with the existing `frame-ancestors 'none'` CSP directive (browsers already honoured `none`; the old value was dead code)
+
+## [1.7.1] - 2026-05-05
+
+### Security
+- **XSS fix**: client name was rendered without escaping in the service card and dashboard by-client list — a malicious name could execute arbitrary JavaScript; wrapped with `escapeHtml()` in both places
+- **Content-Security-Policy**: CSP header now sent on every response, restricting scripts to `self` + unpkg (Leaflet), API connections to `self` + Nominatim/OSRM, and images to OSM tile servers
+- **Login rate limiting**: `/login` now enforces a max of 10 failed attempts per IP per 15-minute window and returns 429 on further attempts
+- **Foreign keys enforced**: `PRAGMA foreign_keys = ON` is now applied on every database open (initial start and all backup restore paths via new `openDb()` helper)
+- **PUT /api/clients/:id**: now returns 404 when the target client does not exist instead of silently succeeding with zero rows changed
+- **File upload error handling**: `uploadPictures` now checks `r.ok` before parsing the response as JSON, ensuring non-JSON error responses (e.g. from a reverse proxy) are surfaced as user-readable messages
+
+### Changed
+- Docker image now includes a `HEALTHCHECK` (`wget` on `/api/version` every 30 s, 5 s timeout) — lets Docker and orchestrators detect silent crashes
+- Dependency versions pinned to exact releases (`express 4.22.1`, `better-sqlite3 9.6.0`) for reproducible Docker builds
+
 ## [1.7.0] - 2026-05-05
 
 ### Added

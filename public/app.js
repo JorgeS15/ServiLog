@@ -5,6 +5,8 @@ const TRANSLATIONS = {
     nav_dashboard: 'Resumo', nav_lista: 'Serviços', nav_clientes: 'Clientes', nav_settings: 'Definições', nav_agenda: 'Agenda',
     dashboard_title: 'Resumo', dashboard_monthly: 'Mensal', dashboard_alltime: 'Tudo',
     stat_services: 'Serviços', stat_hours: 'Horas Trab.', stat_received: 'Recebido',
+    stat_avg_duration: 'Tempo Médio / Serviço',
+    settings_extra_stats: 'Estatísticas adicionais', settings_extra_stats_sub: 'Mostra estatísticas extra no Resumo (tempo médio por serviço, etc.)',
     stat_pending: 'Pendente', stat_billed: 'Total Faturado', stat_horimetro: 'Horímetro',
     stat_tips: 'Gorjetas', stat_horimetro_sub: 'delta do período',
     stat_net: 'Líquido (s/ IVA)', stat_gross: 'Bruto (c/ IVA)',
@@ -113,6 +115,8 @@ const TRANSLATIONS = {
     nav_dashboard: 'Summary', nav_lista: 'Services', nav_clientes: 'Clients', nav_settings: 'Settings', nav_agenda: 'Agenda',
     dashboard_title: 'Summary', dashboard_monthly: 'Monthly', dashboard_alltime: 'All Time',
     stat_services: 'Services', stat_hours: 'Work Hours', stat_received: 'Received',
+    stat_avg_duration: 'Mean Time / Service',
+    settings_extra_stats: 'Additional statistics', settings_extra_stats_sub: 'Show extra stats on the Summary (mean time per service, etc.)',
     stat_pending: 'Pending', stat_billed: 'Total Billed', stat_horimetro: 'Hourmeter',
     stat_tips: 'Tips', stat_horimetro_sub: 'period delta',
     stat_net: 'Net (excl. VAT)', stat_gross: 'Gross (incl. VAT)',
@@ -341,6 +345,15 @@ async function renderDashboard() {
       </div>
     </div>
 
+    ${localStorage.getItem('extra_stats') === '1' ? `
+    <div class="card-row" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+      <div class="stat-block">
+        <div class="stat-label">${t('stat_avg_duration')}</div>
+        <div class="stat-value">${s.avg_duration != null ? s.avg_duration + ' h' : '—'}</div>
+      </div>
+      <div class="stat-block"></div>
+    </div>` : ''}
+
     <div class="card-row" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
       <div class="stat-block">
         <div class="stat-label">${t('stat_received')}</div>
@@ -393,7 +406,7 @@ async function renderDashboard() {
       <div class="section-title" style="margin-bottom:12px">${t('by_client')}</div>
       ${byClient.map(c => `
         <div class="client-row">
-          <div class="client-row-name">${c.name || '—'}</div>
+          <div class="client-row-name">${escapeHtml(c.name || '—')}</div>
           <div class="client-row-stats">
             <div class="client-row-stat"><strong>${c.services}</strong> ${t('serv_abbr')}</div>
             <div class="client-row-stat"><strong>${c.hours || '—'}</strong> h</div>
@@ -523,7 +536,7 @@ function serviceCard(s) {
       <div class="service-top">
         <div>
           <div class="service-date">${formatDate(s.date)}</div>
-          <div class="service-client">${s.client_name || '—'}</div>
+          <div class="service-client">${escapeHtml(s.client_name || '—')}</div>
           ${s.description ? `<div class="service-description">${escapeHtml(s.description)}</div>` : ''}
         </div>
         <div style="text-align:right;flex-shrink:0">
@@ -960,6 +973,11 @@ window.uploadPictures = async function(input, serviceId) {
       headers: { 'Content-Type': file.type || 'application/octet-stream' },
       body: file,
     });
+    if (!r.ok) {
+      let msg = `Upload failed (${r.status})`;
+      try { const e = await r.json(); if (e.error) msg = e.error; } catch (_) {}
+      toast(msg, 'error'); input.value = ''; return;
+    }
     const result = await r.json();
     if (result.error) { toast(result.error, 'error'); input.value = ''; return; }
   }
@@ -1885,6 +1903,22 @@ async function renderSettings() {
       <div style="display:flex;gap:8px">
         <button class="btn btn-sm ${theme === 'dark' ? 'btn-primary' : 'btn-secondary'}" onclick="setTheme('dark')">${t('settings_theme_dark')}</button>
         <button class="btn btn-sm ${theme === 'light' ? 'btn-primary' : 'btn-secondary'}" onclick="setTheme('light')">${t('settings_theme_light')}</button>
+      </div>
+    </div>
+
+    <!-- Extra Stats -->
+    <div class="card" style="margin-bottom:12px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+        <div>
+          <div class="section-title">${t('settings_extra_stats')}</div>
+          <div style="font-size:12px;color:var(--text3);margin-top:2px">${t('settings_extra_stats_sub')}</div>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="extra-stats-toggle"
+                 ${localStorage.getItem('extra_stats') === '1' ? 'checked' : ''}
+                 onchange="saveSetting('extra_stats', this.checked ? '1' : '0'); renderDashboard && navigate('dashboard')">
+          <span class="toggle-slider"></span>
+        </label>
       </div>
     </div>
 
