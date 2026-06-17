@@ -356,6 +356,13 @@ app.get('/api/services/:id', (req, res) => {
   res.json(row);
 });
 
+// Parse a numeric field and clamp it to >= 0; returns null for empty/missing values.
+function parseNonNeg(v) {
+  if (v == null || v === '') return null;
+  const n = parseFloat(v);
+  return isNaN(n) ? null : Math.max(0, n);
+}
+
 // Client already sends net duration_hours (deduction applied) — trust it if provided.
 // Only apply discount_hours when computing from start_time/end_time.
 function calcDuration(start_time, end_time, duration_hours, discount_hours) {
@@ -405,18 +412,18 @@ app.post('/api/services', (req, res) => {
   `).run(
     date, start_time || null, end_time || null,
     duration,
-    discount_hours ? parseFloat(discount_hours) : 0,
+    parseNonNeg(discount_hours) ?? 0,
     client_id || null, description || null,
     finalValue,
-    hourmeter_start != null ? parseFloat(hourmeter_start) : null,
-    hourmeter_end != null ? parseFloat(hourmeter_end) : null,
-    delta,
-    operator_rate ? parseFloat(operator_rate) : 0,
-    machine_rate  ? parseFloat(machine_rate)  : 0,
-    travel_fee ? parseFloat(travel_fee) : null,
-    discount ? parseFloat(discount) : null,
+    parseNonNeg(hourmeter_start),
+    parseNonNeg(hourmeter_end),
+    delta != null ? Math.max(0, delta) : null,
+    parseNonNeg(operator_rate) ?? 0,
+    parseNonNeg(machine_rate)  ?? 0,
+    parseNonNeg(travel_fee),
+    parseNonNeg(discount),
     paid ? 1 : 0,
-    tip ? parseFloat(tip) : 0,
+    parseNonNeg(tip) ?? 0,
     vat_rate != null && vat_rate !== '' ? parseFloat(vat_rate) : null,
     status === 'scheduled' ? 'scheduled' : 'completed'
   );
@@ -450,18 +457,18 @@ app.put('/api/services/:id', (req, res) => {
   `).run(
     date, start_time || null, end_time || null,
     duration,
-    discount_hours ? parseFloat(discount_hours) : 0,
+    parseNonNeg(discount_hours) ?? 0,
     client_id || null, description || null,
     finalValue,
-    hourmeter_start != null ? parseFloat(hourmeter_start) : null,
-    hourmeter_end != null ? parseFloat(hourmeter_end) : null,
-    delta,
-    operator_rate ? parseFloat(operator_rate) : 0,
-    machine_rate  ? parseFloat(machine_rate)  : 0,
-    travel_fee ? parseFloat(travel_fee) : null,
-    discount ? parseFloat(discount) : null,
+    parseNonNeg(hourmeter_start),
+    parseNonNeg(hourmeter_end),
+    delta != null ? Math.max(0, delta) : null,
+    parseNonNeg(operator_rate) ?? 0,
+    parseNonNeg(machine_rate)  ?? 0,
+    parseNonNeg(travel_fee),
+    parseNonNeg(discount),
     paid ? 1 : 0,
-    tip ? parseFloat(tip) : 0,
+    parseNonNeg(tip) ?? 0,
     vat_rate != null && vat_rate !== '' ? parseFloat(vat_rate) : null,
     status === 'scheduled' ? 'scheduled' : 'completed',
     req.params.id
