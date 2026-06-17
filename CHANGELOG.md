@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.8] - 2026-06-17
+
+### Changed
+- **Dockerfile**: switched from `npm install --production` to `npm ci --omit=dev` for reproducible, lock-file-enforced dependency installs; added `package-lock.json` to the COPY step
+- **`.dockerignore`**: added — prevents `node_modules/`, `data/`, `.git/`, database files, and backups from being sent to the Docker build context
+- **README**: corrected version badge to v1.7.8
+
 ## [1.7.7] - 2026-06-17
 
 ### Fixed
