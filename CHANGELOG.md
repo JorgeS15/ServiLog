@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.7.7] - 2026-06-17
+
+### Fixed
+- **Negative numeric values**: all numeric service fields (operator rate, machine rate, travel fee, discount, tip, discount hours, hourmeter readings) are now clamped to ≥ 0 via a shared `parseNonNeg()` helper — negative values submitted via the API are silently floored to zero
+
+### Changed
+- **docker-compose.yml**: `APP_PASSWORD` is now included and active by default with a placeholder value (`change-me`); `HTTPS=true` is present but commented out. New installs will have password protection enabled out of the box
+
 ## [1.7.6] - 2026-06-17
 
 ### Security
