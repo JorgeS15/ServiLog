@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.7.6] - 2026-06-17
+
+### Security
+- **Backup restore bounds checking**: the `.slb` parser now validates every offset and length before reading, and caps `fileCount` at 100 000 — a malformed file could previously cause the parse loop to spin or read past the buffer
+- **Cookie `Secure` flag**: session cookies now include `Secure` when the `HTTPS=true` environment variable is set, preventing transmission over plain HTTP on HTTPS deployments
+
+### Changed
+- **README**: updated to v1.7.6, added `HTTPS=true` env var documentation, documented the `Secure` cookie flag in the security hardening table, added "Additional statistics" feature row
+
 ## [1.7.5] - 2026-06-16
 
 ### Added

@@ -241,8 +241,9 @@ app.post('/login', (req, res) => {
   if (!valid) { recordFailure(ip); return res.redirect('/login?error=1'); }
   clearAttempts(ip);
   const token = makeSessionToken();
+  const secure = process.env.HTTPS === 'true' ? '; Secure' : '';
   res.setHeader('Set-Cookie',
-    `servilog_session=${token}; HttpOnly; SameSite=Strict; Path=/`);
+    `servilog_session=${token}; HttpOnly; SameSite=Strict; Path=/${secure}`);
   res.redirect('/');
 });
 
@@ -681,11 +682,16 @@ app.post('/api/backup/restore',
           return res.status(400).json({ error: 'Invalid backup: bad database' });
         }
         const fileCount = req.body.readUInt32LE(off); off += 4;
+        if (fileCount > 100000) throw new Error('Too many files');
         const uploadFiles = [];
         for (let i = 0; i < fileCount; i++) {
+          if (off + 4 > req.body.length) throw new Error('Truncated');
           const nl   = req.body.readUInt32LE(off); off += 4;
+          if (off + nl > req.body.length) throw new Error('Truncated');
           const name = req.body.slice(off, off + nl).toString('utf8'); off += nl;
+          if (off + 4 > req.body.length) throw new Error('Truncated');
           const dl   = req.body.readUInt32LE(off); off += 4;
+          if (off + dl > req.body.length) throw new Error('Truncated');
           const data = req.body.slice(off, off + dl); off += dl;
           uploadFiles.push({ name: path.basename(name), data });
         }
