@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.7.9] - 2026-06-22
+
+### Fixed
+- **Map picker not rendering**: Leaflet marker icon images (loaded from `unpkg.com`) were blocked by the Content-Security-Policy `img-src` directive, causing the map marker to be invisible. Added `https://unpkg.com` to `img-src`.
+- **Map tiles not appearing on first open**: added `invalidateSize()` call immediately after Leaflet map creation so the map correctly measures its container and loads tiles on first open.
+- **Address not set when "Confirm" is clicked quickly after selecting a search result**: `selectMapResult` now immediately sets `mapPicker.resolvedAddress` to the search result's `display_name` before the async reverse-geocode call returns, so confirming always populates the address field.
+- **Stale base-address `onConfirm` callback leaking into client address picker**: `openMapPicker` now clears `mapPicker.onConfirm` at the start, preventing a previous base-address callback from triggering when picking a client address.
+
 ## [1.7.8] - 2026-06-17
 
 ### Changed

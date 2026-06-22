@@ -1362,6 +1362,7 @@ window.openMapPicker = function(targetInputId) {
   mapPicker.resolvedAddress = '';
   mapPicker.lat = null;
   mapPicker.lng = null;
+  mapPicker.onConfirm = null;
 
   const overlay = document.getElementById('map-picker-overlay');
   overlay.classList.remove('hidden');
@@ -1381,6 +1382,7 @@ window.openMapPicker = function(targetInputId) {
         attribution: '© <a href="https://www.openstreetmap.org">OpenStreetMap</a>',
         maxZoom: 19,
       }).addTo(mapPicker.map);
+      mapPicker.map.invalidateSize();
 
       mapPicker.marker = L.marker([39.5, -8.0], { draggable: true }).addTo(mapPicker.map);
       mapPicker.marker.on('dragend', () => {
@@ -1472,7 +1474,7 @@ window.onMapSearch = function(query) {
       const data = await r.json();
       results.innerHTML = data.length
         ? data.map(item => `
-            <div class="map-search-result" onclick="selectMapResult(${item.lat},${item.lon})">
+            <div class="map-search-result" onclick="selectMapResult(${item.lat},${item.lon},${JSON.stringify(item.display_name)})">
               ${escapeHtml(item.display_name)}
             </div>`).join('')
         : `<div class="map-search-result map-no-result">${t('map_no_results')}</div>`;
@@ -1480,10 +1482,16 @@ window.onMapSearch = function(query) {
   }, 400);
 };
 
-window.selectMapResult = function(lat, lon) {
+window.selectMapResult = function(lat, lon, displayName) {
   const latlng = [parseFloat(lat), parseFloat(lon)];
   mapPicker.map.setView(latlng, 16);
   mapPicker.marker.setLatLng(latlng);
+  mapPicker.lat = parseFloat(lat);
+  mapPicker.lng = parseFloat(lon);
+  if (displayName) {
+    mapPicker.resolvedAddress = displayName;
+    document.getElementById('map-resolved-address').textContent = displayName;
+  }
   document.getElementById('map-search-results').innerHTML = '';
   document.getElementById('map-search-input').value = '';
   reverseGeocode(lat, lon);
