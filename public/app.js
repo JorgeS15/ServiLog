@@ -1374,7 +1374,7 @@ window.openMapPicker = function(targetInputId) {
   document.getElementById('map-search-results').innerHTML = '';
   document.getElementById('map-search-input').value = '';
 
-  requestAnimationFrame(() => {
+  setTimeout(() => {
     if (!mapPicker.map) {
       // Default center: Portugal
       mapPicker.map = L.map('map-leaflet').setView([39.5, -8.0], 6);
@@ -1400,7 +1400,7 @@ window.openMapPicker = function(targetInputId) {
     // If there's an existing address, try to show it on the map
     const existing = document.getElementById(targetInputId)?.value?.trim();
     if (existing) geocodeForMap(existing);
-  });
+  }, 50);
 };
 
 async function reverseGeocode(lat, lng) {
