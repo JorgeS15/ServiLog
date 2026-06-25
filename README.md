@@ -1,6 +1,6 @@
 # ServiLog
 
-> Self-hosted service log for machines and agricultural equipment — v1.9.1
+> Self-hosted service log for machines and agricultural equipment — v1.9.2
 
 <img width="677" height="486" alt="image" src="https://github.com/user-attachments/assets/40974a8e-a146-46a2-940a-817de2516ae3" />
 
@@ -65,6 +65,28 @@ Settings → **Download Backup** exports a single `.slb` file containing the SQL
 Restore by selecting the `.slb` file (or a legacy `.db` file) in Settings → **Load Backup**.
 
 Manual backup: copy `./data/` — restore by replacing the folder and restarting the container.
+
+---
+
+## Email Notifications
+
+ServiLog can send an email reminder **7 days** and **1 day** before each scheduled service. Configure it via environment variables in `docker-compose.yml`:
+
+```yaml
+environment:
+  - SMTP_HOST=smtp.gmail.com
+  - SMTP_PORT=587
+  - SMTP_USER=you@gmail.com
+  - SMTP_PASS=your-app-password      # Gmail: use an App Password, not your account password
+  - SMTP_FROM=ServiLog <you@gmail.com>
+  - NOTIFY_EMAIL=you@gmail.com       # where to send the reminders
+  - NOTIFY_TIME=08:00                # time of day to run the check (server local time)
+  - SMTP_SECURE=false                # set true only for port 465
+```
+
+All four of `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`, and `NOTIFY_EMAIL` must be set — notifications are silently disabled if any are missing.
+
+**Gmail tip**: enable 2FA on your Google account, then generate an [App Password](https://myaccount.google.com/apppasswords) to use as `SMTP_PASS`.
 
 ---
 
