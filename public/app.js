@@ -445,7 +445,6 @@ async function renderView(view) {
   else if (view === 'clients') await renderClients();
   else if (view === 'settings') await renderSettings();
   else if (view === 'agenda') await renderAgenda();
-  else if (view === 'quote') renderQuote();
 }
 
 // ── Dashboard ─────────────────────────────────────────────
@@ -1316,25 +1315,20 @@ td{padding:13px 10px;font-size:13px;border-bottom:1px solid #ebedf0;vertical-ali
 };
 
 // ── Quote view ────────────────────────────────────────────
-function renderQuote() {
-  const el = document.getElementById('view-quote');
+function quoteFormHtml() {
   const today = new Date().toISOString().slice(0, 10);
   const validUntil = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
   const clientOptions = state.clients.map(c =>
-    `<option value="${escapeHtml(c.name)}">${escapeHtml(c.name)}</option>`
+    `<option value="${c.id}">${escapeHtml(c.name)}</option>`
   ).join('');
 
   const defaultOpRate   = settings['default_operator_rate'] || '';
   const defaultMachRate = settings['default_machine_rate']  || '';
   const defaultTravel   = settings['default_travel_fee']    || '';
 
-  el.innerHTML = `
-    <div class="section-header">
-      <span class="section-title">${t('quote_new')}</span>
-    </div>
-
-    <div class="card" style="margin-bottom:12px">
+  return `
+    <div class="form-grid">
       <div class="form-group">
         <label class="form-label">${t('form_client')}</label>
         <select class="form-control" id="q-client-select" onchange="onQuoteClientChange()">
@@ -1393,10 +1387,14 @@ function renderQuote() {
       <div class="form-row">
         <div class="form-group">
           <label class="form-label">${t('form_travel')}</label>
-          <input type="number" class="form-control" id="q-travel"
-                 step="0.5" min="0" placeholder="ex: 10.00"
-                 value="${escapeHtml(defaultTravel)}"
-                 oninput="calcQuoteTotal()">
+          <div style="display:flex;gap:6px">
+            <input type="number" class="form-control" id="q-travel"
+                   step="0.5" min="0" placeholder="ex: 10.00"
+                   value="${escapeHtml(defaultTravel)}"
+                   oninput="calcQuoteTotal()">
+            <button type="button" class="btn btn-ghost btn-sm" id="q-btn-calc-travel"
+                    onclick="calcQuoteTravelFee()" title="${t('form_calc_travel')}" style="white-space:nowrap">🚗</button>
+          </div>
         </div>
         <div class="form-group">
           <label class="form-label">${t('form_discount_value')}</label>
@@ -1440,17 +1438,49 @@ function renderQuote() {
         </div>
       </div>
 
-      <button class="btn btn-primary" style="width:100%" onclick="generateQuote()">
+      <button class="btn btn-primary" style="width:100%;margin-top:4px" onclick="generateQuote()">
         ${t('quote_generate')}
       </button>
     </div>
   `;
 }
 
+function openQuoteModal() {
+  openModal(t('quote_new'), quoteFormHtml());
+}
+
 window.onQuoteClientChange = function() {
   const sel = document.getElementById('q-client-select');
   const custom = document.getElementById('q-client-custom');
   if (custom) custom.style.display = sel.value === '__custom__' ? 'block' : 'none';
+};
+
+window.calcQuoteTravelFee = async function() {
+  const btn = document.getElementById('q-btn-calc-travel');
+  if (btn) btn.disabled = true;
+  try {
+    const clientId = document.getElementById('q-client-select')?.value;
+    const client = state.clients.find(c => String(c.id) === String(clientId));
+    if (!client?.address) { toast(t('toast_no_client_address'), 'error'); return; }
+
+    const base = await getBaseCoords();
+    if (!base) { toast(t('toast_no_base_address'), 'warn'); return; }
+
+    const result = await geocodeAddress(client.address);
+    if (!result) { toast(t('toast_travel_calc_error'), 'error'); return; }
+
+    const clientLat = parseFloat(result.lat), clientLng = parseFloat(result.lon);
+    const distKm = await getRoadDistanceKm(base.lat, base.lng, clientLat, clientLng);
+    const fee = applyTravelFeeFormula(distKm);
+
+    const feeInput = document.getElementById('q-travel');
+    if (feeInput) { feeInput.value = fee.toFixed(2); calcQuoteTotal(); }
+    toast(`🚗 ${distKm.toFixed(1)} km → ${fee.toFixed(2)} ${getCurrency()}`, 'success');
+  } catch (_) {
+    toast(t('toast_travel_calc_error'), 'error');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
 };
 
 window.calcQuoteTotal = function() {
@@ -1489,12 +1519,13 @@ window.generateQuote = async function() {
 
   const clientSel    = document.getElementById('q-client-select');
   const clientCustom = document.getElementById('q-client-custom');
-  let clientName = '';
+  let clientName = '', clientAddress = '', clientPhone = '';
   if (clientSel) {
     if (clientSel.value === '__custom__') {
       clientName = (clientCustom?.value || '').trim();
-    } else {
-      clientName = clientSel.value;
+    } else if (clientSel.value) {
+      const found = state.clients.find(c => String(c.id) === String(clientSel.value));
+      if (found) { clientName = found.name; clientAddress = found.address || ''; clientPhone = found.phone || ''; }
     }
   }
   const description = document.getElementById('q-description')?.value || '';
@@ -1600,7 +1631,11 @@ td{padding:13px 10px;font-size:13px;border-bottom:1px solid #ebedf0;vertical-ali
   <div class="bill-to">
     <div class="sec-label">${t('quote_issued_to')}</div>
     ${clientName
-      ? `<div class="bill-name">${esc(clientName)}</div>`
+      ? `<div class="bill-name">${esc(clientName)}</div>
+         <div class="bill-detail">
+           ${clientAddress ? escNl(clientAddress) + '<br>' : ''}
+           ${clientPhone   ? esc(clientPhone) : ''}
+         </div>`
       : `<div class="bill-name">—</div>`
     }
   </div>
@@ -2344,18 +2379,42 @@ async function init() {
   updateOfflineBadge();
 
   // Nav — apply translations and attach click handlers
-  const navKeyMap = { dashboard: 'nav_dashboard', list: 'nav_lista', clients: 'nav_clientes', settings: 'nav_settings', agenda: 'nav_agenda', quote: 'nav_quote' };
+  const navKeyMap = { dashboard: 'nav_dashboard', list: 'nav_lista', clients: 'nav_clientes', settings: 'nav_settings', agenda: 'nav_agenda' };
   document.querySelectorAll('.nav-btn').forEach(btn => {
     const key = navKeyMap[btn.dataset.view];
     if (key) btn.querySelector('span').textContent = t(key);
     btn.addEventListener('click', () => navigate(btn.dataset.view));
   });
 
-  // FAB
+  // FAB — shows a two-item menu (New Service / New Quote)
   const fab = document.getElementById('fab');
-  fab.title = t('form_new_service');
-  fab.addEventListener('click', () => {
+  const fabMenu = document.getElementById('fab-menu');
+  const fabNewService = document.getElementById('fab-new-service');
+  const fabNewQuote   = document.getElementById('fab-new-quote');
+  function updateFabLabels() {
+    if (fabNewService) fabNewService.textContent = '📋 ' + t('form_new_service');
+    if (fabNewQuote)   fabNewQuote.textContent   = '📄 ' + t('quote_new');
+  }
+  updateFabLabels();
+  window._updateFabLabels = updateFabLabels;
+
+  function closeFabMenu() { fabMenu?.classList.add('hidden'); }
+  fab.addEventListener('click', (e) => {
+    e.stopPropagation();
+    fabMenu?.classList.toggle('hidden');
+  });
+  fabNewService?.addEventListener('click', () => {
+    closeFabMenu();
     openModal(t('form_new_service'), serviceFormHtml());
+  });
+  fabNewQuote?.addEventListener('click', () => {
+    closeFabMenu();
+    openQuoteModal();
+  });
+  document.addEventListener('click', (e) => {
+    if (!fabMenu?.classList.contains('hidden') && !fab.contains(e.target) && !fabMenu.contains(e.target)) {
+      closeFabMenu();
+    }
   });
 
   // Modal close
@@ -2718,11 +2777,12 @@ window.saveSetting = function(key, value) {
 window.setLang = function(lang) {
   state.lang = lang;
   saveSetting('lang', lang);
-  const navKeyMap = { dashboard: 'nav_dashboard', list: 'nav_lista', clients: 'nav_clientes', settings: 'nav_settings', agenda: 'nav_agenda', quote: 'nav_quote' };
+  const navKeyMap = { dashboard: 'nav_dashboard', list: 'nav_lista', clients: 'nav_clientes', settings: 'nav_settings', agenda: 'nav_agenda' };
   document.querySelectorAll('.nav-btn').forEach(btn => {
     const key = navKeyMap[btn.dataset.view];
     if (key) btn.querySelector('span').textContent = t(key);
   });
+  if (window._updateFabLabels) window._updateFabLabels();
   renderSettings();
 };
 
