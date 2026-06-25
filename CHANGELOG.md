@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.7.10] - 2026-06-25
+
+### Fixed
+- **Address search results not clickable**: the `#map-search-results` dropdown sat at `z-index: 10` while Leaflet's internal map panes (tile/marker/popup panes, `z-index` 200–700) shared the same stacking context and overlapped the dropdown — the invisible map layer intercepted every click, so suggestions could be seen but not selected. The `.map-picker-header` now establishes a stacking context above the map panes (`z-index: 1000`), and the dropdown is raised to `z-index: 1001`.
+- **Map frequently not rendering**: tile rendering previously relied on fixed `setTimeout` delays to call `invalidateSize()`, which raced against layout and often measured a 0-height container (blank map). Replaced with a `ResizeObserver` on the map container that calls `invalidateSize()` the moment the container gains real dimensions, plus an immediate `invalidateSize()` on open — deterministic regardless of device speed.
+
 ## [1.7.9] - 2026-06-22
 
 ### Fixed
