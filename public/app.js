@@ -95,6 +95,9 @@ const TRANSLATIONS = {
     map_my_location: 'A minha localização',
     map_no_results: 'Sem resultados',
     map_locating: 'A localizar...',
+    map_lib_error: 'Erro: a biblioteca do mapa não carregou (verifica a ligação / bloqueadores)',
+    map_search_error: 'Falha na pesquisa de moradas',
+    map_tiles_error: 'Mapa carregado mas os tiles foram bloqueados',
     settings_travel_calc: 'Cálculo automático de deslocação',
     settings_base_address: 'Morada base (ponto de partida)',
     settings_base_address_placeholder: 'Seleciona no mapa ou escreve a morada',
@@ -109,6 +112,14 @@ const TRANSLATIONS = {
     form_edit_client: '✎ Editar cliente',
     settings_session: 'Sessão',
     settings_logout: 'Terminar sessão',
+    settings_diagnostics: 'Diagnóstico',
+    settings_diag_sub: 'Use isto se o mapa ou a seleção de moradas não funcionar',
+    settings_diag_test: 'Testar serviços do mapa',
+    settings_diag_copy: 'Copiar logs',
+    settings_diag_copied: 'Logs copiados',
+    settings_diag_testing: 'A testar...',
+    settings_diag_ok: 'OK',
+    settings_diag_fail: 'FALHOU',
   },
   en: {
     months: ['January','February','March','April','May','June','July','August','September','October','November','December'],
@@ -205,6 +216,9 @@ const TRANSLATIONS = {
     map_my_location: 'My location',
     map_no_results: 'No results',
     map_locating: 'Locating...',
+    map_lib_error: 'Error: the map library failed to load (check connection / blockers)',
+    map_search_error: 'Address search failed',
+    map_tiles_error: 'Map loaded but tiles were blocked',
     settings_travel_calc: 'Auto travel fee',
     settings_base_address: 'Base address (departure point)',
     settings_base_address_placeholder: 'Pick on map or type address',
@@ -219,6 +233,14 @@ const TRANSLATIONS = {
     form_edit_client: '✎ Edit client',
     settings_session: 'Session',
     settings_logout: 'Sign out',
+    settings_diagnostics: 'Diagnostics',
+    settings_diag_sub: 'Use this if the map or address selection is not working',
+    settings_diag_test: 'Test map services',
+    settings_diag_copy: 'Copy logs',
+    settings_diag_copied: 'Logs copied',
+    settings_diag_testing: 'Testing...',
+    settings_diag_ok: 'OK',
+    settings_diag_fail: 'FAILED',
   },
 };
 
@@ -278,6 +300,32 @@ function toast(msg, type = 'success') {
   el.className = `show ${type}`;
   setTimeout(() => el.className = '', 2500);
 }
+
+// ── Diagnostics ───────────────────────────────────────────
+// Keeps a rolling in-memory log so failures (which used to vanish into
+// silent catch blocks) can be inspected from the console via
+// `servilogDiag.dump()` even on mobile where devtools is awkward.
+const diag = {
+  buffer: [],
+  _push(level, args) {
+    const stamp = new Date().toISOString();
+    const text = args.map(a => {
+      if (a instanceof Error) return a.stack || a.message;
+      return typeof a === 'object' ? (() => { try { return JSON.stringify(a); } catch { return String(a); } })() : String(a);
+    }).join(' ');
+    this.buffer.push(`${stamp} [${level}] ${text}`);
+    if (this.buffer.length > 300) this.buffer.shift();
+  },
+  log(...a)   { this._push('info', a);  console.log('[ServiLog]', ...a); },
+  warn(...a)  { this._push('warn', a);  console.warn('[ServiLog]', ...a); },
+  error(...a) { this._push('error', a); console.error('[ServiLog]', ...a); },
+  dump()      { return this.buffer.join('\n'); },
+};
+window.servilogDiag = diag;
+
+// Surface otherwise-invisible runtime errors.
+window.addEventListener('error', e => diag.error('uncaught', e.message, `${e.filename}:${e.lineno}:${e.colno}`));
+window.addEventListener('unhandledrejection', e => diag.error('unhandledrejection', (e.reason && (e.reason.stack || e.reason.message)) || e.reason));
 
 // ── Modal ─────────────────────────────────────────────────
 function openModal(title, html) {
@@ -1364,6 +1412,17 @@ window.openMapPicker = function(targetInputId) {
   mapPicker.lng = null;
   mapPicker.onConfirm = null;
 
+  diag.log('openMapPicker', { target: targetInputId });
+
+  // Hard guard: if Leaflet itself didn't load, nothing below will work. This
+  // is the single most common cause of "map never shows" — surface it loudly
+  // instead of throwing silently inside requestAnimationFrame.
+  if (typeof L === 'undefined') {
+    diag.error('Leaflet global "L" is undefined — /vendor/leaflet/leaflet.js did not load/execute');
+    toast(t('map_lib_error'), 'error');
+    return;
+  }
+
   const overlay = document.getElementById('map-picker-overlay');
   overlay.classList.remove('hidden');
 
@@ -1375,45 +1434,66 @@ window.openMapPicker = function(targetInputId) {
   document.getElementById('map-search-input').value = '';
 
   requestAnimationFrame(() => {
-    if (!mapPicker.map) {
-      // Pin Leaflet's image path to the locally-hosted vendor copy so that
-      // browser privacy settings / ad-blockers cannot block an external CDN.
-      L.Icon.Default.imagePath = '/vendor/leaflet/images/';
+    try {
+      if (!mapPicker.map) {
+        // Pin Leaflet's image path to the locally-hosted vendor copy so that
+        // browser privacy settings / ad-blockers cannot block an external CDN.
+        L.Icon.Default.imagePath = '/vendor/leaflet/images/';
 
-      // Default center: Portugal
-      mapPicker.map = L.map('map-leaflet').setView([39.5, -8.0], 6);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© <a href="https://www.openstreetmap.org">OpenStreetMap</a>',
-        maxZoom: 19,
-      }).addTo(mapPicker.map);
+        // Default center: Portugal
+        mapPicker.map = L.map('map-leaflet').setView([39.5, -8.0], 6);
 
-      mapPicker.marker = L.marker([39.5, -8.0], { draggable: true }).addTo(mapPicker.map);
-      mapPicker.marker.on('dragend', () => {
-        const { lat, lng } = mapPicker.marker.getLatLng();
-        reverseGeocode(lat, lng);
-      });
-      mapPicker.map.on('click', e => {
-        mapPicker.marker.setLatLng(e.latlng);
-        reverseGeocode(e.latlng.lat, e.latlng.lng);
-      });
-
-      // Deterministically fix tile rendering: invalidate the map size the
-      // moment the container actually gets non-zero dimensions, rather than
-      // guessing with fixed timeouts (which raced and left the map blank).
-      const container = document.getElementById('map-leaflet');
-      if (window.ResizeObserver) {
-        const ro = new ResizeObserver(() => {
-          if (container.clientHeight > 0) mapPicker.map.invalidateSize();
+        const tiles = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '© <a href="https://www.openstreetmap.org">OpenStreetMap</a>',
+          maxZoom: 19,
         });
-        ro.observe(container);
+        let tileErrors = 0, tilesLoaded = 0;
+        tiles.on('tileerror', err => {
+          tileErrors++;
+          if (tileErrors === 1) {
+            diag.error('tile load failed (tiles blocked or offline)', err && err.tile && err.tile.src);
+            toast(t('map_tiles_error'), 'error');
+          }
+        });
+        tiles.on('load', () => { tilesLoaded++; diag.log('tiles loaded ok', { tilesLoaded, tileErrors }); });
+        tiles.addTo(mapPicker.map);
+
+        mapPicker.marker = L.marker([39.5, -8.0], { draggable: true }).addTo(mapPicker.map);
+        mapPicker.marker.on('dragend', () => {
+          const { lat, lng } = mapPicker.marker.getLatLng();
+          reverseGeocode(lat, lng);
+        });
+        mapPicker.map.on('click', e => {
+          mapPicker.marker.setLatLng(e.latlng);
+          reverseGeocode(e.latlng.lat, e.latlng.lng);
+        });
+
+        // Deterministically fix tile rendering: invalidate the map size the
+        // moment the container actually gets non-zero dimensions, rather than
+        // guessing with fixed timeouts (which raced and left the map blank).
+        const container = document.getElementById('map-leaflet');
+        if (window.ResizeObserver) {
+          const ro = new ResizeObserver(() => {
+            if (container.clientHeight > 0) mapPicker.map.invalidateSize();
+          });
+          ro.observe(container);
+        }
+        diag.log('map created');
       }
+
+      const c = document.getElementById('map-leaflet');
+      diag.log('map container size', { w: c.clientWidth, h: c.clientHeight });
+      if (c.clientHeight === 0) diag.warn('map container has zero height — tiles will not render until it has size');
+
+      mapPicker.map.invalidateSize();
+
+      // If there's an existing address, try to show it on the map
+      const existing = document.getElementById(targetInputId)?.value?.trim();
+      if (existing) geocodeForMap(existing);
+    } catch (err) {
+      diag.error('openMapPicker init failed', err);
+      toast(t('map_lib_error'), 'error');
     }
-
-    mapPicker.map.invalidateSize();
-
-    // If there's an existing address, try to show it on the map
-    const existing = document.getElementById(targetInputId)?.value?.trim();
-    if (existing) geocodeForMap(existing);
   });
 };
 
@@ -1423,15 +1503,17 @@ async function reverseGeocode(lat, lng) {
   const hint = document.getElementById('map-resolved-address');
   hint.textContent = t('map_locating');
   try {
-    const r = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`,
-      { headers: { 'Accept-Language': state.lang === 'pt' ? 'pt' : 'en' } }
-    );
+    const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`;
+    const r = await fetch(url, { headers: { 'Accept-Language': state.lang === 'pt' ? 'pt' : 'en' } });
+    diag.log('reverseGeocode', { status: r.status, lat, lng });
+    if (!r.ok) throw new Error(`Nominatim HTTP ${r.status}`);
     const data = await r.json();
     const addr = buildAddressString(data.address) || data.display_name || `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
     mapPicker.resolvedAddress = addr;
     hint.textContent = addr;
-  } catch (_) {
+  } catch (err) {
+    diag.error('reverseGeocode failed', err);
+    // Still fall back to coordinates so the user can confirm a location.
     const coords = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
     mapPicker.resolvedAddress = coords;
     hint.textContent = coords;
@@ -1455,9 +1537,11 @@ async function geocodeAddress(query) {
       `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`,
       { headers: { 'Accept-Language': state.lang === 'pt' ? 'pt' : 'en' } }
     );
+    diag.log('geocodeAddress', { status: r.status, query });
+    if (!r.ok) throw new Error(`Nominatim HTTP ${r.status}`);
     const data = await r.json();
     return data[0] || null;
-  } catch (_) { return null; }
+  } catch (err) { diag.error('geocodeAddress failed', err); return null; }
 }
 
 async function geocodeForMap(query) {
@@ -1485,6 +1569,8 @@ window.onMapSearch = function(query) {
         `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=5&addressdetails=1`,
         { headers: { 'Accept-Language': state.lang === 'pt' ? 'pt' : 'en' } }
       );
+      diag.log('onMapSearch', { status: r.status, query });
+      if (!r.ok) throw new Error(`Nominatim HTTP ${r.status}`);
       const data = await r.json();
       results.innerHTML = data.length
         ? data.map((item, i) => `
@@ -1501,7 +1587,10 @@ window.onMapSearch = function(query) {
           });
         });
       }
-    } catch (_) {}
+    } catch (err) {
+      diag.error('onMapSearch failed', err);
+      results.innerHTML = `<div class="map-search-result map-no-result">${t('map_search_error')}</div>`;
+    }
   }, 400);
 };
 
@@ -1979,6 +2068,17 @@ async function renderSettings() {
       </div>
     </div>
 
+    <!-- Diagnostics -->
+    <div class="card" style="margin-bottom:12px">
+      <div class="section-title" style="margin-bottom:4px">${t('settings_diagnostics')}</div>
+      <div style="font-size:12px;color:var(--text3);margin-bottom:10px">${t('settings_diag_sub')}</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-secondary btn-sm" onclick="runMapDiagnostics()">${t('settings_diag_test')}</button>
+        <button class="btn btn-secondary btn-sm" onclick="copyDiagnostics()">${t('settings_diag_copy')}</button>
+      </div>
+      <pre id="diag-output" style="display:none;margin-top:10px;padding:10px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;font-size:11px;line-height:1.5;white-space:pre-wrap;word-break:break-word;max-height:240px;overflow:auto"></pre>
+    </div>
+
     <!-- Session / Logout -->
     <div class="card">
       <div class="section-title" style="margin-bottom:12px">${t('settings_session')}</div>
@@ -1996,6 +2096,65 @@ async function renderSettings() {
 }
 
 // ── Settings helpers ──────────────────────────────────────
+
+// Runs live connectivity checks for the three things the map depends on:
+// the Leaflet library, the OSM tile server, and the Nominatim geocoder.
+// Results are written both to the diagnostics log and to the on-screen panel.
+window.runMapDiagnostics = async function() {
+  const out = document.getElementById('diag-output');
+  out.style.display = 'block';
+  out.textContent = t('settings_diag_testing');
+
+  const lines = [];
+  const ok = t('settings_diag_ok'), fail = t('settings_diag_fail');
+
+  // 1) Leaflet library loaded?
+  const leafletOk = typeof L !== 'undefined';
+  lines.push(`Leaflet (L): ${leafletOk ? ok + ' v' + (L.version || '?') : fail}`);
+  diag.log('diag: leaflet', leafletOk);
+
+  // 2) Local vendor asset reachable?
+  try {
+    const r = await fetch('/vendor/leaflet/leaflet.js', { method: 'HEAD' });
+    lines.push(`/vendor/leaflet/leaflet.js: ${r.ok ? ok : fail} (HTTP ${r.status})`);
+    diag.log('diag: vendor leaflet.js', r.status);
+  } catch (e) { lines.push(`/vendor/leaflet/leaflet.js: ${fail} (${e.message})`); diag.error('diag vendor', e); }
+
+  // 3) OSM tile server reachable? (load a single known tile as an <img>)
+  await new Promise(resolve => {
+    const img = new Image();
+    const timer = setTimeout(() => { lines.push(`OSM tiles: ${fail} (timeout)`); diag.error('diag tiles timeout'); resolve(); }, 6000);
+    img.onload  = () => { clearTimeout(timer); lines.push(`OSM tiles: ${ok}`); diag.log('diag tiles ok'); resolve(); };
+    img.onerror = () => { clearTimeout(timer); lines.push(`OSM tiles: ${fail} (blocked/offline)`); diag.error('diag tiles error'); resolve(); };
+    img.src = 'https://a.tile.openstreetmap.org/0/0/0.png?' + Date.now();
+  });
+
+  // 4) Nominatim geocoder reachable?
+  try {
+    const r = await fetch('https://nominatim.openstreetmap.org/search?q=Leiria&format=json&limit=1');
+    const data = r.ok ? await r.json() : null;
+    lines.push(`Nominatim: ${r.ok && data && data.length ? ok : fail} (HTTP ${r.status})`);
+    diag.log('diag nominatim', r.status, data && data.length);
+  } catch (e) { lines.push(`Nominatim: ${fail} (${e.message})`); diag.error('diag nominatim', e); }
+
+  lines.push('', '— recent log —', diag.dump());
+  out.textContent = lines.join('\n');
+};
+
+window.copyDiagnostics = async function() {
+  const out = document.getElementById('diag-output');
+  out.style.display = 'block';
+  const text = `ServiLog diagnostics @ ${new Date().toISOString()}\nUA: ${navigator.userAgent}\nURL: ${location.href}\n\n${diag.dump()}`;
+  if (out.textContent.trim() === '' || out.textContent === t('settings_diag_testing')) out.textContent = text;
+  try {
+    await navigator.clipboard.writeText(text);
+    toast(t('settings_diag_copied'));
+  } catch (_) {
+    // Clipboard API unavailable (e.g. non-HTTPS) — fall back to showing the text to copy manually.
+    out.textContent = text;
+  }
+};
+
 window.openBaseAddressPicker = function() {
   mapPicker.onConfirm = (lat, lng, addr) => {
     localStorage.setItem('base_address', addr);
