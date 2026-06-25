@@ -1443,7 +1443,7 @@ window.openMapPicker = function(targetInputId) {
         // Default center: Portugal
         mapPicker.map = L.map('map-leaflet').setView([39.5, -8.0], 6);
 
-        const tiles = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        const tiles = L.tileLayer('/api/tiles/{z}/{x}/{y}.png', {
           attribution: '© <a href="https://www.openstreetmap.org">OpenStreetMap</a>',
           maxZoom: 19,
         });
@@ -2120,13 +2120,13 @@ window.runMapDiagnostics = async function() {
     diag.log('diag: vendor leaflet.js', r.status);
   } catch (e) { lines.push(`/vendor/leaflet/leaflet.js: ${fail} (${e.message})`); diag.error('diag vendor', e); }
 
-  // 3) OSM tile server reachable? (load a single known tile as an <img>)
+  // 3) Tile proxy reachable?
   await new Promise(resolve => {
     const img = new Image();
-    const timer = setTimeout(() => { lines.push(`OSM tiles: ${fail} (timeout)`); diag.error('diag tiles timeout'); resolve(); }, 6000);
-    img.onload  = () => { clearTimeout(timer); lines.push(`OSM tiles: ${ok}`); diag.log('diag tiles ok'); resolve(); };
-    img.onerror = () => { clearTimeout(timer); lines.push(`OSM tiles: ${fail} (blocked/offline)`); diag.error('diag tiles error'); resolve(); };
-    img.src = 'https://a.tile.openstreetmap.org/0/0/0.png?' + Date.now();
+    const timer = setTimeout(() => { lines.push(`Tile proxy: ${fail} (timeout)`); diag.error('diag tiles timeout'); resolve(); }, 6000);
+    img.onload  = () => { clearTimeout(timer); lines.push(`Tile proxy: ${ok}`); diag.log('diag tiles ok'); resolve(); };
+    img.onerror = () => { clearTimeout(timer); lines.push(`Tile proxy: ${fail} (error)`); diag.error('diag tiles error'); resolve(); };
+    img.src = '/api/tiles/0/0/0.png?' + Date.now();
   });
 
   // 4) Nominatim geocoder reachable?

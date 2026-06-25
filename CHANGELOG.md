@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.8.2] - 2026-06-25
+
+### Fixed
+- **Map tiles not loading**: OSM tile requests from the browser were blocked by some network environments. Map tiles are now fetched server-side via `/api/tiles/{z}/{x}/{y}.png` and proxied to the client, eliminating client-side tile failures caused by firewalls or network policies. The CSP `img-src` no longer needs to allow `*.tile.openstreetmap.org`.
+- **Tile proxy diagnostics**: the Settings diagnostics test now checks the local tile proxy (`/api/tiles/0/0/0.png`) instead of the external OSM URL.
+
 ## [1.8.1] - 2026-06-25
 
 ### Added

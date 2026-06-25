@@ -141,7 +141,7 @@ const CSP = [
   "script-src 'self' 'unsafe-inline'",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com",
-  "img-src 'self' data: blob: https://*.tile.openstreetmap.org",
+  "img-src 'self' data: blob:",
   "connect-src 'self' https://nominatim.openstreetmap.org https://router.project-osrm.org",
   "manifest-src 'self'",
   "worker-src 'self'",
@@ -262,6 +262,40 @@ app.get('/sw.js', (req, res) => {
 });
 
 app.use(express.static(path.join(__dirname, 'public')));
+
+// ── OSM Tile Proxy ────────────────────────────────────────
+// Client-side networks (corporate firewalls, browser privacy modes) often
+// block <img> requests to *.tile.openstreetmap.org while allowing API
+// fetch() calls. Proxying through the server bypasses that restriction:
+// the browser only ever talks to 'self', and the server fetches from OSM.
+// z/x/y are strictly validated to prevent SSRF.
+app.get('/api/tiles/:z/:x/:y', async (req, res) => {
+  const z = parseInt(req.params.z, 10);
+  const x = parseInt(req.params.x, 10);
+  const y = parseInt(req.params.y, 10);
+  if (!Number.isInteger(z) || !Number.isInteger(x) || !Number.isInteger(y)) return res.status(400).end();
+  if (z < 0 || z > 19 || x < 0 || y < 0) return res.status(400).end();
+  const max = 2 ** z;
+  if (x >= max || y >= max) return res.status(400).end();
+
+  const sub = ['a', 'b', 'c'][x % 3];
+  const url = `https://${sub}.tile.openstreetmap.org/${z}/${x}/${y}.png`;
+  try {
+    const r = await fetch(url, {
+      headers: {
+        'User-Agent': `ServiLog/${pkg.version} tile-proxy (+https://github.com/JorgeS15/ServiLog)`,
+        'Referer': 'https://www.openstreetmap.org/',
+      },
+    });
+    if (!r.ok) { console.warn(`[tiles] upstream ${r.status} for ${url}`); return res.status(r.status).end(); }
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Cache-Control', 'public, max-age=86400'); // tiles are static; 24 h cache
+    res.send(Buffer.from(await r.arrayBuffer()));
+  } catch (err) {
+    console.error('[tiles] proxy error', err.message);
+    res.status(502).end();
+  }
+});
 
 // ── Version ───────────────────────────────────────────────
 app.get('/api/version', (req, res) => res.json({ version: pkg.version }));
