@@ -1,6 +1,6 @@
 # ServiLog
 
-> Self-hosted service log for machines and agricultural equipment — v1.9.2
+> Self-hosted service log for machines and agricultural equipment — v1.9.3
 
 <img width="677" height="486" alt="image" src="https://github.com/user-attachments/assets/40974a8e-a146-46a2-940a-817de2516ae3" />
 
@@ -43,7 +43,7 @@ curl -O https://raw.githubusercontent.com/JorgeS15/ServiLog/main/docker-compose.
 docker compose up -d
 ```
 
-ServiLog is now running at **http://localhost:3000**.
+ServiLog is now running at **http://localhost:4000**.
 
 The database and uploads folder are created automatically under `./data/`.
 
@@ -104,10 +104,10 @@ services:
       - ./data:/data
     environment:
       - DB_PATH=/data/tracker.db
-      - PORT=3000
+      - PORT=4000
       - APP_PASSWORD=your-strong-password
     ports:
-      - "3000:3000"
+      - "4000:4000"
 ```
 
 When set, all routes (UI and API) require an authenticated session. Sessions are signed with HMAC-SHA256 and stored in an `HttpOnly; SameSite=Strict` cookie. Sign out is available at the bottom of the Settings page.

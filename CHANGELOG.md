@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.9.3] - 2026-06-25
+
+### Changed
+- **Default port changed from 3000 to 4000**: `docker-compose.yml`, `server.js`, and documentation updated. If you are upgrading, update your port mapping to `"4000:4000"` (or keep `3000:4000` to preserve your existing external port).
+
 ## [1.9.2] - 2026-06-25
 
 ### Added

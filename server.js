@@ -7,7 +7,7 @@ const nodemailer = require('nodemailer');
 const pkg = require('./package.json');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 4000;
 const DB_PATH = process.env.DB_PATH || '/data/tracker.db';
 
 // Ensure data dir exists
