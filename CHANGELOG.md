@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.8.1] - 2026-06-25
+
+### Added
+- **Map diagnostics**: a new "Diagnostics" card in Settings with two actions — **Test map services** (live-checks the Leaflet library, the locally-served `/vendor/leaflet/leaflet.js`, the OSM tile server, and the Nominatim geocoder, reporting OK/FAILED for each) and **Copy logs** (copies a timestamped report including the browser user-agent and recent in-app log to the clipboard for easy sharing).
+- **In-app diagnostic log**: a rolling log buffer (`window.servilogDiag.dump()`) now records map/geocoding activity and captures otherwise-invisible uncaught errors and promise rejections.
+
+### Changed
+- **Map failures are no longer silent**: the previous empty `catch (_) {}` blocks around all Nominatim calls and the map initialisation swallowed every error. They now log the HTTP status / error and surface a clear toast to the user:
+  - Leaflet library not loaded → explicit error toast instead of a silent throw inside `requestAnimationFrame`.
+  - Tile loading blocked → `tileerror` handler reports it.
+  - Address search/geocode HTTP errors (e.g. Nominatim `403`/`429`) → logged with status and shown in the results panel.
+- Map container dimensions are logged on open to help diagnose zero-height rendering issues.
+
 ## [1.8.0] - 2026-06-25
 
 ### Changed
