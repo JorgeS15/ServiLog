@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.9.0] - 2026-06-25
+
+### Added
+- **Server-side request logging**: structured `[req]` lines on stdout for every request (method, path, status, duration, IP). Explicit log lines for auth events (login ok/fail/rate-limited, logout), CSV export (row count), and backup download/restore.
+- **Settings synced to DB**: all settings are now persisted in a `settings` table in SQLite. `GET /api/settings` and `PATCH /api/settings` endpoints sync settings between clients. Settings are loaded from the server at startup and pushed back if localStorage has values the server doesn't.
+- **Offline-first write queue**: POST/PUT/DELETE requests to `/api/services` and `/api/clients` are queued when the network is offline (TypeError from fetch) and replayed automatically when connectivity is restored. A persistent "⚠ Offline" badge appears in the UI when offline.
+- **Attachment thumbnail in service list**: the service card now shows a small thumbnail (48×32 px) for the first image attachment, using a subquery to retrieve `first_image_id` from the services list query.
+- **Invoice auto-numbering**: a "Next invoice number" field in Settings (key `next_invoice_number`) is used as the invoice reference and auto-incremented after each invoice is generated.
+
 ## [1.8.2] - 2026-06-25
 
 ### Fixed

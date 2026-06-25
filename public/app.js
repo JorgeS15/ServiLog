@@ -120,6 +120,7 @@ const TRANSLATIONS = {
     settings_diag_testing: 'A testar...',
     settings_diag_ok: 'OK',
     settings_diag_fail: 'FALHOU',
+    settings_invoice_number: 'Número da próxima fatura',
   },
   en: {
     months: ['January','February','March','April','May','June','July','August','September','October','November','December'],
@@ -241,6 +242,7 @@ const TRANSLATIONS = {
     settings_diag_testing: 'Testing...',
     settings_diag_ok: 'OK',
     settings_diag_fail: 'FAILED',
+    settings_invoice_number: 'Next invoice number',
   },
 };
 
@@ -249,8 +251,15 @@ function t(key) {
   return (TRANSLATIONS[state.lang] || TRANSLATIONS['pt'])[key] || key;
 }
 function getCurrency() {
-  return localStorage.getItem('currency') || '€';
+  return settings['currency'] || '€';
 }
+
+// ── Settings (synced to DB) ───────────────────────────────
+const settings = {};
+
+// ── Offline write queue ───────────────────────────────────
+const offlineQueue = [];
+let isReplaying = false;
 
 // ── State ────────────────────────────────────────────────
 const state = {
@@ -266,6 +275,11 @@ const state = {
 };
 
 // ── API ───────────────────────────────────────────────────
+const OFFLINE_WRITE_PATHS = ['/api/services', '/api/clients'];
+function isOfflineWritePath(path) {
+  return OFFLINE_WRITE_PATHS.some(p => path === p || path.startsWith(p + '/'));
+}
+
 const api = {
   async _handle(r) {
     if (r.status === 401) {
@@ -282,14 +296,44 @@ const api = {
   get(path) {
     return fetch(path).then(r => api._handle(r));
   },
-  post(path, body) {
-    return fetch(path, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) }).then(r => api._handle(r));
+  async post(path, body) {
+    try {
+      return await fetch(path, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) }).then(r => api._handle(r));
+    } catch (e) {
+      if (e instanceof TypeError && isOfflineWritePath(path)) {
+        offlineQueue.push({ method: 'POST', path, body });
+        toast('Saved offline — will sync when connected', 'warn');
+        return {};
+      }
+      throw e;
+    }
   },
-  put(path, body) {
-    return fetch(path, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) }).then(r => api._handle(r));
+  async put(path, body) {
+    try {
+      return await fetch(path, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) }).then(r => api._handle(r));
+    } catch (e) {
+      if (e instanceof TypeError && isOfflineWritePath(path)) {
+        offlineQueue.push({ method: 'PUT', path, body });
+        toast('Saved offline — will sync when connected', 'warn');
+        return {};
+      }
+      throw e;
+    }
   },
-  del(path) {
-    return fetch(path, { method:'DELETE' }).then(r => api._handle(r));
+  async del(path) {
+    try {
+      return await fetch(path, { method:'DELETE' }).then(r => api._handle(r));
+    } catch (e) {
+      if (e instanceof TypeError && isOfflineWritePath(path)) {
+        offlineQueue.push({ method: 'DELETE', path, body: null });
+        toast('Saved offline — will sync when connected', 'warn');
+        return {};
+      }
+      throw e;
+    }
+  },
+  patch(path, body) {
+    return fetch(path, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) }).then(r => api._handle(r));
   },
 };
 
@@ -393,7 +437,7 @@ async function renderDashboard() {
       </div>
     </div>
 
-    ${localStorage.getItem('extra_stats') === '1' ? `
+    ${settings['extra_stats'] === '1' ? `
     <div class="card-row" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
       <div class="stat-block">
         <div class="stat-label">${t('stat_avg_duration')}</div>
@@ -538,6 +582,9 @@ async function renderList() {
 function serviceCard(s) {
   const cur = getCurrency();
   const chips = [];
+  if (s.first_image_id) {
+    chips.push(`<span class="chip" style="padding:2px 4px"><img src="/api/attachments/${s.first_image_id}" style="height:32px;width:48px;object-fit:cover;border-radius:4px;vertical-align:middle"></span>`);
+  }
   const discountH = s.discount_hours > 0 ? ` -${s.discount_hours}h` : '';
   if (s.start_time || s.end_time) {
     chips.push(`<span class="chip hora">🕐 ${s.start_time || '?'}–${s.end_time || '?'}${discountH}${s.duration_hours != null ? ' · ' + s.duration_hours + 'h' : ''}</span>`);
@@ -621,10 +668,10 @@ function serviceFormHtml(s = {}) {
 
   // Pre-fill from settings defaults when creating a new service
   const isNew = !s.id;
-  const defaultOperatorRate = isNew ? (s.operator_rate ?? localStorage.getItem('default_operator_rate') ?? '') : (s.operator_rate ?? '');
-  const defaultMachineRate  = isNew ? (s.machine_rate  ?? localStorage.getItem('default_machine_rate')  ?? '') : (s.machine_rate  ?? '');
-  const defaultTravelFee = isNew ? (s.travel_fee ?? localStorage.getItem('default_travel_fee') ?? '') : (s.travel_fee ?? '');
-  const defaultPaid = isNew ? (s.paid ?? localStorage.getItem('default_paid') ?? '0') : (s.paid ?? '0');
+  const defaultOperatorRate = isNew ? (s.operator_rate ?? settings['default_operator_rate'] ?? '') : (s.operator_rate ?? '');
+  const defaultMachineRate  = isNew ? (s.machine_rate  ?? settings['default_machine_rate']  ?? '') : (s.machine_rate  ?? '');
+  const defaultTravelFee = isNew ? (s.travel_fee ?? settings['default_travel_fee'] ?? '') : (s.travel_fee ?? '');
+  const defaultPaid = isNew ? (s.paid ?? settings['default_paid'] ?? '0') : (s.paid ?? '0');
 
   const serviceDate = s.date || today;
   const defaultStatus = s.status || (serviceDate > today ? 'scheduled' : 'completed');
@@ -1047,18 +1094,19 @@ window.viewPicture = function(id) {
 
 // ── Invoice generator ─────────────────────────────────────
 window.generateInvoice = async function(serviceId) {
-  const issuerName = (localStorage.getItem('inv_name') || '').trim();
+  const issuerName = (settings['inv_name'] || '').trim();
   if (!issuerName) { toast(t('invoice_no_issuer'), 'error'); return; }
 
   const s = await api.get(`/api/services/${serviceId}`);
   const cur = getCurrency();
 
-  const issuerAddress = (localStorage.getItem('inv_address') || '').trim();
-  const issuerNif    = (localStorage.getItem('inv_nif')     || '').trim();
-  const issuerEmail  = (localStorage.getItem('inv_email')   || '').trim();
-  const footerNote   = (localStorage.getItem('inv_note')    || '').trim();
+  const issuerAddress = (settings['inv_address'] || '').trim();
+  const issuerNif    = (settings['inv_nif']     || '').trim();
+  const issuerEmail  = (settings['inv_email']   || '').trim();
+  const footerNote   = (settings['inv_note']    || '').trim();
 
-  const ref   = `F ${new Date().getFullYear()}/${String(serviceId).padStart(4, '0')}`;
+  const invNum = settings['next_invoice_number'] || '1';
+  const ref   = `F ${new Date().getFullYear()}/${String(parseInt(invNum)).padStart(4, '0')}`;
   const today = new Date().toLocaleDateString(state.lang === 'pt' ? 'pt-PT' : 'en-GB');
 
   const esc   = str => (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -1214,6 +1262,8 @@ td{padding:13px 10px;font-size:13px;border-bottom:1px solid #ebedf0;vertical-ali
   if (!w) { toast('Popup blocked — allow popups for this site', 'error'); return; }
   w.document.write(html);
   w.document.close();
+  // Bump invoice number
+  saveSetting('next_invoice_number', String(parseInt(settings['next_invoice_number'] || '1') + 1));
 };
 
 function newService() {
@@ -1660,25 +1710,25 @@ async function getRoadDistanceKm(lat1, lng1, lat2, lng2) {
 }
 
 function applyTravelFeeFormula(distKm) {
-  const pricePerKm = parseFloat(localStorage.getItem('travel_price_per_km') || '1');
-  const step       = parseFloat(localStorage.getItem('travel_fee_step')     || '5');
-  const minFee     = parseFloat(localStorage.getItem('travel_min_fee')      || '20');
+  const pricePerKm = parseFloat(settings['travel_price_per_km'] || '1');
+  const step       = parseFloat(settings['travel_fee_step']     || '5');
+  const minFee     = parseFloat(settings['travel_min_fee']      || '20');
   const raw        = distKm * pricePerKm;
   const stepped    = Math.ceil(raw / step) * step;
   return Math.max(minFee, stepped);
 }
 
 async function getBaseCoords() {
-  const cachedLat = parseFloat(localStorage.getItem('base_lat'));
-  const cachedLng = parseFloat(localStorage.getItem('base_lng'));
+  const cachedLat = parseFloat(settings['base_lat']);
+  const cachedLng = parseFloat(settings['base_lng']);
   if (!isNaN(cachedLat) && !isNaN(cachedLng)) return { lat: cachedLat, lng: cachedLng };
-  const addr = (localStorage.getItem('base_address') || '').trim();
+  const addr = (settings['base_address'] || '').trim();
   if (!addr) return null;
   const result = await geocodeAddress(addr);
   if (!result) return null;
   const lat = parseFloat(result.lat), lng = parseFloat(result.lon);
-  localStorage.setItem('base_lat', String(lat));
-  localStorage.setItem('base_lng', String(lng));
+  saveSetting('base_lat', String(lat));
+  saveSetting('base_lng', String(lng));
   return { lat, lng };
 }
 
@@ -1794,6 +1844,54 @@ window.deleteClient = async function(id, name) {
   renderClients();
 };
 
+// ── Offline badge ─────────────────────────────────────────
+function updateOfflineBadge() {
+  let badge = document.getElementById('offline-badge');
+  if (!navigator.onLine) {
+    if (!badge) {
+      badge = document.createElement('div');
+      badge.id = 'offline-badge';
+      badge.textContent = '⚠ Offline';
+      badge.style.cssText = 'position:fixed;top:8px;right:8px;background:#c0392b;color:#fff;padding:4px 10px;border-radius:6px;font-size:12px;font-weight:700;z-index:9999';
+      document.body.appendChild(badge);
+    }
+  } else {
+    if (badge) badge.remove();
+  }
+}
+
+window.addEventListener('online', async () => {
+  updateOfflineBadge();
+  if (isReplaying || offlineQueue.length === 0) return;
+  isReplaying = true;
+  let synced = 0;
+  while (offlineQueue.length > 0) {
+    const req = offlineQueue[0];
+    try {
+      const opts = { method: req.method, headers: { 'Content-Type': 'application/json' } };
+      if (req.body != null) opts.body = JSON.stringify(req.body);
+      const r = await fetch(req.path, opts);
+      if (r.status >= 400 && r.status < 500) {
+        offlineQueue.shift(); // skip 4xx errors
+      } else if (!r.ok) {
+        break; // network/server error — stop and retry later
+      } else {
+        offlineQueue.shift();
+        synced++;
+      }
+    } catch (e) {
+      break; // still offline
+    }
+  }
+  isReplaying = false;
+  if (synced > 0) {
+    toast(`Synced ${synced} pending change${synced > 1 ? 's' : ''}`);
+    renderView(state.view);
+  }
+});
+
+window.addEventListener('offline', updateOfflineBadge);
+
 // ── Init ──────────────────────────────────────────────────
 async function init() {
   // Migrate legacy localStorage keys (pre-v0.6)
@@ -1816,6 +1914,49 @@ async function init() {
 
   // Load clients into state
   state.clients = await api.get('/api/clients');
+
+  // Load settings from server and populate settings object
+  try {
+    const serverSettings = await api.get('/api/settings');
+    // Merge server settings into settings object and localStorage (cache)
+    Object.assign(settings, serverSettings);
+    for (const [k, v] of Object.entries(serverSettings)) {
+      localStorage.setItem(k, v);
+    }
+    // Push any localStorage keys not on server up to the server
+    const keysToSync = ['lang','theme','currency','extra_stats','default_operator_rate',
+      'default_machine_rate','default_travel_fee','default_paid','base_address','base_lat',
+      'base_lng','travel_price_per_km','travel_fee_step','travel_min_fee','inv_name',
+      'inv_address','inv_nif','inv_email','inv_note','next_invoice_number'];
+    const toSync = {};
+    for (const k of keysToSync) {
+      if (serverSettings[k] == null && localStorage.getItem(k) != null) {
+        toSync[k] = localStorage.getItem(k);
+        settings[k] = localStorage.getItem(k);
+      }
+    }
+    if (Object.keys(toSync).length > 0) {
+      api.patch('/api/settings', toSync).catch(() => {});
+    }
+  } catch (_) {
+    // Offline or server error — fall back to localStorage
+    const keysToLoad = ['lang','theme','currency','extra_stats','default_operator_rate',
+      'default_machine_rate','default_travel_fee','default_paid','base_address','base_lat',
+      'base_lng','travel_price_per_km','travel_fee_step','travel_min_fee','inv_name',
+      'inv_address','inv_nif','inv_email','inv_note','next_invoice_number'];
+    for (const k of keysToLoad) {
+      if (localStorage.getItem(k) != null) settings[k] = localStorage.getItem(k);
+    }
+  }
+
+  // Re-apply theme from settings (may have changed)
+  const resolvedTheme = settings['theme'] || 'dark';
+  document.documentElement.setAttribute('data-theme', resolvedTheme);
+  // Update state.lang from settings
+  if (settings['lang']) state.lang = settings['lang'];
+
+  // Show offline badge if needed
+  updateOfflineBadge();
 
   // Nav — apply translations and attach click handlers
   const navKeyMap = { dashboard: 'nav_dashboard', list: 'nav_lista', clients: 'nav_clientes', settings: 'nav_settings', agenda: 'nav_agenda' };
@@ -1861,17 +2002,17 @@ async function renderSettings() {
   // Fetch app stats and version
   const [stats, version] = await Promise.all([api.get('/api/stats'), api.get('/api/version')]);
 
-  const defaultOperatorRate = localStorage.getItem('default_operator_rate') || '';
-  const defaultMachineRate  = localStorage.getItem('default_machine_rate')  || '';
-  const baseAddress      = localStorage.getItem('base_address')       || '';
-  const baseCoordsSet    = !!(localStorage.getItem('base_lat'));
-  const travelPricePerKm = localStorage.getItem('travel_price_per_km') || '1';
-  const travelFeeStep    = localStorage.getItem('travel_fee_step')     || '5';
-  const travelMinFee     = localStorage.getItem('travel_min_fee')      || '20';
-  const defaultDeslocacao = localStorage.getItem('default_travel_fee') || '';
-  const defaultPago = localStorage.getItem('default_paid') || '0';
+  const defaultOperatorRate = settings['default_operator_rate'] || '';
+  const defaultMachineRate  = settings['default_machine_rate']  || '';
+  const baseAddress      = settings['base_address']       || '';
+  const baseCoordsSet    = !!(settings['base_lat']);
+  const travelPricePerKm = settings['travel_price_per_km'] || '1';
+  const travelFeeStep    = settings['travel_fee_step']     || '5';
+  const travelMinFee     = settings['travel_min_fee']      || '20';
+  const defaultDeslocacao = settings['default_travel_fee'] || '';
+  const defaultPago = settings['default_paid'] || '0';
   const currency = getCurrency();
-  const theme = localStorage.getItem('theme') || 'dark';
+  const theme = settings['theme'] || 'dark';
 
   el.innerHTML = `
     <div class="section-header">
@@ -1911,7 +2052,7 @@ async function renderSettings() {
           <input type="text" class="form-control" id="base-address-input"
                  placeholder="${t('settings_base_address_placeholder')}"
                  value="${escapeHtml(baseAddress)}"
-                 oninput="localStorage.setItem('base_address',this.value);localStorage.removeItem('base_lat');localStorage.removeItem('base_lng')">
+                 oninput="saveSetting('base_address',this.value);delete settings['base_lat'];delete settings['base_lng'];localStorage.removeItem('base_lat');localStorage.removeItem('base_lng')">
           <button class="btn btn-ghost btn-sm" onclick="openBaseAddressPicker()" style="white-space:nowrap">
             ${t('map_pick')}
           </button>
@@ -1987,33 +2128,38 @@ async function renderSettings() {
       <div class="form-group">
         <label class="form-label">${t('invoice_issuer_name')}</label>
         <input type="text" class="form-control" placeholder="${t('invoice_issuer_name_placeholder')}"
-               value="${escapeHtml(localStorage.getItem('inv_name') || '')}"
+               value="${escapeHtml(settings['inv_name'] || '')}"
                oninput="saveSetting('inv_name', this.value)">
       </div>
       <div class="form-group">
         <label class="form-label">${t('invoice_issuer_address')}</label>
         <textarea class="form-control" style="min-height:56px" placeholder="${t('invoice_issuer_address_placeholder')}"
-                  oninput="saveSetting('inv_address', this.value)">${escapeHtml(localStorage.getItem('inv_address') || '')}</textarea>
+                  oninput="saveSetting('inv_address', this.value)">${escapeHtml(settings['inv_address'] || '')}</textarea>
       </div>
       <div class="form-row">
         <div class="form-group">
           <label class="form-label">${t('invoice_issuer_nif')}</label>
           <input type="text" class="form-control" placeholder="${t('invoice_issuer_nif_placeholder')}"
-                 value="${escapeHtml(localStorage.getItem('inv_nif') || '')}"
+                 value="${escapeHtml(settings['inv_nif'] || '')}"
                  oninput="saveSetting('inv_nif', this.value)">
         </div>
         <div class="form-group">
           <label class="form-label">${t('invoice_issuer_email')}</label>
           <input type="email" class="form-control" placeholder="${t('invoice_issuer_email_placeholder')}"
-                 value="${escapeHtml(localStorage.getItem('inv_email') || '')}"
+                 value="${escapeHtml(settings['inv_email'] || '')}"
                  oninput="saveSetting('inv_email', this.value)">
         </div>
       </div>
       <div class="form-group">
         <label class="form-label">${t('invoice_footer_note')}</label>
         <input type="text" class="form-control" placeholder="${t('invoice_footer_note_placeholder')}"
-               value="${escapeHtml(localStorage.getItem('inv_note') || '')}"
+               value="${escapeHtml(settings['inv_note'] || '')}"
                oninput="saveSetting('inv_note', this.value)">
+      </div>
+      <div class="form-group">
+        <label class="form-label">${t('settings_invoice_number')}</label>
+        <input type="number" class="form-control" min="1" value="${escapeHtml(settings['next_invoice_number'] || '1')}"
+               oninput="saveSetting('next_invoice_number', this.value)">
       </div>
     </div>
 
@@ -2035,7 +2181,7 @@ async function renderSettings() {
         </div>
         <label class="toggle-switch">
           <input type="checkbox" id="extra-stats-toggle"
-                 ${localStorage.getItem('extra_stats') === '1' ? 'checked' : ''}
+                 ${settings['extra_stats'] === '1' ? 'checked' : ''}
                  onchange="saveSetting('extra_stats', this.checked ? '1' : '0'); renderDashboard && navigate('dashboard')">
           <span class="toggle-slider"></span>
         </label>
@@ -2157,9 +2303,9 @@ window.copyDiagnostics = async function() {
 
 window.openBaseAddressPicker = function() {
   mapPicker.onConfirm = (lat, lng, addr) => {
-    localStorage.setItem('base_address', addr);
-    localStorage.setItem('base_lat', String(lat));
-    localStorage.setItem('base_lng', String(lng));
+    saveSetting('base_address', addr);
+    saveSetting('base_lat', String(lat));
+    saveSetting('base_lng', String(lng));
     const inp = document.getElementById('base-address-input');
     if (inp) inp.value = addr;
     const hint = document.getElementById('base-address-hint');
@@ -2169,12 +2315,14 @@ window.openBaseAddressPicker = function() {
 };
 
 window.saveSetting = function(key, value) {
+  settings[key] = value;
   localStorage.setItem(key, value);
+  api.patch('/api/settings', { [key]: value }).catch(() => {});
 };
 
 window.setLang = function(lang) {
   state.lang = lang;
-  localStorage.setItem('lang', lang);
+  saveSetting('lang', lang);
   const navKeyMap = { dashboard: 'nav_dashboard', list: 'nav_lista', clients: 'nav_clientes', settings: 'nav_settings', agenda: 'nav_agenda' };
   document.querySelectorAll('.nav-btn').forEach(btn => {
     const key = navKeyMap[btn.dataset.view];
@@ -2184,7 +2332,7 @@ window.setLang = function(lang) {
 };
 
 window.setTheme = function(theme) {
-  localStorage.setItem('theme', theme);
+  saveSetting('theme', theme);
   document.documentElement.setAttribute('data-theme', theme);
   renderSettings();
 };
