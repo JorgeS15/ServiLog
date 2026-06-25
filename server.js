@@ -865,6 +865,38 @@ app.patch('/api/settings', (req, res) => {
   res.json({ ok: true });
 });
 
+// ── Notification test ─────────────────────────────────────
+app.post('/api/notify/test', async (req, res) => {
+  if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS || !NOTIFY_EMAIL) {
+    return res.status(400).json({ error: 'SMTP not configured' });
+  }
+  const transport = createMailTransport();
+  try {
+    await transport.sendMail({
+      from: SMTP_FROM,
+      to: NOTIFY_EMAIL,
+      subject: `[ServiLog] Test email`,
+      html: `<!DOCTYPE html><html><head><meta charset="UTF-8"></head>
+<body style="font-family:Arial,sans-serif;font-size:14px;color:#1a1e2e;background:#f4f4f4;margin:0;padding:20px">
+  <div style="max-width:540px;margin:0 auto;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.10)">
+    <div style="background:#1a1e2e;color:#fff;padding:18px 24px">
+      <span style="font-size:17px;font-weight:700">✅ ServiLog — SMTP OK</span>
+    </div>
+    <div style="padding:24px">
+      <p>This is a test email sent from ServiLog v${pkg.version}.</p>
+      <p style="margin-top:12px;color:#666;font-size:12px">SMTP: ${SMTP_HOST}:${SMTP_PORT} → ${NOTIFY_EMAIL}</p>
+    </div>
+  </div>
+</body></html>`,
+    });
+    console.log(`[notify] test email sent → ${NOTIFY_EMAIL}`);
+    res.json({ ok: true, to: NOTIFY_EMAIL });
+  } catch (err) {
+    console.error(`[notify] test email error: ${err.message}`);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── Email notifications ───────────────────────────────────
 // Triggered daily at NOTIFY_TIME (default 08:00 local server time).
 // Sends one email per scheduled service due in exactly 7 days or 1 day.
