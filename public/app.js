@@ -121,6 +121,30 @@ const TRANSLATIONS = {
     settings_diag_ok: 'OK',
     settings_diag_fail: 'FALHOU',
     settings_invoice_number: 'Número da próxima fatura',
+    nav_quote: 'Orçamento',
+    quote_title: 'ORÇAMENTO',
+    quote_new: 'Novo Orçamento',
+    quote_generate: '📄 Gerar Orçamento',
+    quote_valid_until: 'Válido até',
+    quote_est_hours: 'Horas estimadas',
+    quote_notes: 'Notas / Condições',
+    quote_ref: 'Ref.',
+    quote_date: 'Data',
+    quote_issued_to: 'Para',
+    quote_services: 'Descrição do trabalho',
+    quote_col_desc: 'Descrição',
+    quote_col_hours: 'Horas',
+    quote_col_rate: 'Preço/h',
+    quote_col_travel: 'Deslocação',
+    quote_col_discount: 'Desconto',
+    quote_col_total: 'Total',
+    quote_subtotal: 'Subtotal',
+    quote_total: 'Total',
+    quote_vat: 'IVA',
+    quote_print: 'Imprimir / Guardar PDF',
+    quote_no_issuer: 'Configure os dados da fatura nas Definições antes de gerar um orçamento.',
+    settings_quote: 'Dados para Orçamentos',
+    settings_quote_number: 'Número do próximo orçamento',
   },
   en: {
     months: ['January','February','March','April','May','June','July','August','September','October','November','December'],
@@ -243,6 +267,30 @@ const TRANSLATIONS = {
     settings_diag_ok: 'OK',
     settings_diag_fail: 'FAILED',
     settings_invoice_number: 'Next invoice number',
+    nav_quote: 'Quote',
+    quote_title: 'QUOTATION',
+    quote_new: 'New Quote',
+    quote_generate: '📄 Generate Quote',
+    quote_valid_until: 'Valid until',
+    quote_est_hours: 'Estimated hours',
+    quote_notes: 'Notes / Terms',
+    quote_ref: 'Ref.',
+    quote_date: 'Date',
+    quote_issued_to: 'To',
+    quote_services: 'Job description',
+    quote_col_desc: 'Description',
+    quote_col_hours: 'Hours',
+    quote_col_rate: 'Rate/h',
+    quote_col_travel: 'Travel',
+    quote_col_discount: 'Discount',
+    quote_col_total: 'Total',
+    quote_subtotal: 'Subtotal',
+    quote_total: 'Total',
+    quote_vat: 'VAT',
+    quote_print: 'Print / Save PDF',
+    quote_no_issuer: 'Configure invoice details in Settings before generating a quote.',
+    settings_quote: 'Quote Settings',
+    settings_quote_number: 'Next quote number',
   },
 };
 
@@ -397,6 +445,7 @@ async function renderView(view) {
   else if (view === 'clients') await renderClients();
   else if (view === 'settings') await renderSettings();
   else if (view === 'agenda') await renderAgenda();
+  else if (view === 'quote') renderQuote();
 }
 
 // ── Dashboard ─────────────────────────────────────────────
@@ -1266,6 +1315,342 @@ td{padding:13px 10px;font-size:13px;border-bottom:1px solid #ebedf0;vertical-ali
   saveSetting('next_invoice_number', String(parseInt(settings['next_invoice_number'] || '1') + 1));
 };
 
+// ── Quote view ────────────────────────────────────────────
+function renderQuote() {
+  const el = document.getElementById('view-quote');
+  const today = new Date().toISOString().slice(0, 10);
+  const validUntil = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+  const clientOptions = state.clients.map(c =>
+    `<option value="${escapeHtml(c.name)}">${escapeHtml(c.name)}</option>`
+  ).join('');
+
+  const defaultOpRate   = settings['default_operator_rate'] || '';
+  const defaultMachRate = settings['default_machine_rate']  || '';
+  const defaultTravel   = settings['default_travel_fee']    || '';
+
+  el.innerHTML = `
+    <div class="section-header">
+      <span class="section-title">${t('quote_new')}</span>
+    </div>
+
+    <div class="card" style="margin-bottom:12px">
+      <div class="form-group">
+        <label class="form-label">${t('form_client')}</label>
+        <select class="form-control" id="q-client-select" onchange="onQuoteClientChange()">
+          <option value="">${t('form_no_client')}</option>
+          ${clientOptions}
+          <option value="__custom__">✎ ${t('form_new_client_placeholder')}...</option>
+        </select>
+        <input type="text" class="form-control" id="q-client-custom"
+               placeholder="${t('form_new_client_placeholder')}"
+               style="margin-top:6px;display:none">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">${t('quote_services')}</label>
+        <textarea class="form-control" id="q-description" rows="3"
+                  placeholder="${t('form_desc_placeholder')}"></textarea>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">${t('quote_date')}</label>
+          <input type="date" class="form-control" id="q-date" value="${today}">
+        </div>
+        <div class="form-group">
+          <label class="form-label">${t('quote_valid_until')}</label>
+          <input type="date" class="form-control" id="q-valid-until" value="${validUntil}">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">${t('quote_est_hours')}</label>
+        <input type="number" class="form-control" id="q-hours"
+               step="0.25" min="0" placeholder="ex: 4"
+               oninput="calcQuoteTotal()">
+      </div>
+
+      <hr class="divider">
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">${t('form_operator_rate')}</label>
+          <input type="number" class="form-control" id="q-operator-rate"
+                 step="0.5" min="0" placeholder="ex: 15.00"
+                 value="${escapeHtml(defaultOpRate)}"
+                 oninput="calcQuoteTotal()">
+        </div>
+        <div class="form-group">
+          <label class="form-label">${t('form_machine_rate')}</label>
+          <input type="number" class="form-control" id="q-machine-rate"
+                 step="0.5" min="0" placeholder="ex: 15.00"
+                 value="${escapeHtml(defaultMachRate)}"
+                 oninput="calcQuoteTotal()">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">${t('form_travel')}</label>
+          <input type="number" class="form-control" id="q-travel"
+                 step="0.5" min="0" placeholder="ex: 10.00"
+                 value="${escapeHtml(defaultTravel)}"
+                 oninput="calcQuoteTotal()">
+        </div>
+        <div class="form-group">
+          <label class="form-label">${t('form_discount_value')}</label>
+          <input type="number" class="form-control" id="q-discount"
+                 step="0.5" min="0" placeholder="ex: 5.00"
+                 oninput="calcQuoteTotal()">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">${t('form_vat')}</label>
+          <select class="form-control" id="q-vat" onchange="calcQuoteTotal()">
+            <option value="">${t('form_vat_none')}</option>
+            <option value="6">6%</option>
+            <option value="13">13%</option>
+            <option value="23">23%</option>
+          </select>
+        </div>
+        <div class="form-group"></div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">${t('quote_notes')}</label>
+        <textarea class="form-control" id="q-notes" rows="3"
+                  placeholder="${t('invoice_footer_note_placeholder')}"></textarea>
+      </div>
+
+      <div id="quote-total-display" style="padding:12px;background:var(--bg3);border-radius:8px;margin-bottom:12px;font-size:14px;display:none">
+        <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border)">
+          <span style="color:var(--text2)">${t('quote_subtotal')}</span>
+          <span id="qt-subtotal">—</span>
+        </div>
+        <div id="qt-vat-row" style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);display:none">
+          <span style="color:var(--text2)">${t('quote_vat')}</span>
+          <span id="qt-vat">—</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:6px 0;font-weight:700;font-size:16px">
+          <span>${t('quote_total')}</span>
+          <span id="qt-total" style="color:var(--accent)">—</span>
+        </div>
+      </div>
+
+      <button class="btn btn-primary" style="width:100%" onclick="generateQuote()">
+        ${t('quote_generate')}
+      </button>
+    </div>
+  `;
+}
+
+window.onQuoteClientChange = function() {
+  const sel = document.getElementById('q-client-select');
+  const custom = document.getElementById('q-client-custom');
+  if (custom) custom.style.display = sel.value === '__custom__' ? 'block' : 'none';
+};
+
+window.calcQuoteTotal = function() {
+  const hours    = parseFloat(document.getElementById('q-hours')?.value) || 0;
+  const opRate   = parseFloat(document.getElementById('q-operator-rate')?.value) || 0;
+  const machRate = parseFloat(document.getElementById('q-machine-rate')?.value) || 0;
+  const travel   = parseFloat(document.getElementById('q-travel')?.value) || 0;
+  const discount = parseFloat(document.getElementById('q-discount')?.value) || 0;
+  const vatRate  = parseFloat(document.getElementById('q-vat')?.value) || 0;
+
+  const subtotal = Math.max(0, hours * (opRate + machRate) + travel - discount);
+  const vatAmt   = subtotal * vatRate / 100;
+  const total    = subtotal + vatAmt;
+
+  const cur = getCurrency();
+  const display = document.getElementById('quote-total-display');
+  const subEl   = document.getElementById('qt-subtotal');
+  const vatRow  = document.getElementById('qt-vat-row');
+  const vatEl   = document.getElementById('qt-vat');
+  const totEl   = document.getElementById('qt-total');
+
+  if (display && subtotal > 0) {
+    display.style.display = 'block';
+    if (subEl) subEl.textContent = subtotal.toFixed(2) + ' ' + cur;
+    if (vatRow) vatRow.style.display = vatRate > 0 ? 'flex' : 'none';
+    if (vatEl)  vatEl.textContent = '+' + vatAmt.toFixed(2) + ' ' + cur;
+    if (totEl)  totEl.textContent = total.toFixed(2) + ' ' + cur;
+  } else if (display) {
+    display.style.display = 'none';
+  }
+};
+
+window.generateQuote = async function() {
+  const issuerName = (settings['inv_name'] || '').trim();
+  if (!issuerName) { toast(t('quote_no_issuer'), 'error'); return; }
+
+  const clientSel    = document.getElementById('q-client-select');
+  const clientCustom = document.getElementById('q-client-custom');
+  let clientName = '';
+  if (clientSel) {
+    if (clientSel.value === '__custom__') {
+      clientName = (clientCustom?.value || '').trim();
+    } else {
+      clientName = clientSel.value;
+    }
+  }
+  const description = document.getElementById('q-description')?.value || '';
+  const dateVal     = document.getElementById('q-date')?.value        || new Date().toISOString().slice(0,10);
+  const validUntil  = document.getElementById('q-valid-until')?.value || '';
+  const hours       = parseFloat(document.getElementById('q-hours')?.value) || 0;
+  const opRate      = parseFloat(document.getElementById('q-operator-rate')?.value) || 0;
+  const machRate    = parseFloat(document.getElementById('q-machine-rate')?.value)  || 0;
+  const travel      = parseFloat(document.getElementById('q-travel')?.value)   || 0;
+  const discount    = parseFloat(document.getElementById('q-discount')?.value)  || 0;
+  const vatRate     = parseFloat(document.getElementById('q-vat')?.value)       || 0;
+  const notes       = document.getElementById('q-notes')?.value || '';
+
+  const issuerAddress = (settings['inv_address'] || '').trim();
+  const issuerNif    = (settings['inv_nif']     || '').trim();
+  const issuerEmail  = (settings['inv_email']   || '').trim();
+  const footerNote   = (settings['inv_note']    || '').trim();
+
+  const quoteNum = settings['next_quote_number'] || '1';
+  const ref      = `ORC ${new Date().getFullYear()}/${String(parseInt(quoteNum)).padStart(4, '0')}`;
+
+  const esc   = str => (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const escNl = str => esc(str).replace(/\n/g,'<br>');
+  const fmt   = n   => (n != null && !isNaN(n)) ? parseFloat(n).toFixed(2) + ' ' + getCurrency() : '—';
+
+  const totalRate   = opRate + machRate;
+  const subtotal    = Math.max(0, hours * totalRate + travel - discount);
+  const vatAmt      = subtotal * vatRate / 100;
+  const grandTotal  = subtotal + vatAmt;
+
+  const showRate     = totalRate > 0;
+  const showTravel   = travel > 0;
+  const showDiscount = discount > 0;
+
+  const today = new Date().toLocaleDateString(state.lang === 'pt' ? 'pt-PT' : 'en-GB');
+  const validFmt = validUntil ? new Date(validUntil).toLocaleDateString(state.lang === 'pt' ? 'pt-PT' : 'en-GB') : '';
+
+  const html = `<!DOCTYPE html>
+<html lang="${state.lang}">
+<head>
+<meta charset="UTF-8">
+<title>${t('quote_title')} ${ref}</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Helvetica Neue',Arial,sans-serif;font-size:13px;color:#1a1e2e;background:#e8e8e8}
+.topbar{background:#1a1e2e;color:#fff;padding:10px 24px;display:flex;justify-content:space-between;align-items:center;gap:12px;position:sticky;top:0;z-index:10}
+.topbar-ref{font-size:12px;opacity:.6}
+.print-btn{background:#e8a020;color:#000;border:none;border-radius:6px;font-size:13px;font-weight:700;padding:8px 20px;cursor:pointer;letter-spacing:.02em}
+.page{max-width:800px;margin:24px auto 48px;background:#fff;padding:52px;box-shadow:0 4px 24px rgba(0,0,0,.12)}
+.inv-header{display:flex;justify-content:space-between;align-items:flex-start;gap:24px;margin-bottom:40px;padding-bottom:24px;border-bottom:3px solid #1a1e2e}
+.issuer-name{font-size:19px;font-weight:800;margin-bottom:6px}
+.issuer-detail{font-size:12px;color:#555c7a;line-height:1.9}
+.inv-right{text-align:right}
+.inv-title{font-size:38px;font-weight:900;letter-spacing:.06em;line-height:1;margin-bottom:10px}
+.inv-meta{font-size:12px;color:#555c7a;line-height:1.9}
+.inv-meta strong{color:#1a1e2e}
+.sec-label{font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#9098b0;margin-bottom:8px}
+.bill-to{margin-bottom:32px}
+.bill-name{font-size:16px;font-weight:700;margin-bottom:4px}
+table{width:100%;border-collapse:collapse;margin-bottom:24px}
+th{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#9098b0;padding:8px 10px;text-align:left;border-bottom:2px solid #d0d4de}
+th.r,td.r{text-align:right}
+td{padding:13px 10px;font-size:13px;border-bottom:1px solid #ebedf0;vertical-align:top}
+.td-main{font-weight:600}
+.totals{display:flex;justify-content:flex-end;margin-bottom:28px}
+.totals-inner{width:250px}
+.tot-row{display:flex;justify-content:space-between;padding:5px 0;font-size:13px;color:#555c7a;border-bottom:1px solid #ebedf0}
+.tot-row.grand{font-size:16px;font-weight:800;color:#1a1e2e;padding-top:10px;border-top:2px solid #1a1e2e;border-bottom:none;margin-top:6px}
+.status-badge{display:inline-block;font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;padding:5px 16px;border-radius:20px;background:rgba(41,128,185,0.12);color:#1a6fa0;border:1.5px solid #1a6fa0;margin-bottom:32px}
+.footer{border-top:1px solid #d0d4de;padding-top:14px;display:flex;justify-content:space-between;align-items:flex-end;font-size:11px;color:#9098b0;margin-top:40px}
+@media print{
+  body{background:#fff}
+  .topbar{display:none}
+  .page{margin:0;padding:36px;box-shadow:none;max-width:100%}
+}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <span class="topbar-ref">${t('quote_title')} &middot; ${ref} &middot; ${today}</span>
+  <button class="print-btn" onclick="window.print()">${t('quote_print')}</button>
+</div>
+<div class="page">
+  <div class="inv-header">
+    <div>
+      <div class="issuer-name">${esc(issuerName)}</div>
+      <div class="issuer-detail">
+        ${issuerAddress ? escNl(issuerAddress) + '<br>' : ''}
+        ${issuerNif    ? 'NIF: ' + esc(issuerNif) + '<br>' : ''}
+        ${issuerEmail  ? esc(issuerEmail) : ''}
+      </div>
+    </div>
+    <div class="inv-right">
+      <div class="inv-title">${t('quote_title')}</div>
+      <div class="inv-meta">
+        <strong>${t('quote_ref')}:</strong> ${ref}<br>
+        <strong>${t('quote_date')}:</strong> ${today}<br>
+        ${validFmt ? `<strong>${t('quote_valid_until')}:</strong> ${validFmt}` : ''}
+      </div>
+    </div>
+  </div>
+
+  <div class="bill-to">
+    <div class="sec-label">${t('quote_issued_to')}</div>
+    ${clientName
+      ? `<div class="bill-name">${esc(clientName)}</div>`
+      : `<div class="bill-name">—</div>`
+    }
+  </div>
+
+  <div class="sec-label" style="margin-bottom:8px">${t('quote_services')}</div>
+  <table>
+    <thead><tr>
+      <th>${t('quote_col_desc')}</th>
+      <th class="r">${t('quote_col_hours')}</th>
+      ${showRate     ? `<th class="r">${t('quote_col_rate')}</th>`     : ''}
+      ${showTravel   ? `<th class="r">${t('quote_col_travel')}</th>`   : ''}
+      ${showDiscount ? `<th class="r">${t('quote_col_discount')}</th>` : ''}
+      <th class="r">${t('quote_col_total')}</th>
+    </tr></thead>
+    <tbody><tr>
+      <td>${description ? `<div class="td-main">${esc(description)}</div>` : '<span>—</span>'}</td>
+      <td class="r">${hours > 0 ? hours + ' h' : '—'}</td>
+      ${showRate     ? `<td class="r">${fmt(totalRate)}</td>`   : ''}
+      ${showTravel   ? `<td class="r">${fmt(travel)}</td>`      : ''}
+      ${showDiscount ? `<td class="r">-${fmt(discount)}</td>`   : ''}
+      <td class="r"><strong>${fmt(subtotal)}</strong></td>
+    </tr></tbody>
+  </table>
+
+  <div class="totals">
+    <div class="totals-inner">
+      <div class="tot-row"><span>${t('quote_subtotal')}</span><span>${fmt(subtotal)}</span></div>
+      ${vatRate > 0 ? `<div class="tot-row"><span>${t('quote_vat')} (${vatRate}%)</span><span>+${fmt(vatAmt)}</span></div>` : ''}
+      <div class="tot-row grand"><span>${t('quote_total')}</span><span>${fmt(grandTotal)}</span></div>
+    </div>
+  </div>
+
+  <div class="status-badge">${t('quote_title')}</div>
+
+  <div class="footer">
+    <div>${notes ? escNl(notes) : (footerNote ? escNl(footerNote) : '')}</div>
+    <div>${esc(issuerName)}</div>
+  </div>
+</div>
+</body>
+</html>`;
+
+  const w = window.open('', '_blank');
+  if (!w) { toast('Popup blocked — allow popups for this site', 'error'); return; }
+  w.document.write(html);
+  w.document.close();
+  // Bump quote number
+  saveSetting('next_quote_number', String(parseInt(settings['next_quote_number'] || '1') + 1));
+};
+
 function newService() {
   openModal(t('form_new_service'), serviceFormHtml());
 }
@@ -1959,7 +2344,7 @@ async function init() {
   updateOfflineBadge();
 
   // Nav — apply translations and attach click handlers
-  const navKeyMap = { dashboard: 'nav_dashboard', list: 'nav_lista', clients: 'nav_clientes', settings: 'nav_settings', agenda: 'nav_agenda' };
+  const navKeyMap = { dashboard: 'nav_dashboard', list: 'nav_lista', clients: 'nav_clientes', settings: 'nav_settings', agenda: 'nav_agenda', quote: 'nav_quote' };
   document.querySelectorAll('.nav-btn').forEach(btn => {
     const key = navKeyMap[btn.dataset.view];
     if (key) btn.querySelector('span').textContent = t(key);
@@ -2163,6 +2548,16 @@ async function renderSettings() {
       </div>
     </div>
 
+    <!-- Quote Settings -->
+    <div class="card" style="margin-bottom:12px">
+      <div class="section-title" style="margin-bottom:12px">${t('settings_quote')}</div>
+      <div class="form-group">
+        <label class="form-label">${t('settings_quote_number')}</label>
+        <input type="number" class="form-control" min="1" value="${escapeHtml(settings['next_quote_number'] || '1')}"
+               oninput="saveSetting('next_quote_number', this.value)">
+      </div>
+    </div>
+
     <!-- Appearance / Theme -->
     <div class="card" style="margin-bottom:12px">
       <div class="section-title" style="margin-bottom:12px">${t('settings_theme')}</div>
@@ -2323,7 +2718,7 @@ window.saveSetting = function(key, value) {
 window.setLang = function(lang) {
   state.lang = lang;
   saveSetting('lang', lang);
-  const navKeyMap = { dashboard: 'nav_dashboard', list: 'nav_lista', clients: 'nav_clientes', settings: 'nav_settings', agenda: 'nav_agenda' };
+  const navKeyMap = { dashboard: 'nav_dashboard', list: 'nav_lista', clients: 'nav_clientes', settings: 'nav_settings', agenda: 'nav_agenda', quote: 'nav_quote' };
   document.querySelectorAll('.nav-btn').forEach(btn => {
     const key = navKeyMap[btn.dataset.view];
     if (key) btn.querySelector('span').textContent = t(key);
