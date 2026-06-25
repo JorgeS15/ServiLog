@@ -120,6 +120,11 @@ const TRANSLATIONS = {
     settings_diag_testing: 'A testar...',
     settings_diag_ok: 'OK',
     settings_diag_fail: 'FALHOU',
+    settings_diag_send_test: 'Enviar email de teste',
+    settings_diag_sending: 'A enviar...',
+    settings_diag_smtp_ok: 'Email enviado para',
+    settings_diag_smtp_fail: 'Falha no envio do email',
+    settings_diag_smtp_not_configured: 'SMTP não configurado no servidor',
     settings_invoice_number: 'Número da próxima fatura',
     nav_quote: 'Orçamento',
     quote_title: 'ORÇAMENTO',
@@ -266,6 +271,11 @@ const TRANSLATIONS = {
     settings_diag_testing: 'Testing...',
     settings_diag_ok: 'OK',
     settings_diag_fail: 'FAILED',
+    settings_diag_send_test: 'Send test email',
+    settings_diag_sending: 'Sending...',
+    settings_diag_smtp_ok: 'Email sent to',
+    settings_diag_smtp_fail: 'Failed to send email',
+    settings_diag_smtp_not_configured: 'SMTP not configured on the server',
     settings_invoice_number: 'Next invoice number',
     nav_quote: 'Quote',
     quote_title: 'QUOTATION',
@@ -2674,6 +2684,7 @@ async function renderSettings() {
       <div style="font-size:12px;color:var(--text3);margin-bottom:10px">${t('settings_diag_sub')}</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-secondary btn-sm" onclick="runMapDiagnostics()">${t('settings_diag_test')}</button>
+        <button class="btn btn-secondary btn-sm" onclick="sendTestEmail()">${t('settings_diag_send_test')}</button>
         <button class="btn btn-secondary btn-sm" onclick="copyDiagnostics()">${t('settings_diag_copy')}</button>
       </div>
       <pre id="diag-output" style="display:none;margin-top:10px;padding:10px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;font-size:11px;line-height:1.5;white-space:pre-wrap;word-break:break-word;max-height:240px;overflow:auto"></pre>
@@ -2752,6 +2763,25 @@ window.copyDiagnostics = async function() {
   } catch (_) {
     // Clipboard API unavailable (e.g. non-HTTPS) — fall back to showing the text to copy manually.
     out.textContent = text;
+  }
+};
+
+window.sendTestEmail = async function() {
+  const btn = [...document.querySelectorAll('.btn')].find(b => b.textContent.trim() === t('settings_diag_send_test'));
+  if (btn) { btn.disabled = true; btn.textContent = t('settings_diag_sending'); }
+  try {
+    const r = await fetch('/api/notify/test', { method: 'POST' });
+    const data = await r.json();
+    if (r.ok) {
+      toast(`${t('settings_diag_smtp_ok')} ${data.to}`, 'success');
+    } else {
+      const msg = data.error === 'SMTP not configured' ? t('settings_diag_smtp_not_configured') : `${t('settings_diag_smtp_fail')}: ${data.error}`;
+      toast(msg, 'error');
+    }
+  } catch (_) {
+    toast(t('settings_diag_smtp_fail'), 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = t('settings_diag_send_test'); }
   }
 };
 
