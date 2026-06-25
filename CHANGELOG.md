@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.8.0] - 2026-06-25
+
+### Changed
+- **Leaflet self-hosted**: Leaflet 1.9.4 (JS, CSS, and marker images) is now bundled under `public/vendor/leaflet/` and served by the app itself. The `unpkg.com` CDN is no longer used for Leaflet, eliminating failures caused by browser privacy settings, ad-blockers, or corporate firewalls that block external CDNs. The CSP is tightened accordingly — `https://unpkg.com` removed from `script-src`, `style-src`, and `img-src`.
+
 ## [1.7.10] - 2026-06-25
 
 ### Fixed

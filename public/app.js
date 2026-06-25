@@ -1376,6 +1376,10 @@ window.openMapPicker = function(targetInputId) {
 
   requestAnimationFrame(() => {
     if (!mapPicker.map) {
+      // Pin Leaflet's image path to the locally-hosted vendor copy so that
+      // browser privacy settings / ad-blockers cannot block an external CDN.
+      L.Icon.Default.imagePath = '/vendor/leaflet/images/';
+
       // Default center: Portugal
       mapPicker.map = L.map('map-leaflet').setView([39.5, -8.0], 6);
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
