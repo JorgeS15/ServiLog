@@ -13,5 +13,16 @@ services:
       - APP_PASSWORD=change-me
       # Uncomment if you are serving over HTTPS (adds the Secure flag to the session cookie).
       #- HTTPS=true
+      # ── Email notifications (upcoming scheduled services) ──────────────────
+      # Sends a reminder 7 days and 1 day before each scheduled service.
+      # All four vars below must be set to enable notifications.
+      #- SMTP_HOST=smtp.gmail.com
+      #- SMTP_PORT=587
+      #- SMTP_USER=you@gmail.com
+      #- SMTP_PASS=your-app-password
+      #- SMTP_FROM=ServiLog <you@gmail.com>
+      #- NOTIFY_EMAIL=you@gmail.com
+      #- NOTIFY_TIME=08:00
+      #- SMTP_SECURE=false
     ports:
       - "3000:3000"

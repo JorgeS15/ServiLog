@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.9.2] - 2026-06-25
+
+### Added
+- **Email notifications for upcoming services**: ServiLog now sends a reminder email 7 days and 1 day before each scheduled service. Configured entirely via environment variables in `docker-compose.yml` — no code changes needed. Supports any SMTP provider (Gmail, Outlook, Resend, Mailgun, self-hosted). New env vars: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`, `NOTIFY_EMAIL`, `NOTIFY_TIME` (default `08:00`). Notifications are disabled when SMTP vars are not set.
+
 ## [1.9.1] - 2026-06-25
 
 ### Added

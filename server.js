@@ -3,6 +3,7 @@ const Database = require('better-sqlite3');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
+const nodemailer = require('nodemailer');
 const pkg = require('./package.json');
 
 const app = express();
@@ -863,5 +864,131 @@ app.patch('/api/settings', (req, res) => {
   upsertMany(Object.entries(body));
   res.json({ ok: true });
 });
+
+// ── Email notifications ───────────────────────────────────
+// Triggered daily at NOTIFY_TIME (default 08:00 local server time).
+// Sends one email per scheduled service due in exactly 7 days or 1 day.
+// Required env vars: SMTP_HOST, SMTP_USER, SMTP_PASS, NOTIFY_EMAIL
+// Optional: SMTP_PORT (default 587), SMTP_FROM, SMTP_SECURE (true/false),
+//           NOTIFY_TIME (HH:MM, default "08:00")
+
+const SMTP_HOST    = process.env.SMTP_HOST;
+const SMTP_PORT    = parseInt(process.env.SMTP_PORT || '587', 10);
+const SMTP_USER    = process.env.SMTP_USER;
+const SMTP_PASS    = process.env.SMTP_PASS;
+const SMTP_FROM    = process.env.SMTP_FROM || SMTP_USER;
+const SMTP_SECURE  = process.env.SMTP_SECURE === 'true';
+const NOTIFY_EMAIL = process.env.NOTIFY_EMAIL;
+const NOTIFY_TIME  = process.env.NOTIFY_TIME || '08:00';
+
+function createMailTransport() {
+  if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS || !NOTIFY_EMAIL) return null;
+  return nodemailer.createTransport({
+    host: SMTP_HOST,
+    port: SMTP_PORT,
+    secure: SMTP_SECURE,
+    auth: { user: SMTP_USER, pass: SMTP_PASS },
+  });
+}
+
+function dateOffsetISO(days) {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+function fmtDate(iso) {
+  if (!iso) return iso;
+  const [y, m, day] = iso.split('-');
+  return `${day}/${m}/${y}`;
+}
+
+async function sendServiceReminder(service, daysUntil) {
+  const transport = createMailTransport();
+  if (!transport) return;
+
+  const label    = daysUntil === 1 ? 'amanhã' : `em ${daysUntil} dias`;
+  const labelEn  = daysUntil === 1 ? 'tomorrow' : `in ${daysUntil} days`;
+  const client   = service.client_name || '—';
+  const dateStr  = fmtDate(service.date);
+  const timeStr  = service.start_time ? ` às ${service.start_time}` : '';
+  const desc     = service.description || '';
+
+  const html = `
+<!DOCTYPE html><html><head><meta charset="UTF-8"></head>
+<body style="font-family:Arial,sans-serif;font-size:14px;color:#1a1e2e;background:#f4f4f4;margin:0;padding:20px">
+  <div style="max-width:540px;margin:0 auto;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.10)">
+    <div style="background:#1a1e2e;color:#fff;padding:18px 24px;display:flex;align-items:center;gap:12px">
+      <span style="font-size:22px">📅</span>
+      <span style="font-size:17px;font-weight:700">ServiLog — Lembrete de Serviço</span>
+    </div>
+    <div style="padding:24px">
+      <p style="font-size:16px;margin:0 0 18px">Tens um serviço agendado <strong>${label}</strong>:</p>
+      <table style="width:100%;border-collapse:collapse;font-size:14px">
+        <tr><td style="padding:8px 0;color:#666;width:110px">Data</td><td style="padding:8px 0;font-weight:600">${dateStr}${timeStr}</td></tr>
+        <tr><td style="padding:8px 0;color:#666">Cliente</td><td style="padding:8px 0;font-weight:600">${client}</td></tr>
+        ${desc ? `<tr><td style="padding:8px 0;color:#666">Descrição</td><td style="padding:8px 0">${desc}</td></tr>` : ''}
+      </table>
+      <p style="margin:20px 0 0;font-size:12px;color:#999">— ServiLog v${pkg.version}</p>
+    </div>
+  </div>
+</body></html>`;
+
+  const subject = `[ServiLog] Serviço ${label} — ${client} (${dateStr})`;
+
+  try {
+    await transport.sendMail({ from: SMTP_FROM, to: NOTIFY_EMAIL, subject, html });
+    console.log(`[notify] email sent: service ${service.id} (${daysUntil}d) → ${NOTIFY_EMAIL}`);
+  } catch (err) {
+    console.error(`[notify] email error: ${err.message}`);
+  }
+}
+
+async function runNotificationCheck() {
+  if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS || !NOTIFY_EMAIL) return;
+  console.log('[notify] running daily check');
+  const targets = [
+    { days: 7,  date: dateOffsetISO(7) },
+    { days: 1,  date: dateOffsetISO(1) },
+  ];
+  for (const { days, date } of targets) {
+    const services = db.prepare(`
+      SELECT s.id, s.date, s.start_time, s.description, c.name as client_name
+      FROM services s
+      LEFT JOIN clients c ON s.client_id = c.id
+      WHERE s.status = 'scheduled' AND s.date = ?
+    `).all(date);
+    for (const svc of services) {
+      await sendServiceReminder(svc, days);
+    }
+    if (services.length) console.log(`[notify] ${services.length} reminder(s) for ${date} (${days}d notice)`);
+  }
+}
+
+function scheduleNotifications() {
+  if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS || !NOTIFY_EMAIL) {
+    console.log('[notify] SMTP not configured — notifications disabled');
+    return;
+  }
+  const [hh, mm] = NOTIFY_TIME.split(':').map(Number);
+  function msUntilNext() {
+    const now = new Date();
+    const next = new Date(now);
+    next.setHours(hh, mm, 0, 0);
+    if (next <= now) next.setDate(next.getDate() + 1);
+    return next - now;
+  }
+  function scheduleNext() {
+    const delay = msUntilNext();
+    console.log(`[notify] next check in ${Math.round(delay / 60000)} min (at ${NOTIFY_TIME})`);
+    setTimeout(async () => {
+      await runNotificationCheck();
+      scheduleNext();
+    }, delay);
+  }
+  scheduleNext();
+}
+
+scheduleNotifications();
 
 app.listen(PORT, () => console.log(`ServiLog running on port ${PORT}`));
