@@ -7,7 +7,7 @@ services:
       - ./data:/data
     environment:
       - DB_PATH=/data/tracker.db
-      - PORT=3000
+      - PORT=4000
       # Uncomment and set a strong password to enable login protection.
       # Without this the app is open to anyone who can reach the port.
       - APP_PASSWORD=change-me
@@ -25,4 +25,4 @@ services:
       #- NOTIFY_TIME=08:00
       #- SMTP_SECURE=false
     ports:
-      - "3000:3000"
+      - "4000:4000"
