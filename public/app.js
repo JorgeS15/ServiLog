@@ -1382,7 +1382,6 @@ window.openMapPicker = function(targetInputId) {
         attribution: '© <a href="https://www.openstreetmap.org">OpenStreetMap</a>',
         maxZoom: 19,
       }).addTo(mapPicker.map);
-      mapPicker.map.invalidateSize();
 
       mapPicker.marker = L.marker([39.5, -8.0], { draggable: true }).addTo(mapPicker.map);
       mapPicker.marker.on('dragend', () => {
@@ -1393,14 +1392,16 @@ window.openMapPicker = function(targetInputId) {
         mapPicker.marker.setLatLng(e.latlng);
         reverseGeocode(e.latlng.lat, e.latlng.lng);
       });
-    } else {
-      mapPicker.map.invalidateSize();
     }
+
+    mapPicker.map.invalidateSize();
+    // second invalidate after paint to catch any remaining layout shifts
+    setTimeout(() => mapPicker.map && mapPicker.map.invalidateSize(), 200);
 
     // If there's an existing address, try to show it on the map
     const existing = document.getElementById(targetInputId)?.value?.trim();
     if (existing) geocodeForMap(existing);
-  }, 50);
+  }, 100);
 };
 
 async function reverseGeocode(lat, lng) {
@@ -1473,11 +1474,20 @@ window.onMapSearch = function(query) {
       );
       const data = await r.json();
       results.innerHTML = data.length
-        ? data.map(item => `
-            <div class="map-search-result" onclick="selectMapResult(${item.lat},${item.lon},${JSON.stringify(item.display_name)})">
+        ? data.map((item, i) => `
+            <div class="map-search-result" data-idx="${i}">
               ${escapeHtml(item.display_name)}
             </div>`).join('')
         : `<div class="map-search-result map-no-result">${t('map_no_results')}</div>`;
+      if (data.length) {
+        const _results = data;
+        results.querySelectorAll('[data-idx]').forEach(el => {
+          el.addEventListener('click', () => {
+            const item = _results[+el.dataset.idx];
+            selectMapResult(item.lat, item.lon, item.display_name);
+          });
+        });
+      }
     } catch (_) {}
   }, 400);
 };
