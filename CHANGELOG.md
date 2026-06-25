@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.1] - 2026-06-25
+
+### Added
+- **Quote (Orçamento) feature**: a new "Orçamento" tab in the bottom nav opens a quote builder form. Fill in client, job description, date, valid-until date, estimated hours, operator/machine rates, travel fee, discount, VAT rate, and notes. A live total is calculated as you type. Clicking "Gerar Orçamento" opens a print-ready quotation page in a new tab, styled to match the existing invoice layout, with a "ORÇAMENTO" status badge in blue.
+- **Quote numbering**: a `next_quote_number` setting key (ref format `ORC YYYY/NNNN`) is auto-incremented on each generated quote. A "Next quote number" field is available under a new "Dados para Orçamentos" / "Quote Settings" card in Settings.
+- Quotes are generated entirely on-the-fly (no database persistence required).
+
 ## [1.9.0] - 2026-06-25
 
 ### Added

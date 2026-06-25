@@ -840,6 +840,7 @@ const SETTINGS_ALLOWLIST = new Set([
   'travel_price_per_km', 'travel_fee_step', 'travel_min_fee',
   'inv_name', 'inv_address', 'inv_nif', 'inv_email', 'inv_note',
   'next_invoice_number',
+  'next_quote_number',
 ]);
 
 app.get('/api/settings', (req, res) => {
