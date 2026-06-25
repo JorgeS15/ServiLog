@@ -1374,7 +1374,7 @@ window.openMapPicker = function(targetInputId) {
   document.getElementById('map-search-results').innerHTML = '';
   document.getElementById('map-search-input').value = '';
 
-  setTimeout(() => {
+  requestAnimationFrame(() => {
     if (!mapPicker.map) {
       // Default center: Portugal
       mapPicker.map = L.map('map-leaflet').setView([39.5, -8.0], 6);
@@ -1392,16 +1392,25 @@ window.openMapPicker = function(targetInputId) {
         mapPicker.marker.setLatLng(e.latlng);
         reverseGeocode(e.latlng.lat, e.latlng.lng);
       });
+
+      // Deterministically fix tile rendering: invalidate the map size the
+      // moment the container actually gets non-zero dimensions, rather than
+      // guessing with fixed timeouts (which raced and left the map blank).
+      const container = document.getElementById('map-leaflet');
+      if (window.ResizeObserver) {
+        const ro = new ResizeObserver(() => {
+          if (container.clientHeight > 0) mapPicker.map.invalidateSize();
+        });
+        ro.observe(container);
+      }
     }
 
     mapPicker.map.invalidateSize();
-    // second invalidate after paint to catch any remaining layout shifts
-    setTimeout(() => mapPicker.map && mapPicker.map.invalidateSize(), 200);
 
     // If there's an existing address, try to show it on the map
     const existing = document.getElementById(targetInputId)?.value?.trim();
     if (existing) geocodeForMap(existing);
-  }, 100);
+  });
 };
 
 async function reverseGeocode(lat, lng) {
