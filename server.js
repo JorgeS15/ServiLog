@@ -65,6 +65,11 @@ db.exec(`
     size INTEGER,
     created_at TEXT DEFAULT (datetime('now','localtime'))
   );
+
+  CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT
+  );
 `);
 
 // Run all migrations — safe to call multiple times
@@ -134,6 +139,18 @@ function runMigrations() {
     WHERE price_per_hour IS NOT NULL AND operator_rate = 0`).run();
 }
 runMigrations();
+
+// ── Request logging middleware ────────────────────────────
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/tiles')) return next();
+  const start = Date.now();
+  const ip = req.socket.remoteAddress || '';
+  res.on('finish', () => {
+    const ms = Date.now() - start;
+    console.log(`[req] ${req.method} ${req.path} ${res.statusCode} ${ms}ms ${ip}`);
+  });
+  next();
+});
 
 // ── Security headers ──────────────────────────────────────
 const CSP = [
@@ -230,6 +247,7 @@ function clearAttempts(ip) { loginAttempts.delete(ip); }
 app.post('/login', (req, res) => {
   const ip = req.socket.remoteAddress || '';
   if (isRateLimited(ip)) {
+    console.log(`[auth] rate-limited ip=${ip}`);
     return res.status(429).redirect('/login?error=2');
   }
   const submitted = String(req.body.password || '');
@@ -238,8 +256,9 @@ app.post('/login', (req, res) => {
   const valid = APP_PASSWORD &&
     subBuf.length === pwdBuf.length &&
     crypto.timingSafeEqual(subBuf, pwdBuf);
-  if (!valid) { recordFailure(ip); return res.redirect('/login?error=1'); }
+  if (!valid) { recordFailure(ip); console.log(`[auth] login fail ip=${ip}`); return res.redirect('/login?error=1'); }
   clearAttempts(ip);
+  console.log(`[auth] login ok ip=${ip}`);
   const token = makeSessionToken();
   const secure = process.env.HTTPS === 'true' ? '; Secure' : '';
   res.setHeader('Set-Cookie',
@@ -248,6 +267,8 @@ app.post('/login', (req, res) => {
 });
 
 app.post('/logout', (req, res) => {
+  const ip = req.socket.remoteAddress || '';
+  console.log(`[auth] logout ip=${ip}`);
   res.setHeader('Set-Cookie',
     'servilog_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0');
   res.redirect(APP_PASSWORD ? '/login' : '/');
@@ -343,7 +364,8 @@ app.get('/api/services', (req, res) => {
   const { month, year, client_id, status } = req.query;
   let query = `
     SELECT s.*, c.name as client_name,
-           COUNT(a.id) as attachment_count
+           COUNT(a.id) as attachment_count,
+           (SELECT id FROM service_attachments WHERE service_id = s.id AND mime_type LIKE 'image/%' ORDER BY created_at LIMIT 1) as first_image_id
     FROM services s
     LEFT JOIN clients c ON s.client_id = c.id
     LEFT JOIN service_attachments a ON a.service_id = s.id
@@ -670,6 +692,7 @@ app.get('/api/export/csv', (req, res) => {
     .map(csvCell).join(',')
   ).join('\n');
 
+  console.log(`[export] csv rows=${rows.length}`);
   res.setHeader('Content-Type', 'text/csv');
   res.setHeader('Content-Disposition', 'attachment; filename="services.csv"');
   res.send(csv);
@@ -700,6 +723,8 @@ app.get('/api/backup/download', (req, res) => {
   }
 
   const dateStr = new Date().toISOString().slice(0, 10);
+  const totalSize = parts.reduce((s, b) => s + b.length, 0);
+  console.log(`[backup] download size=${totalSize}`);
   res.setHeader('Content-Type', 'application/octet-stream');
   res.setHeader('Content-Disposition', `attachment; filename="servilog-backup-${dateStr}.slb"`);
   res.send(Buffer.concat(parts));
@@ -756,6 +781,7 @@ app.post('/api/backup/restore',
         runMigrations();
         try { fs.rmSync(oldUploads, { recursive: true, force: true }); } catch (_) {}
 
+        console.log('[backup] restore ok');
         res.json({ ok: true });
       } catch (e) {
         // Clean up any temp files left behind
@@ -763,6 +789,7 @@ app.post('/api/backup/restore',
         try { fs.rmSync(UPLOADS_DIR + '_restoring', { recursive: true, force: true }); } catch (_) {}
         // If DB was closed but not yet reopened, reopen what's there
         if (!db.open) { try { db = openDb(DB_PATH); runMigrations(); } catch (_) {} }
+        console.log(`[backup] restore error ${e.message}`);
         res.status(400).json({ error: 'Corrupt backup file' });
       }
     } else if (req.body.slice(0, 15).toString('utf8').startsWith('SQLite format 3')) {
@@ -774,10 +801,12 @@ app.post('/api/backup/restore',
         fs.renameSync(tmpDb, DB_PATH);
         db = openDb(DB_PATH);
         runMigrations();
+        console.log('[backup] restore ok');
         res.json({ ok: true });
       } catch (e) {
         try { fs.unlinkSync(tmpDb); } catch (_) {}
         if (!db.open) { try { db = openDb(DB_PATH); runMigrations(); } catch (_) {} }
+        console.log(`[backup] restore error ${e.message}`);
         res.status(400).json({ error: 'Restore failed' });
       }
     } else {
@@ -801,6 +830,37 @@ app.get('/api/stats', (req, res) => {
     }
   } catch (_) {}
   res.json({ totalServices, totalClients, totalAttachments, dbSizeBytes, uploadsSizeBytes, dateRange });
+});
+
+// ── Settings API ──────────────────────────────────────────
+const SETTINGS_ALLOWLIST = new Set([
+  'lang', 'theme', 'currency', 'extra_stats',
+  'default_operator_rate', 'default_machine_rate', 'default_travel_fee', 'default_paid',
+  'base_address', 'base_lat', 'base_lng',
+  'travel_price_per_km', 'travel_fee_step', 'travel_min_fee',
+  'inv_name', 'inv_address', 'inv_nif', 'inv_email', 'inv_note',
+  'next_invoice_number',
+]);
+
+app.get('/api/settings', (req, res) => {
+  const rows = db.prepare('SELECT key, value FROM settings').all();
+  const result = {};
+  for (const row of rows) result[row.key] = row.value;
+  res.json(result);
+});
+
+app.patch('/api/settings', (req, res) => {
+  const body = req.body;
+  if (!body || typeof body !== 'object') return res.status(400).json({ error: 'Invalid body' });
+  const upsert = db.prepare('INSERT INTO settings (key, value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value');
+  const upsertMany = db.transaction((entries) => {
+    for (const [key, value] of entries) {
+      if (!SETTINGS_ALLOWLIST.has(key)) continue;
+      upsert.run(key, String(value));
+    }
+  });
+  upsertMany(Object.entries(body));
+  res.json({ ok: true });
 });
 
 app.listen(PORT, () => console.log(`ServiLog running on port ${PORT}`));
