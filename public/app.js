@@ -266,6 +266,7 @@ const TRANSLATIONS = {
     dashboard_lubelogger: 'Custo Total da Máquina (LubeLogger)',
     dashboard_lubelogger_sub: 'Total acumulado, não filtrado por mês',
     dashboard_lubelogger_error: 'Não foi possível contactar o servidor LubeLogger',
+    dashboard_lubelogger_error_vehicle: 'Verifique o ID do veículo nas Definições',
     nav_orcamentos: 'Orçamentos',
     quotes_title: 'Orçamentos',
     quote_saved: 'Orçamento guardado',
@@ -552,6 +553,7 @@ const TRANSLATIONS = {
     dashboard_lubelogger: 'Machine Total Cost (LubeLogger)',
     dashboard_lubelogger_sub: 'All-time total, not filtered by month',
     dashboard_lubelogger_error: 'Could not reach LubeLogger server',
+    dashboard_lubelogger_error_vehicle: 'Check the Vehicle ID in Settings',
     nav_orcamentos: 'Quotes',
     quotes_title: 'Quotes',
     quote_saved: 'Quote saved',
@@ -599,8 +601,8 @@ async function loadLubeloggerCost(force = false) {
       lubeloggerState.fetchedAt = Date.now();
       return data;
     })
-    .catch(() => {
-      lubeloggerState.data = { configured: true, error: true };
+    .catch(err => {
+      lubeloggerState.data = { configured: true, error: err?.message || true };
       lubeloggerState.fetchedAt = Date.now();
       return lubeloggerState.data;
     })
@@ -795,9 +797,8 @@ async function renderView(view) {
 async function renderDashboard() {
   const el = document.getElementById('view-dashboard');
   const url = state.globalView ? '/api/summary' : `/api/summary?month=${state.month}&year=${state.year}`;
-  const data = await api.get(url);
+  const [data, lube] = await Promise.all([api.get(url), loadLubeloggerCost()]);
   const { stats, byClient } = data;
-  const lube = await loadLubeloggerCost();
 
   const s = stats || {};
   const cur = getCurrency();
@@ -912,7 +913,7 @@ async function renderDashboard() {
       ${
         lube.error
           ? `
-        <div style="font-size:12px;color:var(--text3)">${t('dashboard_lubelogger_error')}</div>
+        <div style="font-size:12px;color:var(--text3)">${lube.error === 'vehicle_not_found' ? t('dashboard_lubelogger_error_vehicle') : t('dashboard_lubelogger_error')}</div>
       `
           : `
         <div class="stat-value accent" style="font-size:20px">${lube.total.toFixed(2)} ${cur}</div>
@@ -920,7 +921,7 @@ async function renderDashboard() {
           lube.vehicle
             ? `
           <div style="font-size:11px;color:var(--text3);margin-top:4px">
-            ${[lube.vehicle.year, lube.vehicle.make, lube.vehicle.model].filter(Boolean).join(' ')}
+            ${[lube.vehicle.year, lube.vehicle.make, lube.vehicle.model].filter(Boolean).map(escapeHtml).join(' ')}
             ${lube.vehicle.licensePlate ? ' · ' + escapeHtml(lube.vehicle.licensePlate) : ''}
           </div>`
             : ''
@@ -3535,6 +3536,7 @@ async function renderSettings() {
         <label class="form-label">${t('settings_lubelogger_key')}</label>
         <input type="password" class="form-control" autocomplete="off"
                value="${escapeHtml(settings['lubelogger_api_key'] || '')}"
+               onfocus="if (this.value === '••••••••') this.value = ''"
                oninput="saveSetting('lubelogger_api_key', this.value)">
       </div>
       <div class="form-group">
