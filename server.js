@@ -952,6 +952,7 @@ app.post('/api/backup/restore',
 app.get('/api/stats', (req, res) => {
   const totalServices = db.prepare('SELECT COUNT(*) as n FROM services').get().n;
   const totalClients = db.prepare('SELECT COUNT(*) as n FROM clients').get().n;
+  const totalQuotes = db.prepare('SELECT COUNT(*) as n FROM quotes').get().n;
   const totalAttachments = db.prepare('SELECT COUNT(*) as n FROM service_attachments').get().n;
   const dateRange = db.prepare('SELECT MIN(date) as first, MAX(date) as last FROM services').get();
   let dbSizeBytes = 0;
@@ -962,7 +963,7 @@ app.get('/api/stats', (req, res) => {
       try { uploadsSizeBytes += fs.statSync(path.join(UPLOADS_DIR, name)).size; } catch (_) {}
     }
   } catch (_) {}
-  res.json({ totalServices, totalClients, totalAttachments, dbSizeBytes, uploadsSizeBytes, dateRange });
+  res.json({ totalServices, totalClients, totalQuotes, totalAttachments, dbSizeBytes, uploadsSizeBytes, dateRange });
 });
 
 // ── Settings API ──────────────────────────────────────────

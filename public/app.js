@@ -53,7 +53,7 @@ const TRANSLATIONS = {
     settings_default_payment: 'Estado pagamento por defeito',
     settings_currency: 'Símbolo de moeda', settings_theme: 'Tema',
     settings_theme_dark: 'Escuro', settings_theme_light: 'Claro',
-    settings_data_stats: 'Estatísticas', settings_total_services: 'Total de serviços',
+    settings_data_stats: 'Estatísticas', settings_total_services: 'Total de serviços', settings_total_quotes: 'Total de orçamentos',
     settings_total_clients: 'Total de clientes', settings_db_size: 'Tamanho da base de dados',
     settings_date_range: 'Período de dados', settings_version: 'Versão',
     tip_badge: 'gorjeta',
@@ -222,7 +222,7 @@ const TRANSLATIONS = {
     settings_default_payment: 'Default payment status',
     settings_currency: 'Currency symbol', settings_theme: 'Theme',
     settings_theme_dark: 'Dark', settings_theme_light: 'Light',
-    settings_data_stats: 'Statistics', settings_total_services: 'Total services',
+    settings_data_stats: 'Statistics', settings_total_services: 'Total services', settings_total_quotes: 'Total quotes',
     settings_total_clients: 'Total clients', settings_db_size: 'Database size',
     settings_date_range: 'Data range', settings_version: 'Version',
     tip_badge: 'tip',
@@ -1665,7 +1665,7 @@ function buildQuoteHtml(data) {
 <html lang="${state.lang}">
 <head>
 <meta charset="UTF-8">
-<title>${t('quote_title')} ${ref}</title>
+<title>${esc(ref)}</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Helvetica Neue',Arial,sans-serif;font-size:13px;color:#1a1e2e;background:#e8e8e8}
@@ -1673,32 +1673,34 @@ body{font-family:'Helvetica Neue',Arial,sans-serif;font-size:13px;color:#1a1e2e;
 .topbar-ref{font-size:12px;opacity:.6}
 .print-btn{background:#e8a020;color:#000;border:none;border-radius:6px;font-size:13px;font-weight:700;padding:8px 20px;cursor:pointer;letter-spacing:.02em}
 .page{max-width:800px;margin:24px auto 48px;background:#fff;padding:52px;box-shadow:0 4px 24px rgba(0,0,0,.12)}
-.inv-header{display:flex;justify-content:space-between;align-items:flex-start;gap:24px;margin-bottom:40px;padding-bottom:24px;border-bottom:3px solid #1a1e2e}
+.inv-header{display:flex;justify-content:space-between;align-items:flex-start;gap:28px;margin-bottom:40px;padding-bottom:24px;border-bottom:3px solid #1a1e2e}
 .inv-header>div:first-child{flex:1;min-width:0}
-.inv-header>.inv-right{flex-shrink:0}
-.issuer-name{font-size:19px;font-weight:800;margin-bottom:6px;overflow-wrap:anywhere;word-break:break-word}
+.inv-header>.inv-right{flex-shrink:0;max-width:40%}
+.issuer-name{font-size:18px;font-weight:800;margin-bottom:6px;overflow-wrap:anywhere;word-break:break-word}
 .issuer-detail{font-size:12px;color:#555c7a;line-height:1.9;overflow-wrap:anywhere}
 .inv-right{text-align:right}
-.inv-title{font-size:38px;font-weight:900;letter-spacing:.06em;line-height:1;margin-bottom:10px}
+.inv-title{font-size:23px;font-weight:900;letter-spacing:.04em;line-height:1.1;margin-bottom:10px}
 .inv-meta{font-size:12px;color:#555c7a;line-height:1.9}
 .inv-meta strong{color:#1a1e2e}
 .sec-label{font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#9098b0;margin-bottom:8px}
 .bill-to{margin-bottom:32px}
-.bill-name{font-size:16px;font-weight:700;margin-bottom:4px}
+.bill-name{font-size:16px;font-weight:700;margin-bottom:4px;overflow-wrap:anywhere}
 table{width:100%;border-collapse:collapse;margin-bottom:24px}
 th{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#9098b0;padding:8px 10px;text-align:left;border-bottom:2px solid #d0d4de}
 th.r,td.r{text-align:right}
 td{padding:13px 10px;font-size:13px;border-bottom:1px solid #ebedf0;vertical-align:top}
-.td-main{font-weight:600}
+.td-main{font-weight:600;white-space:pre-wrap;overflow-wrap:anywhere}
 .totals{display:flex;justify-content:flex-end;margin-bottom:28px}
 .totals-inner{width:250px}
 .tot-row{display:flex;justify-content:space-between;padding:5px 0;font-size:13px;color:#555c7a;border-bottom:1px solid #ebedf0}
 .tot-row.grand{font-size:16px;font-weight:800;color:#1a1e2e;padding-top:10px;border-top:2px solid #1a1e2e;border-bottom:none;margin-top:6px}
 .footer{border-top:1px solid #d0d4de;padding-top:14px;display:flex;justify-content:space-between;align-items:flex-end;font-size:11px;color:#9098b0;margin-top:40px}
+/* Remove the browser's print header/footer (date, document title, about:blank URL) */
+@page{margin:0}
 @media print{
   body{background:#fff}
   .topbar{display:none}
-  .page{margin:0;padding:36px;box-shadow:none;max-width:100%}
+  .page{margin:0;padding:46px 52px;box-shadow:none;max-width:100%}
 }
 </style>
 </head>
@@ -1750,7 +1752,7 @@ td{padding:13px 10px;font-size:13px;border-bottom:1px solid #ebedf0;vertical-ali
       <th class="r">${t('quote_col_total')}</th>
     </tr></thead>
     <tbody><tr>
-      <td>${description ? `<div class="td-main">${escNl(description)}</div>` : '<span>—</span>'}</td>
+      <td>${description ? `<div class="td-main">${esc(description)}</div>` : '<span>—</span>'}</td>
       <td class="r">${hours > 0 ? hours + ' h' : '—'}</td>
       ${showRate     ? `<td class="r">${fmt(totalRate)}</td>`   : ''}
       ${showTravel   ? `<td class="r">${fmt(travel)}</td>`      : ''}
@@ -2875,6 +2877,7 @@ async function renderSettings() {
       ${[
         [t('settings_total_services'), stats.totalServices],
         [t('settings_total_clients'),  stats.totalClients],
+        [t('settings_total_quotes'),   stats.totalQuotes],
         [t('settings_total_attachments'), stats.totalAttachments],
         [t('settings_db_size'),        formatBytes(stats.dbSizeBytes)],
         [t('settings_uploads_size'),   formatBytes(stats.uploadsSizeBytes)],
