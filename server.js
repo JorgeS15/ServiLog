@@ -10,6 +10,8 @@ const app = express();
 const PORT = process.env.PORT || 4000;
 const DB_PATH = process.env.DB_PATH || '/data/tracker.db';
 
+console.log(`[ServiLog] starting v${pkg.version} (node ${process.version})`);
+
 // Ensure data dir exists
 const dataDir = path.dirname(DB_PATH);
 if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
@@ -764,6 +766,7 @@ app.get('/api/summary', (req, res) => {
       ROUND(SUM(COALESCE(tip,0)),2) as total_tips,
       ROUND(SUM(COALESCE(operator_rate,0) * COALESCE(duration_hours,0)),2) as total_operator,
       ROUND(SUM(COALESCE(machine_rate,0)  * COALESCE(duration_hours,0)),2) as total_machine,
+      ROUND(SUM(COALESCE(discount,0)),2) as total_discount,
       ROUND(AVG(CASE WHEN duration_hours IS NOT NULL THEN duration_hours END),2) as avg_duration
     FROM services WHERE ${where}
   `).get(...params);
@@ -1156,4 +1159,6 @@ function scheduleNotifications() {
 
 scheduleNotifications();
 
-app.listen(PORT, () => console.log(`ServiLog running on port ${PORT}`));
+// Bind explicitly to 0.0.0.0 so the container healthcheck (127.0.0.1) can reach it
+// regardless of IPv6/dual-stack behaviour.
+app.listen(PORT, '0.0.0.0', () => console.log(`ServiLog v${pkg.version} running on port ${PORT}`));
