@@ -26,3 +26,12 @@ services:
       #- SMTP_SECURE=false
     ports:
       - "4000:4000"
+    # Explicit healthcheck (overrides whatever is baked into the image). Runs
+    # inside the container, so it targets 127.0.0.1 on the app's own port — not
+    # the host or any other container. If you change PORT above, change 4000 here too.
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:4000/api/version"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
