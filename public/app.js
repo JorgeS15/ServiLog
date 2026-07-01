@@ -150,6 +150,24 @@ const TRANSLATIONS = {
     quote_no_issuer: 'Configure os dados da fatura nas Definições antes de gerar um orçamento.',
     settings_quote: 'Dados para Orçamentos',
     settings_quote_number: 'Número do próximo orçamento',
+    nav_orcamentos: 'Orçamentos',
+    quotes_title: 'Orçamentos',
+    quote_saved: 'Orçamento guardado',
+    quote_updated: 'Orçamento atualizado',
+    quote_edit: 'Editar',
+    quote_delete: 'Eliminar',
+    confirm_remove_quote: 'Eliminar o orçamento',
+    quote_view_pdf: 'PDF',
+    quote_duplicate: 'Duplicar',
+    quote_to_service: 'Converter em serviço',
+    quote_status: 'Estado',
+    quote_status_pending: 'Pendente',
+    quote_status_accepted: 'Aceite',
+    quote_status_rejected: 'Recusado',
+    quote_empty: 'Ainda não há orçamentos. Cria um com o botão +.',
+    quote_save: '📄 Gerar e guardar',
+    toast_quote_removed: 'orçamento eliminado',
+    toast_quote_converted: 'Orçamento convertido — confirma e guarda o serviço',
   },
   en: {
     months: ['January','February','March','April','May','June','July','August','September','October','November','December'],
@@ -301,6 +319,24 @@ const TRANSLATIONS = {
     quote_no_issuer: 'Configure invoice details in Settings before generating a quote.',
     settings_quote: 'Quote Settings',
     settings_quote_number: 'Next quote number',
+    nav_orcamentos: 'Quotes',
+    quotes_title: 'Quotes',
+    quote_saved: 'Quote saved',
+    quote_updated: 'Quote updated',
+    quote_edit: 'Edit',
+    quote_delete: 'Delete',
+    confirm_remove_quote: 'Delete the quote',
+    quote_view_pdf: 'PDF',
+    quote_duplicate: 'Duplicate',
+    quote_to_service: 'Convert to service',
+    quote_status: 'Status',
+    quote_status_pending: 'Pending',
+    quote_status_accepted: 'Accepted',
+    quote_status_rejected: 'Rejected',
+    quote_empty: 'No quotes yet. Create one with the + button.',
+    quote_save: '📄 Generate & save',
+    toast_quote_removed: 'quote deleted',
+    toast_quote_converted: 'Quote converted — confirm and save the service',
   },
 };
 
@@ -333,7 +369,7 @@ const state = {
 };
 
 // ── API ───────────────────────────────────────────────────
-const OFFLINE_WRITE_PATHS = ['/api/services', '/api/clients'];
+const OFFLINE_WRITE_PATHS = ['/api/services', '/api/clients', '/api/quotes'];
 function isOfflineWritePath(path) {
   return OFFLINE_WRITE_PATHS.some(p => path === p || path.startsWith(p + '/'));
 }
@@ -453,6 +489,7 @@ async function renderView(view) {
   if (view === 'dashboard') await renderDashboard();
   else if (view === 'list') await renderList();
   else if (view === 'clients') await renderClients();
+  else if (view === 'quotes') await renderQuotes();
   else if (view === 'settings') await renderSettings();
   else if (view === 'agenda') await renderAgenda();
 }
@@ -1210,8 +1247,10 @@ body{font-family:'Helvetica Neue',Arial,sans-serif;font-size:13px;color:#1a1e2e;
 .print-btn{background:#e8a020;color:#000;border:none;border-radius:6px;font-size:13px;font-weight:700;padding:8px 20px;cursor:pointer;letter-spacing:.02em}
 .page{max-width:800px;margin:24px auto 48px;background:#fff;padding:52px;box-shadow:0 4px 24px rgba(0,0,0,.12)}
 .inv-header{display:flex;justify-content:space-between;align-items:flex-start;gap:24px;margin-bottom:40px;padding-bottom:24px;border-bottom:3px solid #1a1e2e}
-.issuer-name{font-size:19px;font-weight:800;margin-bottom:6px}
-.issuer-detail{font-size:12px;color:#555c7a;line-height:1.9}
+.inv-header>div:first-child{flex:1;min-width:0}
+.inv-header>.inv-right{flex-shrink:0}
+.issuer-name{font-size:19px;font-weight:800;margin-bottom:6px;overflow-wrap:anywhere;word-break:break-word}
+.issuer-detail{font-size:12px;color:#555c7a;line-height:1.9;overflow-wrap:anywhere}
 .inv-right{text-align:right}
 .inv-title{font-size:38px;font-weight:900;letter-spacing:.06em;line-height:1;margin-bottom:10px}
 .inv-meta{font-size:12px;color:#555c7a;line-height:1.9}
@@ -1325,36 +1364,47 @@ td{padding:13px 10px;font-size:13px;border-bottom:1px solid #ebedf0;vertical-ali
 };
 
 // ── Quote view ────────────────────────────────────────────
-function quoteFormHtml() {
-  const today = new Date().toISOString().slice(0, 10);
-  const validUntil = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+function quoteFormHtml(q = {}) {
+  const has = k => q[k] != null && q[k] !== '';
+  const today = has('date') ? q.date : new Date().toISOString().slice(0, 10);
+  const validUntil = has('valid_until') ? q.valid_until
+    : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
+  const selClientId = q.client_id != null ? String(q.client_id) : '';
+  // A custom (free-text) client is one with a name but no linked client_id.
+  const isCustomClient = !selClientId && has('client_name');
   const clientOptions = state.clients.map(c =>
-    `<option value="${c.id}">${escapeHtml(c.name)}</option>`
+    `<option value="${c.id}"${String(c.id) === selClientId ? ' selected' : ''}>${escapeHtml(c.name)}</option>`
   ).join('');
 
-  const defaultOpRate   = settings['default_operator_rate'] || '';
-  const defaultMachRate = settings['default_machine_rate']  || '';
-  const defaultTravel   = settings['default_travel_fee']    || '';
+  const val = (k, def = '') => has(k) ? escapeHtml(String(q[k])) : (def !== '' ? escapeHtml(String(def)) : '');
+  const opRate   = val('operator_rate', q.id != null || isCustomClient || has('description') ? '' : (settings['default_operator_rate'] || ''));
+  const machRate = val('machine_rate',  q.id != null || isCustomClient || has('description') ? '' : (settings['default_machine_rate']  || ''));
+  const travel   = val('travel_fee',    q.id != null || isCustomClient || has('description') ? '' : (settings['default_travel_fee']    || ''));
+  const vatSel   = has('vat_rate') ? String(parseFloat(q.vat_rate)) : '';
+  const saveLabel = q.id != null ? t('quote_generate') : t('quote_save');
+  const editId = q.id != null ? q.id : '';
+  const editRef = q.ref ? escapeHtml(q.ref) : '';
 
   return `
-    <div class="form-grid">
+    <div class="form-grid" data-quote-id="${editId}" data-quote-ref="${editRef}">
       <div class="form-group">
         <label class="form-label">${t('form_client')}</label>
         <select class="form-control" id="q-client-select" onchange="onQuoteClientChange()">
-          <option value="">${t('form_no_client')}</option>
+          <option value=""${!selClientId && !isCustomClient ? ' selected' : ''}>${t('form_no_client')}</option>
           ${clientOptions}
-          <option value="__custom__">✎ ${t('form_new_client_placeholder')}...</option>
+          <option value="__custom__"${isCustomClient ? ' selected' : ''}>✎ ${t('form_new_client_placeholder')}...</option>
         </select>
         <input type="text" class="form-control" id="q-client-custom"
                placeholder="${t('form_new_client_placeholder')}"
-               style="margin-top:6px;display:none">
+               value="${isCustomClient ? escapeHtml(q.client_name) : ''}"
+               style="margin-top:6px;display:${isCustomClient ? 'block' : 'none'}">
       </div>
 
       <div class="form-group">
         <label class="form-label">${t('quote_services')}</label>
         <textarea class="form-control" id="q-description" rows="3"
-                  placeholder="${t('form_desc_placeholder')}"></textarea>
+                  placeholder="${t('form_desc_placeholder')}">${has('description') ? escapeHtml(q.description) : ''}</textarea>
       </div>
 
       <div class="form-row">
@@ -1371,7 +1421,7 @@ function quoteFormHtml() {
       <div class="form-group">
         <label class="form-label">${t('quote_est_hours')}</label>
         <input type="number" class="form-control" id="q-hours"
-               step="0.25" min="0" placeholder="ex: 4"
+               step="0.25" min="0" placeholder="ex: 4" value="${val('hours')}"
                oninput="calcQuoteTotal()">
       </div>
 
@@ -1382,14 +1432,14 @@ function quoteFormHtml() {
           <label class="form-label">${t('form_operator_rate')}</label>
           <input type="number" class="form-control" id="q-operator-rate"
                  step="0.5" min="0" placeholder="ex: 15.00"
-                 value="${escapeHtml(defaultOpRate)}"
+                 value="${opRate}"
                  oninput="calcQuoteTotal()">
         </div>
         <div class="form-group">
           <label class="form-label">${t('form_machine_rate')}</label>
           <input type="number" class="form-control" id="q-machine-rate"
                  step="0.5" min="0" placeholder="ex: 15.00"
-                 value="${escapeHtml(defaultMachRate)}"
+                 value="${machRate}"
                  oninput="calcQuoteTotal()">
         </div>
       </div>
@@ -1400,7 +1450,7 @@ function quoteFormHtml() {
           <div style="display:flex;gap:6px">
             <input type="number" class="form-control" id="q-travel"
                    step="0.5" min="0" placeholder="ex: 10.00"
-                   value="${escapeHtml(defaultTravel)}"
+                   value="${travel}"
                    oninput="calcQuoteTotal()">
             <button type="button" class="btn btn-ghost btn-sm" id="q-btn-calc-travel"
                     onclick="calcQuoteTravelFee()" title="${t('form_calc_travel')}" style="white-space:nowrap">🚗</button>
@@ -1409,7 +1459,7 @@ function quoteFormHtml() {
         <div class="form-group">
           <label class="form-label">${t('form_discount_value')}</label>
           <input type="number" class="form-control" id="q-discount"
-                 step="0.5" min="0" placeholder="ex: 5.00"
+                 step="0.5" min="0" placeholder="ex: 5.00" value="${val('discount')}"
                  oninput="calcQuoteTotal()">
         </div>
       </div>
@@ -1418,10 +1468,10 @@ function quoteFormHtml() {
         <div class="form-group">
           <label class="form-label">${t('form_vat')}</label>
           <select class="form-control" id="q-vat" onchange="calcQuoteTotal()">
-            <option value="">${t('form_vat_none')}</option>
-            <option value="6">6%</option>
-            <option value="13">13%</option>
-            <option value="23">23%</option>
+            <option value=""${vatSel === '' ? ' selected' : ''}>${t('form_vat_none')}</option>
+            <option value="6"${vatSel === '6' ? ' selected' : ''}>6%</option>
+            <option value="13"${vatSel === '13' ? ' selected' : ''}>13%</option>
+            <option value="23"${vatSel === '23' ? ' selected' : ''}>23%</option>
           </select>
         </div>
         <div class="form-group"></div>
@@ -1430,7 +1480,7 @@ function quoteFormHtml() {
       <div class="form-group">
         <label class="form-label">${t('quote_notes')}</label>
         <textarea class="form-control" id="q-notes" rows="3"
-                  placeholder="${t('invoice_footer_note_placeholder')}"></textarea>
+                  placeholder="${t('invoice_footer_note_placeholder')}">${has('notes') ? escapeHtml(q.notes) : ''}</textarea>
       </div>
 
       <div id="quote-total-display" style="padding:12px;background:var(--bg3);border-radius:8px;margin-bottom:12px;font-size:14px;display:none">
@@ -1448,15 +1498,17 @@ function quoteFormHtml() {
         </div>
       </div>
 
-      <button class="btn btn-primary" style="width:100%;margin-top:4px" onclick="generateQuote()">
-        ${t('quote_generate')}
+      <button class="btn btn-primary" style="width:100%;margin-top:4px" onclick="saveQuote()">
+        ${saveLabel}
       </button>
     </div>
   `;
 }
 
-function openQuoteModal() {
-  openModal(t('quote_new'), quoteFormHtml());
+function openQuoteModal(q = {}) {
+  openModal(q && q.id != null ? t('quote_edit') + ' ' + (q.ref || '') : t('quote_new'), quoteFormHtml(q));
+  // Recompute the live total once the prefilled fields are in the DOM.
+  setTimeout(() => { try { calcQuoteTotal(); } catch (_) {} }, 0);
 }
 
 window.onQuoteClientChange = function() {
@@ -1523,39 +1575,74 @@ window.calcQuoteTotal = function() {
   }
 };
 
-window.generateQuote = async function() {
-  const issuerName = (settings['inv_name'] || '').trim();
-  if (!issuerName) { toast(t('quote_no_issuer'), 'error'); return; }
-
+// Read the quote form fields into a normalized object (DB field names).
+// For a linked client, snapshot the client's address/phone so the PDF and the
+// stored record stay correct even if the client is edited later.
+function readQuoteForm() {
   const clientSel    = document.getElementById('q-client-select');
   const clientCustom = document.getElementById('q-client-custom');
-  let clientName = '', clientAddress = '', clientPhone = '';
+  let client_id = null, client_name = '', client_address = '', client_phone = '';
   if (clientSel) {
     if (clientSel.value === '__custom__') {
-      clientName = (clientCustom?.value || '').trim();
+      client_name = (clientCustom?.value || '').trim();
     } else if (clientSel.value) {
+      client_id = parseInt(clientSel.value, 10);
       const found = state.clients.find(c => String(c.id) === String(clientSel.value));
-      if (found) { clientName = found.name; clientAddress = found.address || ''; clientPhone = found.phone || ''; }
+      if (found) { client_name = found.name; client_address = found.address || ''; client_phone = found.phone || ''; }
     }
   }
-  const description = document.getElementById('q-description')?.value || '';
-  const dateVal     = document.getElementById('q-date')?.value        || new Date().toISOString().slice(0,10);
-  const validUntil  = document.getElementById('q-valid-until')?.value || '';
-  const hours       = parseFloat(document.getElementById('q-hours')?.value) || 0;
-  const opRate      = parseFloat(document.getElementById('q-operator-rate')?.value) || 0;
-  const machRate    = parseFloat(document.getElementById('q-machine-rate')?.value)  || 0;
-  const travel      = parseFloat(document.getElementById('q-travel')?.value)   || 0;
-  const discount    = parseFloat(document.getElementById('q-discount')?.value)  || 0;
-  const vatRate     = parseFloat(document.getElementById('q-vat')?.value)       || 0;
-  const notes       = document.getElementById('q-notes')?.value || '';
+  return {
+    client_id,
+    client_name:    client_name || null,
+    client_address: client_address || null,
+    client_phone:   client_phone || null,
+    description:    document.getElementById('q-description')?.value || '',
+    date:           document.getElementById('q-date')?.value || new Date().toISOString().slice(0,10),
+    valid_until:    document.getElementById('q-valid-until')?.value || '',
+    hours:          parseFloat(document.getElementById('q-hours')?.value) || 0,
+    operator_rate:  parseFloat(document.getElementById('q-operator-rate')?.value) || 0,
+    machine_rate:   parseFloat(document.getElementById('q-machine-rate')?.value)  || 0,
+    travel_fee:     parseFloat(document.getElementById('q-travel')?.value)   || 0,
+    discount:       parseFloat(document.getElementById('q-discount')?.value)  || 0,
+    vat_rate:       parseFloat(document.getElementById('q-vat')?.value)       || 0,
+    notes:          document.getElementById('q-notes')?.value || '',
+  };
+}
+
+// Compute subtotal / VAT / grand total from a quote record or form object.
+function quoteTotals(q) {
+  const hours    = parseFloat(q.hours) || 0;
+  const rate     = (parseFloat(q.operator_rate) || 0) + (parseFloat(q.machine_rate) || 0);
+  const travel   = parseFloat(q.travel_fee) || 0;
+  const discount = parseFloat(q.discount) || 0;
+  const vatRate  = parseFloat(q.vat_rate) || 0;
+  const subtotal = Math.max(0, hours * rate + travel - discount);
+  const vatAmt   = subtotal * vatRate / 100;
+  return { subtotal, vatAmt, grandTotal: subtotal + vatAmt };
+}
+
+// Build the print-ready quotation HTML from a normalized quote object.
+function buildQuoteHtml(data) {
+  const issuerName    = (settings['inv_name']    || '').trim();
+  const clientName    = data.client_name || '';
+  const clientAddress = data.client_address || '';
+  const clientPhone   = data.client_phone || '';
+  const description   = data.description || '';
+  const notes         = data.notes || '';
+  const hours         = parseFloat(data.hours) || 0;
+  const opRate        = parseFloat(data.operator_rate) || 0;
+  const machRate      = parseFloat(data.machine_rate) || 0;
+  const travel        = parseFloat(data.travel_fee) || 0;
+  const discount      = parseFloat(data.discount) || 0;
+  const vatRate       = parseFloat(data.vat_rate) || 0;
+  const validUntil    = data.valid_until || '';
 
   const issuerAddress = (settings['inv_address'] || '').trim();
   const issuerNif    = (settings['inv_nif']     || '').trim();
   const issuerEmail  = (settings['inv_email']   || '').trim();
   const footerNote   = (settings['inv_note']    || '').trim();
 
-  const quoteNum = settings['next_quote_number'] || '1';
-  const ref      = `ORC ${new Date().getFullYear()}/${String(parseInt(quoteNum)).padStart(4, '0')}`;
+  const ref = data.ref || `ORC ${new Date().getFullYear()}/0000`;
 
   const esc   = str => (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   const escNl = str => esc(str).replace(/\n/g,'<br>');
@@ -1570,10 +1657,11 @@ window.generateQuote = async function() {
   const showTravel   = travel > 0;
   const showDiscount = discount > 0;
 
-  const today = new Date().toLocaleDateString(state.lang === 'pt' ? 'pt-PT' : 'en-GB');
-  const validFmt = validUntil ? new Date(validUntil).toLocaleDateString(state.lang === 'pt' ? 'pt-PT' : 'en-GB') : '';
+  const locale = state.lang === 'pt' ? 'pt-PT' : 'en-GB';
+  const today = data.date ? new Date(data.date).toLocaleDateString(locale) : new Date().toLocaleDateString(locale);
+  const validFmt = validUntil ? new Date(validUntil).toLocaleDateString(locale) : '';
 
-  const html = `<!DOCTYPE html>
+  return `<!DOCTYPE html>
 <html lang="${state.lang}">
 <head>
 <meta charset="UTF-8">
@@ -1586,8 +1674,10 @@ body{font-family:'Helvetica Neue',Arial,sans-serif;font-size:13px;color:#1a1e2e;
 .print-btn{background:#e8a020;color:#000;border:none;border-radius:6px;font-size:13px;font-weight:700;padding:8px 20px;cursor:pointer;letter-spacing:.02em}
 .page{max-width:800px;margin:24px auto 48px;background:#fff;padding:52px;box-shadow:0 4px 24px rgba(0,0,0,.12)}
 .inv-header{display:flex;justify-content:space-between;align-items:flex-start;gap:24px;margin-bottom:40px;padding-bottom:24px;border-bottom:3px solid #1a1e2e}
-.issuer-name{font-size:19px;font-weight:800;margin-bottom:6px}
-.issuer-detail{font-size:12px;color:#555c7a;line-height:1.9}
+.inv-header>div:first-child{flex:1;min-width:0}
+.inv-header>.inv-right{flex-shrink:0}
+.issuer-name{font-size:19px;font-weight:800;margin-bottom:6px;overflow-wrap:anywhere;word-break:break-word}
+.issuer-detail{font-size:12px;color:#555c7a;line-height:1.9;overflow-wrap:anywhere}
 .inv-right{text-align:right}
 .inv-title{font-size:38px;font-weight:900;letter-spacing:.06em;line-height:1;margin-bottom:10px}
 .inv-meta{font-size:12px;color:#555c7a;line-height:1.9}
@@ -1604,7 +1694,6 @@ td{padding:13px 10px;font-size:13px;border-bottom:1px solid #ebedf0;vertical-ali
 .totals-inner{width:250px}
 .tot-row{display:flex;justify-content:space-between;padding:5px 0;font-size:13px;color:#555c7a;border-bottom:1px solid #ebedf0}
 .tot-row.grand{font-size:16px;font-weight:800;color:#1a1e2e;padding-top:10px;border-top:2px solid #1a1e2e;border-bottom:none;margin-top:6px}
-.status-badge{display:inline-block;font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;padding:5px 16px;border-radius:20px;background:rgba(41,128,185,0.12);color:#1a6fa0;border:1.5px solid #1a6fa0;margin-bottom:32px}
 .footer{border-top:1px solid #d0d4de;padding-top:14px;display:flex;justify-content:space-between;align-items:flex-end;font-size:11px;color:#9098b0;margin-top:40px}
 @media print{
   body{background:#fff}
@@ -1661,7 +1750,7 @@ td{padding:13px 10px;font-size:13px;border-bottom:1px solid #ebedf0;vertical-ali
       <th class="r">${t('quote_col_total')}</th>
     </tr></thead>
     <tbody><tr>
-      <td>${description ? `<div class="td-main">${esc(description)}</div>` : '<span>—</span>'}</td>
+      <td>${description ? `<div class="td-main">${escNl(description)}</div>` : '<span>—</span>'}</td>
       <td class="r">${hours > 0 ? hours + ' h' : '—'}</td>
       ${showRate     ? `<td class="r">${fmt(totalRate)}</td>`   : ''}
       ${showTravel   ? `<td class="r">${fmt(travel)}</td>`      : ''}
@@ -1678,8 +1767,6 @@ td{padding:13px 10px;font-size:13px;border-bottom:1px solid #ebedf0;vertical-ali
     </div>
   </div>
 
-  <div class="status-badge">${t('quote_title')}</div>
-
   <div class="footer">
     <div>${notes ? escNl(notes) : (footerNote ? escNl(footerNote) : '')}</div>
     <div>${esc(issuerName)}</div>
@@ -1687,13 +1774,146 @@ td{padding:13px 10px;font-size:13px;border-bottom:1px solid #ebedf0;vertical-ali
 </div>
 </body>
 </html>`;
+}
 
+// Open the print-ready quotation in a new tab.
+function openQuotePdf(data) {
   const w = window.open('', '_blank');
-  if (!w) { toast('Popup blocked — allow popups for this site', 'error'); return; }
-  w.document.write(html);
+  if (!w) { toast('Popup blocked — allow popups for this site', 'error'); return false; }
+  w.document.write(buildQuoteHtml(data));
   w.document.close();
-  // Bump quote number
-  saveSetting('next_quote_number', String(parseInt(settings['next_quote_number'] || '1') + 1));
+  return true;
+}
+
+// Persist the quote (create or update) and open its PDF. Auto-save on generate.
+window.saveQuote = async function() {
+  const issuerName = (settings['inv_name'] || '').trim();
+  if (!issuerName) { toast(t('quote_no_issuer'), 'error'); return; }
+
+  const grid = document.querySelector('#modal-body .form-grid[data-quote-id]');
+  const editId = grid && grid.dataset.quoteId ? grid.dataset.quoteId : '';
+  const payload = readQuoteForm();
+
+  let ref;
+  try {
+    if (editId) {
+      await api.put(`/api/quotes/${editId}`, payload);
+      ref = grid.dataset.quoteRef || '';
+      toast(t('quote_updated'));
+    } else {
+      const res = await api.post('/api/quotes', payload);
+      ref = res.ref || '';
+      // Keep the local settings cache in sync with the server-side counter bump.
+      if (res.number != null) settings['next_quote_number'] = String(res.number + 1);
+      toast(t('quote_saved'));
+    }
+  } catch (e) {
+    toast(e.message || 'Error', 'error');
+    return;
+  }
+
+  openQuotePdf({ ...payload, ref });
+  closeModal();
+  if (state.view === 'quotes') renderQuotes();
+};
+
+// ── Quotes (Orçamentos) list ──────────────────────────────
+async function renderQuotes() {
+  const el = document.getElementById('view-quotes');
+  const quotes = await api.get('/api/quotes');
+  state.quotes = quotes;
+
+  const locale = state.lang === 'pt' ? 'pt-PT' : 'en-GB';
+  const fmt = n => (n != null && !isNaN(n)) ? parseFloat(n).toFixed(2) + ' ' + getCurrency() : '—';
+  const statusOpts = cur => ['pending', 'accepted', 'rejected'].map(s =>
+    `<option value="${s}"${cur === s ? ' selected' : ''}>${t('quote_status_' + s)}</option>`).join('');
+
+  el.innerHTML = `
+    <div class="section-header">
+      <span class="section-title">${t('quotes_title')}</span>
+    </div>
+
+    <div id="quotes-list">
+      ${quotes.length === 0
+        ? `<div class="empty"><div class="empty-icon">📄</div><div class="empty-title">${t('quote_empty')}</div></div>`
+        : quotes.map(q => {
+            const { grandTotal } = quoteTotals(q);
+            const dateStr = q.date ? new Date(q.date).toLocaleDateString(locale) : '';
+            return `
+            <div class="client-item" style="flex-direction:column;align-items:stretch;gap:8px">
+              <div style="display:flex;justify-content:space-between;gap:10px">
+                <div style="min-width:0">
+                  <div class="client-name">${escapeHtml(q.ref || '')}</div>
+                  <div class="client-detail">${escapeHtml(q.client_name || '—')}${dateStr ? ' · ' + dateStr : ''}</div>
+                </div>
+                <div style="font-weight:800;color:var(--accent);flex-shrink:0">${fmt(grandTotal)}</div>
+              </div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+                <select class="form-control" style="width:auto;padding:4px 8px;font-size:12px" onchange="setQuoteStatus(${q.id}, this.value)">
+                  ${statusOpts(q.status || 'pending')}
+                </select>
+                <button class="btn btn-secondary btn-sm" onclick="editQuote(${q.id})">${t('quote_edit')}</button>
+                <button class="btn btn-ghost btn-sm" onclick="viewQuotePdf(${q.id})">${t('quote_view_pdf')}</button>
+                <button class="btn btn-ghost btn-sm" onclick="duplicateQuote(${q.id})">${t('quote_duplicate')}</button>
+                <button class="btn btn-ghost btn-sm" onclick="convertQuoteToService(${q.id})">${t('quote_to_service')}</button>
+                <button class="btn btn-danger btn-sm" onclick="deleteQuote(${q.id})">${t('quote_delete')}</button>
+              </div>
+            </div>`;
+          }).join('')
+      }
+    </div>
+  `;
+}
+
+window.editQuote = async function(id) {
+  const q = await api.get(`/api/quotes/${id}`);
+  openQuoteModal(q);
+};
+
+window.duplicateQuote = async function(id) {
+  const q = await api.get(`/api/quotes/${id}`);
+  delete q.id; delete q.ref; delete q.number;
+  q.status = 'pending';
+  openQuoteModal(q);   // no id → saved as a brand-new quote
+};
+
+window.viewQuotePdf = async function(id) {
+  const q = await api.get(`/api/quotes/${id}`);
+  openQuotePdf(q);
+};
+
+window.setQuoteStatus = async function(id, status) {
+  const q = (state.quotes || []).find(x => x.id === id);
+  if (!q) return;
+  await api.put(`/api/quotes/${id}`, { ...q, status });
+  q.status = status;
+  toast(t('quote_updated'));
+};
+
+window.deleteQuote = async function(id) {
+  const q = (state.quotes || []).find(x => x.id === id);
+  const label = (q && q.ref) || id;
+  if (!confirm(`${t('confirm_remove_quote')} "${label}"?`)) return;
+  await api.del(`/api/quotes/${id}`);
+  toast(`"${label}" ${t('toast_quote_removed')}`);
+  renderQuotes();
+};
+
+// Convert an accepted quote into a service: opens the service form prefilled
+// with the overlapping fields so the user only confirms date/hours and saves.
+window.convertQuoteToService = async function(id) {
+  const q = await api.get(`/api/quotes/${id}`);
+  const prefill = {
+    client_id:     q.client_id || undefined,
+    description:   q.description || '',
+    operator_rate: q.operator_rate,
+    machine_rate:  q.machine_rate,
+    travel_fee:    q.travel_fee,
+    discount:      q.discount,
+    vat_rate:      q.vat_rate,
+  };
+  openModal(t('form_new_service'), serviceFormHtml(prefill));
+  toast(t('toast_quote_converted'));
 };
 
 function newService() {
@@ -2389,7 +2609,7 @@ async function init() {
   updateOfflineBadge();
 
   // Nav — apply translations and attach click handlers
-  const navKeyMap = { dashboard: 'nav_dashboard', list: 'nav_lista', clients: 'nav_clientes', settings: 'nav_settings', agenda: 'nav_agenda' };
+  const navKeyMap = { dashboard: 'nav_dashboard', list: 'nav_lista', clients: 'nav_clientes', quotes: 'nav_orcamentos', settings: 'nav_settings', agenda: 'nav_agenda' };
   document.querySelectorAll('.nav-btn').forEach(btn => {
     const key = navKeyMap[btn.dataset.view];
     if (key) btn.querySelector('span').textContent = t(key);
@@ -2804,7 +3024,7 @@ window.saveSetting = function(key, value) {
 window.setLang = function(lang) {
   state.lang = lang;
   saveSetting('lang', lang);
-  const navKeyMap = { dashboard: 'nav_dashboard', list: 'nav_lista', clients: 'nav_clientes', settings: 'nav_settings', agenda: 'nav_agenda' };
+  const navKeyMap = { dashboard: 'nav_dashboard', list: 'nav_lista', clients: 'nav_clientes', quotes: 'nav_orcamentos', settings: 'nav_settings', agenda: 'nav_agenda' };
   document.querySelectorAll('.nav-btn').forEach(btn => {
     const key = navKeyMap[btn.dataset.view];
     if (key) btn.querySelector('span').textContent = t(key);

@@ -71,6 +71,28 @@ db.exec(`
     key TEXT PRIMARY KEY,
     value TEXT
   );
+
+  CREATE TABLE IF NOT EXISTS quotes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    number INTEGER,
+    ref TEXT,
+    client_id INTEGER REFERENCES clients(id),
+    client_name TEXT,
+    client_address TEXT,
+    client_phone TEXT,
+    description TEXT,
+    date TEXT,
+    valid_until TEXT,
+    hours REAL,
+    operator_rate REAL,
+    machine_rate REAL,
+    travel_fee REAL,
+    discount REAL,
+    vat_rate REAL,
+    notes TEXT,
+    status TEXT DEFAULT 'pending',
+    created_at TEXT DEFAULT (datetime('now','localtime'))
+  );
 `);
 
 // Run all migrations — safe to call multiple times
@@ -138,6 +160,31 @@ function runMigrations() {
   tryAlter(`ALTER TABLE services ADD COLUMN machine_rate REAL DEFAULT 0`);
   db.prepare(`UPDATE services SET operator_rate = COALESCE(price_per_hour, 0)
     WHERE price_per_hour IS NOT NULL AND operator_rate = 0`).run();
+
+  // v1.10.0 — persisted quotes (Orçamentos tab)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS quotes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      number INTEGER,
+      ref TEXT,
+      client_id INTEGER REFERENCES clients(id),
+      client_name TEXT,
+      client_address TEXT,
+      client_phone TEXT,
+      description TEXT,
+      date TEXT,
+      valid_until TEXT,
+      hours REAL,
+      operator_rate REAL,
+      machine_rate REAL,
+      travel_fee REAL,
+      discount REAL,
+      vat_rate REAL,
+      notes TEXT,
+      status TEXT DEFAULT 'pending',
+      created_at TEXT DEFAULT (datetime('now','localtime'))
+    );
+  `);
 }
 runMigrations();
 
@@ -539,6 +586,91 @@ app.delete('/api/services/:id', (req, res) => {
   attachments.forEach(a => { try { fs.unlinkSync(path.join(UPLOADS_DIR, a.filename)); } catch (_) {} });
   db.prepare('DELETE FROM service_attachments WHERE service_id = ?').run(req.params.id);
   db.prepare('DELETE FROM services WHERE id = ?').run(req.params.id);
+  res.json({ ok: true });
+});
+
+// ── Quotes (Orçamentos) ───────────────────────────────────
+const QUOTE_STATUSES = new Set(['pending', 'accepted', 'rejected']);
+
+function quoteFieldsFromBody(body) {
+  return {
+    client_id:      body.client_id || null,
+    client_name:    body.client_name?.trim() || null,
+    client_address: body.client_address?.trim() || null,
+    client_phone:   body.client_phone?.trim() || null,
+    description:    body.description?.trim() || null,
+    date:           body.date || null,
+    valid_until:    body.valid_until || null,
+    hours:          parseNonNeg(body.hours),
+    operator_rate:  parseNonNeg(body.operator_rate) ?? 0,
+    machine_rate:   parseNonNeg(body.machine_rate)  ?? 0,
+    travel_fee:     parseNonNeg(body.travel_fee),
+    discount:       parseNonNeg(body.discount),
+    vat_rate:       body.vat_rate != null && body.vat_rate !== '' ? parseFloat(body.vat_rate) : null,
+    notes:          body.notes?.trim() || null,
+    status:         QUOTE_STATUSES.has(body.status) ? body.status : 'pending',
+  };
+}
+
+app.get('/api/quotes', (req, res) => {
+  const rows = db.prepare(`
+    SELECT q.*, COALESCE(c.name, q.client_name) AS client_name
+    FROM quotes q
+    LEFT JOIN clients c ON q.client_id = c.id
+    ORDER BY q.number DESC, q.id DESC
+  `).all();
+  res.json(rows);
+});
+
+app.get('/api/quotes/:id', (req, res) => {
+  const row = db.prepare(`
+    SELECT q.*, COALESCE(c.name, q.client_name) AS client_name,
+           c.address AS client_address_ref, c.phone AS client_phone_ref
+    FROM quotes q
+    LEFT JOIN clients c ON q.client_id = c.id
+    WHERE q.id = ?
+  `).get(req.params.id);
+  if (!row) return res.status(404).json({ error: 'Not found' });
+  res.json(row);
+});
+
+app.post('/api/quotes', (req, res) => {
+  const f = quoteFieldsFromBody(req.body);
+  const number = parseInt(db.prepare(`SELECT value FROM settings WHERE key='next_quote_number'`).get()?.value || '1', 10) || 1;
+  const ref = `ORC ${new Date().getFullYear()}/${String(number).padStart(4, '0')}`;
+
+  const result = db.prepare(`
+    INSERT INTO quotes
+      (number, ref, client_id, client_name, client_address, client_phone, description,
+       date, valid_until, hours, operator_rate, machine_rate, travel_fee, discount, vat_rate, notes, status)
+    VALUES (@number, @ref, @client_id, @client_name, @client_address, @client_phone, @description,
+       @date, @valid_until, @hours, @operator_rate, @machine_rate, @travel_fee, @discount, @vat_rate, @notes, @status)
+  `).run({ ...f, number, ref });
+
+  // Bump the shared quote counter (server-side, so re-generating an existing quote never advances it)
+  db.prepare(`INSERT INTO settings (key, value) VALUES ('next_quote_number', ?)
+              ON CONFLICT(key) DO UPDATE SET value=excluded.value`).run(String(number + 1));
+
+  res.json({ id: result.lastInsertRowid, number, ref });
+});
+
+app.put('/api/quotes/:id', (req, res) => {
+  const existing = db.prepare('SELECT id FROM quotes WHERE id = ?').get(req.params.id);
+  if (!existing) return res.status(404).json({ error: 'Not found' });
+  const f = quoteFieldsFromBody(req.body);
+  db.prepare(`
+    UPDATE quotes SET
+      client_id=@client_id, client_name=@client_name, client_address=@client_address,
+      client_phone=@client_phone, description=@description, date=@date, valid_until=@valid_until,
+      hours=@hours, operator_rate=@operator_rate, machine_rate=@machine_rate, travel_fee=@travel_fee,
+      discount=@discount, vat_rate=@vat_rate, notes=@notes, status=@status
+    WHERE id=@id
+  `).run({ ...f, id: req.params.id });
+  res.json({ ok: true });
+});
+
+app.delete('/api/quotes/:id', (req, res) => {
+  db.prepare('DELETE FROM quotes WHERE id = ?').run(req.params.id);
   res.json({ ok: true });
 });
 
