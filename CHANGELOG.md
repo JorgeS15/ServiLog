@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.10.2] - 2026-07-01
+
+### Added
+- **Phone number on quotes/invoices**: a new **Telemóvel / Phone** field under Settings → "Dados para Faturas" (`inv_phone`). When set, it appears in the issuer details (as `Tel: …`) on both the quote and the invoice.
+
+### Changed
+- **Quote formatted for A4**: the quote now fills a full A4 sheet, with the subtotal/VAT/total block and footer pushed to the bottom of the page for a cleaner, more complete look.
+- **Removed the issuer name from the quote footer** (right side); the footer now shows only the notes/terms.
+
 ## [1.10.1] - 2026-07-01
 
 ### Fixed

@@ -69,6 +69,7 @@ const TRANSLATIONS = {
     invoice_issuer_address: 'Morada', invoice_issuer_address_placeholder: 'ex: Rua Principal 10, 3000-000 Coimbra',
     invoice_issuer_nif: 'NIF', invoice_issuer_nif_placeholder: 'ex: 123456789',
     invoice_issuer_email: 'Email', invoice_issuer_email_placeholder: 'ex: joao@email.com',
+    invoice_issuer_phone: 'Telemóvel', invoice_issuer_phone_placeholder: 'ex: 912 345 678',
     invoice_footer_note: 'Nota de rodapé', invoice_footer_note_placeholder: 'ex: Pagamento a 30 dias',
     invoice_btn: '📄 Fatura',
     invoice_title: 'FATURA', invoice_ref: 'Ref.', invoice_date: 'Data',
@@ -238,6 +239,7 @@ const TRANSLATIONS = {
     invoice_issuer_address: 'Address', invoice_issuer_address_placeholder: 'e.g. 10 Main St, Springfield',
     invoice_issuer_nif: 'Tax/VAT No.', invoice_issuer_nif_placeholder: 'e.g. 123456789',
     invoice_issuer_email: 'Email', invoice_issuer_email_placeholder: 'e.g. john@email.com',
+    invoice_issuer_phone: 'Phone', invoice_issuer_phone_placeholder: 'e.g. +351 912 345 678',
     invoice_footer_note: 'Footer note', invoice_footer_note_placeholder: 'e.g. Payment due in 30 days',
     invoice_btn: '📄 Invoice',
     invoice_title: 'INVOICE', invoice_ref: 'Ref.', invoice_date: 'Date',
@@ -1198,6 +1200,7 @@ window.generateInvoice = async function(serviceId) {
   const issuerAddress = (settings['inv_address'] || '').trim();
   const issuerNif    = (settings['inv_nif']     || '').trim();
   const issuerEmail  = (settings['inv_email']   || '').trim();
+  const issuerPhone  = (settings['inv_phone']   || '').trim();
   const footerNote   = (settings['inv_note']    || '').trim();
 
   const invNum = settings['next_invoice_number'] || '1';
@@ -1290,6 +1293,7 @@ td{padding:13px 10px;font-size:13px;border-bottom:1px solid #ebedf0;vertical-ali
       <div class="issuer-detail">
         ${issuerAddress ? escNl(issuerAddress) + '<br>' : ''}
         ${issuerNif    ? 'NIF: ' + esc(issuerNif) + '<br>' : ''}
+        ${issuerPhone  ? 'Tel: ' + esc(issuerPhone) + '<br>' : ''}
         ${issuerEmail  ? esc(issuerEmail) : ''}
       </div>
     </div>
@@ -1640,6 +1644,7 @@ function buildQuoteHtml(data) {
   const issuerAddress = (settings['inv_address'] || '').trim();
   const issuerNif    = (settings['inv_nif']     || '').trim();
   const issuerEmail  = (settings['inv_email']   || '').trim();
+  const issuerPhone  = (settings['inv_phone']   || '').trim();
   const footerNote   = (settings['inv_note']    || '').trim();
 
   const ref = data.ref || `ORC ${new Date().getFullYear()}/0000`;
@@ -1696,7 +1701,10 @@ td{padding:13px 10px;font-size:13px;border-bottom:1px solid #ebedf0;vertical-ali
 .tot-row.grand{font-size:16px;font-weight:800;color:#1a1e2e;padding-top:10px;border-top:2px solid #1a1e2e;border-bottom:none;margin-top:6px}
 .footer{border-top:1px solid #d0d4de;padding-top:14px;display:flex;justify-content:space-between;align-items:flex-end;font-size:11px;color:#9098b0;margin-top:40px}
 /* Remove the browser's print header/footer (date, document title, about:blank URL) */
-@page{margin:0}
+@page{margin:0;size:A4}
+/* Fill an A4 sheet: the flexible spacer pushes the totals/footer to the bottom */
+.page{display:flex;flex-direction:column;min-height:297mm}
+.spacer{flex:1 1 auto;min-height:24px}
 @media print{
   body{background:#fff}
   .topbar{display:none}
@@ -1716,6 +1724,7 @@ td{padding:13px 10px;font-size:13px;border-bottom:1px solid #ebedf0;vertical-ali
       <div class="issuer-detail">
         ${issuerAddress ? escNl(issuerAddress) + '<br>' : ''}
         ${issuerNif    ? 'NIF: ' + esc(issuerNif) + '<br>' : ''}
+        ${issuerPhone  ? 'Tel: ' + esc(issuerPhone) + '<br>' : ''}
         ${issuerEmail  ? esc(issuerEmail) : ''}
       </div>
     </div>
@@ -1761,6 +1770,8 @@ td{padding:13px 10px;font-size:13px;border-bottom:1px solid #ebedf0;vertical-ali
     </tr></tbody>
   </table>
 
+  <div class="spacer"></div>
+
   <div class="totals">
     <div class="totals-inner">
       <div class="tot-row"><span>${t('quote_subtotal')}</span><span>${fmt(subtotal)}</span></div>
@@ -1771,7 +1782,6 @@ td{padding:13px 10px;font-size:13px;border-bottom:1px solid #ebedf0;vertical-ali
 
   <div class="footer">
     <div>${notes ? escNl(notes) : (footerNote ? escNl(footerNote) : '')}</div>
-    <div>${esc(issuerName)}</div>
   </div>
 </div>
 </body>
@@ -2579,7 +2589,7 @@ async function init() {
     const keysToSync = ['lang','theme','currency','extra_stats','default_operator_rate',
       'default_machine_rate','default_travel_fee','default_paid','base_address','base_lat',
       'base_lng','travel_price_per_km','travel_fee_step','travel_min_fee','inv_name',
-      'inv_address','inv_nif','inv_email','inv_note','next_invoice_number'];
+      'inv_address','inv_nif','inv_email','inv_phone','inv_note','next_invoice_number'];
     const toSync = {};
     for (const k of keysToSync) {
       if (serverSettings[k] == null && localStorage.getItem(k) != null) {
@@ -2595,7 +2605,7 @@ async function init() {
     const keysToLoad = ['lang','theme','currency','extra_stats','default_operator_rate',
       'default_machine_rate','default_travel_fee','default_paid','base_address','base_lat',
       'base_lng','travel_price_per_km','travel_fee_step','travel_min_fee','inv_name',
-      'inv_address','inv_nif','inv_email','inv_note','next_invoice_number'];
+      'inv_address','inv_nif','inv_email','inv_phone','inv_note','next_invoice_number'];
     for (const k of keysToLoad) {
       if (localStorage.getItem(k) != null) settings[k] = localStorage.getItem(k);
     }
@@ -2822,6 +2832,12 @@ async function renderSettings() {
                  value="${escapeHtml(settings['inv_email'] || '')}"
                  oninput="saveSetting('inv_email', this.value)">
         </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">${t('invoice_issuer_phone')}</label>
+        <input type="tel" class="form-control" placeholder="${t('invoice_issuer_phone_placeholder')}"
+               value="${escapeHtml(settings['inv_phone'] || '')}"
+               oninput="saveSetting('inv_phone', this.value)">
       </div>
       <div class="form-group">
         <label class="form-label">${t('invoice_footer_note')}</label>
