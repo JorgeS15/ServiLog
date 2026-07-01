@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.4] - 2026-07-01
+
+### Fixed
+- **Docker image build/health check failure**: `package-lock.json` was missing the `nodemailer` entry added in 1.9.3, causing `npm ci --omit=dev` to fail during the image build. The lockfile has been regenerated.
+- **Container reported "unhealthy"**: the `Dockerfile`'s `EXPOSE` and `HEALTHCHECK` still targeted port 3000 after the default port was changed to 4000 in 1.9.3. Both now correctly target port 4000.
+- **Modal closing on outside click**: clicking outside the service/quote form modal accidentally closed it, discarding unsaved input. The modal now only closes via the explicit ✕ button or after a successful save.
+
 ## [1.9.3] - 2026-06-25
 
 ### Changed
