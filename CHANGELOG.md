@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.10.6] - 2026-07-01
+
+### Fixed
+- **Explicit healthcheck in `docker-compose.yml`**: containers created from an older image kept a stale baked healthcheck (`wget http://localhost:3000/...`, from before the 3000→4000 port change) even while running current code, causing a persistent "unhealthy — Connection refused". The compose now defines the healthcheck explicitly (`wget http://127.0.0.1:4000/api/version`), which overrides whatever is baked into the image. Recreate the container (`docker compose up -d --force-recreate`) to apply it.
+
 ## [1.10.5] - 2026-07-01
 
 ### Fixed
