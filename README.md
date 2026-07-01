@@ -1,6 +1,6 @@
 # ServiLog
 
-> Self-hosted service log for machines and agricultural equipment — v1.10.6
+> Self-hosted service log for machines and agricultural equipment — v1.11.0
 
 <img width="677" height="486" alt="image" src="https://github.com/user-attachments/assets/40974a8e-a146-46a2-940a-817de2516ae3" />
 
@@ -25,6 +25,7 @@ Installable PWA with a mobile-first dark UI. Runs entirely in Docker, no cloud r
 | Clients | Name, address (with map picker), phone; edit client directly from the service form |
 | Map picker | Pick client address on an OpenStreetMap map — no API key required |
 | Summaries | Monthly and all-time, per client, net and gross; operator and machine cost breakdown |
+| LubeLogger integration | Optional: shows the machine's all-time maintenance/fuel cost on the dashboard, pulled from a self-hosted [LubeLogger](https://github.com/hargata/lubelog) instance |
 | Additional statistics | Optional toggle (Settings) to show extra stats on the Summary — currently mean time per service |
 | Invoices | Printable invoice generated from any service |
 | Quotes (Orçamentos) | Build printable quotes, saved in a dedicated tab — edit, duplicate, set status (pending/accepted/rejected), convert to a service, or re-open the PDF |
@@ -88,6 +89,20 @@ environment:
 All four of `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`, and `NOTIFY_EMAIL` must be set — notifications are silently disabled if any are missing.
 
 **Gmail tip**: enable 2FA on your Google account, then generate an [App Password](https://myaccount.google.com/apppasswords) to use as `SMTP_PASS`.
+
+---
+
+## LubeLogger Integration
+
+Track the machine's real maintenance/fuel cost alongside your service revenue. If you run a self-hosted [LubeLogger](https://github.com/hargata/lubelog) instance for the same machine, ServiLog can show its all-time total cost (service + repair + upgrade + tax + gas records) right on the dashboard.
+
+Configure it under Settings → **LubeLogger Integration**:
+
+- **Server address** — e.g. `http://192.168.1.50:5000`
+- **API key** — generate one in LubeLogger under user settings
+- **Vehicle ID** — the LubeLogger vehicle ID that corresponds to this machine
+
+The API key is only ever used server-side — ServiLog's backend proxies the request, so the key never reaches the browser. Leave any of the three fields empty to disable the integration; the dashboard card stays hidden until all three are set.
 
 ---
 
