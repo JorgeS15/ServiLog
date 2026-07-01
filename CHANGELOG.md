@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.10.5] - 2026-07-01
+
+### Fixed
+- **Container still reported "unhealthy" (`Connection refused`)**: the healthcheck fix from 1.10.4 had been reverted back to `wget http://localhost:4000` (and `EXPOSE` set to `3000`). Restored the healthcheck to `http://127.0.0.1:${PORT:-4000}/api/version` — `localhost` resolves to IPv6 `::1` in Alpine while the server listens on IPv4, causing the refusal — and set `EXPOSE` back to `4000` to match the port the app actually uses.
+
 ## [1.10.4] - 2026-07-01
 
 ### Fixed
