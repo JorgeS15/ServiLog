@@ -972,7 +972,7 @@ const SETTINGS_ALLOWLIST = new Set([
   'default_operator_rate', 'default_machine_rate', 'default_travel_fee', 'default_paid',
   'base_address', 'base_lat', 'base_lng',
   'travel_price_per_km', 'travel_fee_step', 'travel_min_fee',
-  'inv_name', 'inv_address', 'inv_nif', 'inv_email', 'inv_note',
+  'inv_name', 'inv_address', 'inv_nif', 'inv_email', 'inv_phone', 'inv_note',
   'next_invoice_number',
   'next_quote_number',
 ]);
