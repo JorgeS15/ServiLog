@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.10.3] - 2026-07-01
+
+### Changed
+- **Travel fee & discount are now line items**: on both the quote and the invoice, the travel fee (deslocação) and the discount appear as their own rows in the work table instead of as extra columns, so each charge reads as a separate line.
+- **Quote notes moved up**: the notes/conditions block now appears directly below the work description, before the totals (previously in the page footer).
+- **Quote date = creation date**: the date shown top-right on the quote is now the quote's creation date (`created_at`), independent of the editable date field.
+
 ## [1.10.2] - 2026-07-01
 
 ### Added

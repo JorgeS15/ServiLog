@@ -1236,6 +1236,9 @@ window.generateInvoice = async function(serviceId) {
   const showRate     = totalRate > 0;
   const showTravel   = travelAmt > 0;
   const showDiscount = discountAmt > 0;
+  // Labour portion, backing the travel fee and discount out of the net value so
+  // each can be shown as its own line in the table.
+  const laborAmt = valueAmt != null ? valueAmt - travelAmt + discountAmt : null;
 
   const html = `<!DOCTYPE html>
 <html lang="${state.lang}">
@@ -1324,20 +1327,31 @@ td{padding:13px 10px;font-size:13px;border-bottom:1px solid #ebedf0;vertical-ali
       <th>${t('invoice_col_date')}</th>
       <th>${t('invoice_col_desc')}</th>
       <th class="r">${t('invoice_col_hours')}</th>
-      ${showRate     ? `<th class="r">${t('invoice_col_rate')}</th>`     : ''}
-      ${showTravel   ? `<th class="r">${t('invoice_col_travel')}</th>`   : ''}
-      ${showDiscount ? `<th class="r">${t('invoice_col_discount')}</th>` : ''}
+      ${showRate ? `<th class="r">${t('invoice_col_rate')}</th>` : ''}
       <th class="r">${t('invoice_col_total')}</th>
     </tr></thead>
     <tbody><tr>
       <td style="white-space:nowrap">${formatDate(s.date)}</td>
       <td>${descCell}</td>
       <td class="r">${s.duration_hours != null ? s.duration_hours + '\u00a0h' : '—'}</td>
-      ${showRate     ? `<td class="r">${fmt(totalRate)}</td>` : ''}
-      ${showTravel   ? `<td class="r">${fmt(travelAmt)}</td>`        : ''}
-      ${showDiscount ? `<td class="r">-${fmt(discountAmt)}</td>`     : ''}
-      <td class="r"><strong>${fmt(valueAmt)}</strong></td>
-    </tr></tbody>
+      ${showRate ? `<td class="r">${fmt(totalRate)}</td>` : ''}
+      <td class="r"><strong>${fmt(laborAmt)}</strong></td>
+    </tr>
+      ${showTravel ? `<tr>
+        <td></td>
+        <td><div class="td-main">${t('invoice_col_travel')}</div></td>
+        <td class="r">—</td>
+        ${showRate ? '<td class="r">—</td>' : ''}
+        <td class="r"><strong>${fmt(travelAmt)}</strong></td>
+      </tr>` : ''}
+      ${showDiscount ? `<tr>
+        <td></td>
+        <td><div class="td-main">${t('invoice_col_discount')}</div></td>
+        <td class="r">—</td>
+        ${showRate ? '<td class="r">—</td>' : ''}
+        <td class="r"><strong>-${fmt(discountAmt)}</strong></td>
+      </tr>` : ''}
+    </tbody>
   </table>
 
   <div class="totals">
@@ -1389,9 +1403,10 @@ function quoteFormHtml(q = {}) {
   const saveLabel = q.id != null ? t('quote_generate') : t('quote_save');
   const editId = q.id != null ? q.id : '';
   const editRef = q.ref ? escapeHtml(q.ref) : '';
+  const editCreated = q.created_at ? escapeHtml(q.created_at) : '';
 
   return `
-    <div class="form-grid" data-quote-id="${editId}" data-quote-ref="${editRef}">
+    <div class="form-grid" data-quote-id="${editId}" data-quote-ref="${editRef}" data-quote-created="${editCreated}">
       <div class="form-group">
         <label class="form-label">${t('form_client')}</label>
         <select class="form-control" id="q-client-select" onchange="onQuoteClientChange()">
@@ -1654,6 +1669,7 @@ function buildQuoteHtml(data) {
   const fmt   = n   => (n != null && !isNaN(n)) ? parseFloat(n).toFixed(2) + ' ' + getCurrency() : '—';
 
   const totalRate   = opRate + machRate;
+  const workAmt     = hours * totalRate;
   const subtotal    = Math.max(0, hours * totalRate + travel - discount);
   const vatAmt      = subtotal * vatRate / 100;
   const grandTotal  = subtotal + vatAmt;
@@ -1663,7 +1679,9 @@ function buildQuoteHtml(data) {
   const showDiscount = discount > 0;
 
   const locale = state.lang === 'pt' ? 'pt-PT' : 'en-GB';
-  const today = data.date ? new Date(data.date).toLocaleDateString(locale) : new Date().toLocaleDateString(locale);
+  // Top-right date = when the quote was created (created_at), falling back to today for a brand-new quote.
+  const created = data.created_at || data.date;
+  const today = created ? new Date(String(created).replace(' ', 'T')).toLocaleDateString(locale) : new Date().toLocaleDateString(locale);
   const validFmt = validUntil ? new Date(validUntil).toLocaleDateString(locale) : '';
 
   return `<!DOCTYPE html>
@@ -1702,9 +1720,11 @@ td{padding:13px 10px;font-size:13px;border-bottom:1px solid #ebedf0;vertical-ali
 .footer{border-top:1px solid #d0d4de;padding-top:14px;display:flex;justify-content:space-between;align-items:flex-end;font-size:11px;color:#9098b0;margin-top:40px}
 /* Remove the browser's print header/footer (date, document title, about:blank URL) */
 @page{margin:0;size:A4}
-/* Fill an A4 sheet: the flexible spacer pushes the totals/footer to the bottom */
+/* Fill an A4 sheet: the flexible spacer pushes the totals to the bottom */
 .page{display:flex;flex-direction:column;min-height:297mm}
 .spacer{flex:1 1 auto;min-height:24px}
+.notes-block{margin-bottom:8px}
+.notes-body{font-size:12px;color:#555c7a;line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere}
 @media print{
   body{background:#fff}
   .topbar{display:none}
@@ -1755,20 +1775,34 @@ td{padding:13px 10px;font-size:13px;border-bottom:1px solid #ebedf0;vertical-ali
     <thead><tr>
       <th>${t('quote_col_desc')}</th>
       <th class="r">${t('quote_col_hours')}</th>
-      ${showRate     ? `<th class="r">${t('quote_col_rate')}</th>`     : ''}
-      ${showTravel   ? `<th class="r">${t('quote_col_travel')}</th>`   : ''}
-      ${showDiscount ? `<th class="r">${t('quote_col_discount')}</th>` : ''}
+      ${showRate ? `<th class="r">${t('quote_col_rate')}</th>` : ''}
       <th class="r">${t('quote_col_total')}</th>
     </tr></thead>
     <tbody><tr>
       <td>${description ? `<div class="td-main">${esc(description)}</div>` : '<span>—</span>'}</td>
       <td class="r">${hours > 0 ? hours + ' h' : '—'}</td>
-      ${showRate     ? `<td class="r">${fmt(totalRate)}</td>`   : ''}
-      ${showTravel   ? `<td class="r">${fmt(travel)}</td>`      : ''}
-      ${showDiscount ? `<td class="r">-${fmt(discount)}</td>`   : ''}
-      <td class="r"><strong>${fmt(subtotal)}</strong></td>
-    </tr></tbody>
+      ${showRate ? `<td class="r">${fmt(totalRate)}</td>` : ''}
+      <td class="r"><strong>${fmt(workAmt)}</strong></td>
+    </tr>
+      ${showTravel ? `<tr>
+        <td><div class="td-main">${t('quote_col_travel')}</div></td>
+        <td class="r">—</td>
+        ${showRate ? '<td class="r">—</td>' : ''}
+        <td class="r"><strong>${fmt(travel)}</strong></td>
+      </tr>` : ''}
+      ${showDiscount ? `<tr>
+        <td><div class="td-main">${t('quote_col_discount')}</div></td>
+        <td class="r">—</td>
+        ${showRate ? '<td class="r">—</td>' : ''}
+        <td class="r"><strong>-${fmt(discount)}</strong></td>
+      </tr>` : ''}
+    </tbody>
   </table>
+
+  ${(notes || footerNote) ? `<div class="notes-block">
+    <div class="sec-label" style="margin-bottom:6px">${t('quote_notes')}</div>
+    <div class="notes-body">${escNl(notes || footerNote)}</div>
+  </div>` : ''}
 
   <div class="spacer"></div>
 
@@ -1780,9 +1814,6 @@ td{padding:13px 10px;font-size:13px;border-bottom:1px solid #ebedf0;vertical-ali
     </div>
   </div>
 
-  <div class="footer">
-    <div>${notes ? escNl(notes) : (footerNote ? escNl(footerNote) : '')}</div>
-  </div>
 </div>
 </body>
 </html>`;
@@ -1807,10 +1838,14 @@ window.saveQuote = async function() {
   const payload = readQuoteForm();
 
   let ref;
+  // Top-right date on the PDF = when the quote was created. On edit keep the
+  // original created_at; on a new quote it is being created right now.
+  let created = new Date().toISOString().slice(0, 10);
   try {
     if (editId) {
       await api.put(`/api/quotes/${editId}`, payload);
       ref = grid.dataset.quoteRef || '';
+      created = grid.dataset.quoteCreated || created;
       toast(t('quote_updated'));
     } else {
       const res = await api.post('/api/quotes', payload);
@@ -1824,7 +1859,7 @@ window.saveQuote = async function() {
     return;
   }
 
-  openQuotePdf({ ...payload, ref });
+  openQuotePdf({ ...payload, ref, created_at: created });
   closeModal();
   if (state.view === 'quotes') renderQuotes();
 };
@@ -1884,7 +1919,7 @@ window.editQuote = async function(id) {
 
 window.duplicateQuote = async function(id) {
   const q = await api.get(`/api/quotes/${id}`);
-  delete q.id; delete q.ref; delete q.number;
+  delete q.id; delete q.ref; delete q.number; delete q.created_at;
   q.status = 'pending';
   openQuoteModal(q);   // no id → saved as a brand-new quote
 };
