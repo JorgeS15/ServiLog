@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.10.0] - 2026-07-01
+
+### Added
+- **Saved quotes ("Orçamentos" tab)**: generated quotes are now persisted in a new `quotes` table and listed under a dedicated **Orçamentos** tab in the top nav. Each quote shows its reference, client, date and total. From the list you can **edit** a quote (re-opens the form pre-filled and re-generates the PDF), re-open its **PDF**, **duplicate** it as the basis for a new quote, set its **status** (Pending / Accepted / Rejected), **convert it to a service** (opens the service form pre-filled with the shared fields), or **delete** it. New REST endpoints: `GET/POST/PUT/DELETE /api/quotes`. The `next_quote_number` counter is now advanced server-side on creation, so re-generating an existing quote no longer skips numbers.
+
+### Changed
+- **Quote generation auto-saves**: clicking "Gerar Orçamento" now saves the quote to the Orçamentos tab and opens the print-ready PDF in one step.
+
+### Fixed
+- **Quote work description now keeps line breaks**: the job description in the generated PDF preserves the line breaks entered in the editor (previously collapsed onto a single line).
+- **Long issuer names no longer overflow**: the issuer name/details in generated quotes and invoices now wrap correctly instead of running off the header.
+- **Removed the redundant blue "ORÇAMENTO" badge** from the generated quote PDF.
+
 ## [1.9.4] - 2026-07-01
 
 ### Fixed

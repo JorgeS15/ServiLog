@@ -27,6 +27,7 @@ Installable PWA with a mobile-first dark UI. Runs entirely in Docker, no cloud r
 | Summaries | Monthly and all-time, per client, net and gross; operator and machine cost breakdown |
 | Additional statistics | Optional toggle (Settings) to show extra stats on the Summary — currently mean time per service |
 | Invoices | Printable invoice generated from any service |
+| Quotes (Orçamentos) | Build printable quotes, saved in a dedicated tab — edit, duplicate, set status (pending/accepted/rejected), convert to a service, or re-open the PDF |
 | Export | CSV download |
 | Settings | Full backup/restore (DB + files), language, theme, invoice details, storage stats |
 | PWA | Installable on Android & iOS, works offline |
