@@ -151,6 +151,15 @@ const TRANSLATIONS = {
     quote_no_issuer: 'Configure os dados da fatura nas Definições antes de gerar um orçamento.',
     settings_quote: 'Dados para Orçamentos',
     settings_quote_number: 'Número do próximo orçamento',
+    settings_lubelogger: 'Integração LubeLogger',
+    settings_lubelogger_sub: 'Ligar à sua instância LubeLogger para mostrar o custo total de manutenção da máquina.',
+    settings_lubelogger_url: 'Endereço do servidor',
+    settings_lubelogger_url_placeholder: 'http://192.168.1.50:5000',
+    settings_lubelogger_key: 'Chave da API',
+    settings_lubelogger_vehicle_id: 'ID do veículo',
+    dashboard_lubelogger: 'Custo Total da Máquina (LubeLogger)',
+    dashboard_lubelogger_sub: 'Total acumulado, não filtrado por mês',
+    dashboard_lubelogger_error: 'Não foi possível contactar o servidor LubeLogger',
     nav_orcamentos: 'Orçamentos',
     quotes_title: 'Orçamentos',
     quote_saved: 'Orçamento guardado',
@@ -321,6 +330,15 @@ const TRANSLATIONS = {
     quote_no_issuer: 'Configure invoice details in Settings before generating a quote.',
     settings_quote: 'Quote Settings',
     settings_quote_number: 'Next quote number',
+    settings_lubelogger: 'LubeLogger Integration',
+    settings_lubelogger_sub: 'Connect to your self-hosted LubeLogger instance to show the lifetime maintenance cost of your machine.',
+    settings_lubelogger_url: 'Server address',
+    settings_lubelogger_url_placeholder: 'http://192.168.1.50:5000',
+    settings_lubelogger_key: 'API key',
+    settings_lubelogger_vehicle_id: 'Vehicle ID',
+    dashboard_lubelogger: 'Machine Total Cost (LubeLogger)',
+    dashboard_lubelogger_sub: 'All-time total, not filtered by month',
+    dashboard_lubelogger_error: 'Could not reach LubeLogger server',
     nav_orcamentos: 'Quotes',
     quotes_title: 'Quotes',
     quote_saved: 'Quote saved',
@@ -352,6 +370,29 @@ function getCurrency() {
 
 // ── Settings (synced to DB) ───────────────────────────────
 const settings = {};
+
+// ── LubeLogger cost (cached; all-time, not month-filtered) ─
+const lubeloggerState = { data: null, fetchedAt: 0, inFlight: null };
+async function loadLubeloggerCost(force = false) {
+  const FIVE_MIN = 5 * 60 * 1000;
+  if (!force && lubeloggerState.data && Date.now() - lubeloggerState.fetchedAt < FIVE_MIN) {
+    return lubeloggerState.data;
+  }
+  if (lubeloggerState.inFlight) return lubeloggerState.inFlight;
+  lubeloggerState.inFlight = api.get('/api/lubelogger/cost')
+    .then(data => {
+      lubeloggerState.data = data;
+      lubeloggerState.fetchedAt = Date.now();
+      return data;
+    })
+    .catch(() => {
+      lubeloggerState.data = { configured: true, error: true };
+      lubeloggerState.fetchedAt = Date.now();
+      return lubeloggerState.data;
+    })
+    .finally(() => { lubeloggerState.inFlight = null; });
+  return lubeloggerState.inFlight;
+}
 
 // ── Offline write queue ───────────────────────────────────
 const offlineQueue = [];
@@ -502,6 +543,7 @@ async function renderDashboard() {
   const url = state.globalView ? '/api/summary' : `/api/summary?month=${state.month}&year=${state.year}`;
   const data = await api.get(url);
   const { stats, byClient } = data;
+  const lube = await loadLubeloggerCost();
 
   const s = stats || {};
   const cur = getCurrency();
@@ -591,6 +633,22 @@ async function renderDashboard() {
         <div class="stat-label">${t('stat_machine')}</div>
         <div class="stat-value">${s.total_machine ? s.total_machine.toFixed(2) + ' ' + cur : '—'}</div>
       </div>
+    </div>` : ''}
+
+    ${lube && lube.configured !== false ? `
+    <div class="card" style="margin-bottom:12px">
+      <div class="section-title" style="margin-bottom:6px">${t('dashboard_lubelogger')}</div>
+      <div style="font-size:11px;color:var(--text3);margin-bottom:8px">${t('dashboard_lubelogger_sub')}</div>
+      ${lube.error ? `
+        <div style="font-size:12px;color:var(--text3)">${t('dashboard_lubelogger_error')}</div>
+      ` : `
+        <div class="stat-value accent" style="font-size:20px">${lube.total.toFixed(2)} ${cur}</div>
+        ${lube.vehicle ? `
+          <div style="font-size:11px;color:var(--text3);margin-top:4px">
+            ${[lube.vehicle.year, lube.vehicle.make, lube.vehicle.model].filter(Boolean).join(' ')}
+            ${lube.vehicle.licensePlate ? ' · ' + escapeHtml(lube.vehicle.licensePlate) : ''}
+          </div>` : ''}
+      `}
     </div>` : ''}
 
     ${byClient.length ? `
@@ -2627,7 +2685,8 @@ async function init() {
     const keysToSync = ['lang','theme','currency','extra_stats','default_operator_rate',
       'default_machine_rate','default_travel_fee','default_paid','base_address','base_lat',
       'base_lng','travel_price_per_km','travel_fee_step','travel_min_fee','inv_name',
-      'inv_address','inv_nif','inv_email','inv_phone','inv_note','next_invoice_number'];
+      'inv_address','inv_nif','inv_email','inv_phone','inv_note','next_invoice_number',
+      'lubelogger_url','lubelogger_api_key','lubelogger_vehicle_id'];
     const toSync = {};
     for (const k of keysToSync) {
       if (serverSettings[k] == null && localStorage.getItem(k) != null) {
@@ -2643,7 +2702,8 @@ async function init() {
     const keysToLoad = ['lang','theme','currency','extra_stats','default_operator_rate',
       'default_machine_rate','default_travel_fee','default_paid','base_address','base_lat',
       'base_lng','travel_price_per_km','travel_fee_step','travel_min_fee','inv_name',
-      'inv_address','inv_nif','inv_email','inv_phone','inv_note','next_invoice_number'];
+      'inv_address','inv_nif','inv_email','inv_phone','inv_note','next_invoice_number',
+      'lubelogger_url','lubelogger_api_key','lubelogger_vehicle_id'];
     for (const k of keysToLoad) {
       if (localStorage.getItem(k) != null) settings[k] = localStorage.getItem(k);
     }
@@ -2900,6 +2960,30 @@ async function renderSettings() {
       </div>
     </div>
 
+    <!-- LubeLogger Integration -->
+    <div class="card" style="margin-bottom:12px">
+      <div class="section-title" style="margin-bottom:12px">${t('settings_lubelogger')}</div>
+      <div style="font-size:12px;color:var(--text3);margin-bottom:10px">${t('settings_lubelogger_sub')}</div>
+      <div class="form-group">
+        <label class="form-label">${t('settings_lubelogger_url')}</label>
+        <input type="text" class="form-control" placeholder="${t('settings_lubelogger_url_placeholder')}"
+               value="${escapeHtml(settings['lubelogger_url'] || '')}"
+               oninput="saveSetting('lubelogger_url', this.value)">
+      </div>
+      <div class="form-group">
+        <label class="form-label">${t('settings_lubelogger_key')}</label>
+        <input type="password" class="form-control" autocomplete="off"
+               value="${escapeHtml(settings['lubelogger_api_key'] || '')}"
+               oninput="saveSetting('lubelogger_api_key', this.value)">
+      </div>
+      <div class="form-group">
+        <label class="form-label">${t('settings_lubelogger_vehicle_id')}</label>
+        <input type="number" class="form-control" min="1" step="1"
+               value="${escapeHtml(settings['lubelogger_vehicle_id'] || '')}"
+               oninput="saveSetting('lubelogger_vehicle_id', this.value)">
+      </div>
+    </div>
+
     <!-- Appearance / Theme -->
     <div class="card" style="margin-bottom:12px">
       <div class="section-title" style="margin-bottom:12px">${t('settings_theme')}</div>
@@ -3076,6 +3160,10 @@ window.saveSetting = function(key, value) {
   settings[key] = value;
   localStorage.setItem(key, value);
   api.patch('/api/settings', { [key]: value }).catch(() => {});
+  if (key === 'lubelogger_url' || key === 'lubelogger_api_key' || key === 'lubelogger_vehicle_id') {
+    lubeloggerState.data = null;
+    lubeloggerState.fetchedAt = 0;
+  }
 };
 
 window.setLang = function(lang) {

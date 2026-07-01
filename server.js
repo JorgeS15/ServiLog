@@ -368,6 +368,76 @@ app.get('/api/tiles/:z/:x/:y', async (req, res) => {
   }
 });
 
+// ── LubeLogger Proxy ──────────────────────────────────────
+// Reads the machine's maintenance/fuel cost total from a self-hosted
+// LubeLogger instance. Proxied server-side so the API key never reaches
+// the browser. LubeLogger's own vehicleId filter can't be trusted to
+// always narrow the response to one vehicle, so we fetch the array and
+// find the matching entry ourselves.
+app.get('/api/lubelogger/cost', async (req, res) => {
+  const row = (key) => db.prepare('SELECT value FROM settings WHERE key = ?').get(key)?.value;
+  const rawUrl = row('lubelogger_url');
+  const apiKey = row('lubelogger_api_key');
+  const vehicleId = row('lubelogger_vehicle_id');
+
+  if (!rawUrl || !apiKey || !vehicleId) {
+    return res.json({ configured: false });
+  }
+
+  const base = rawUrl.replace(/\/+$/, '');
+  const url = `${base}/api/vehicle/info?vehicleId=${encodeURIComponent(vehicleId)}`;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+  let list;
+  try {
+    const r = await fetch(url, {
+      headers: { 'x-api-key': apiKey },
+      signal: controller.signal,
+    });
+    if (!r.ok) {
+      console.warn(`[lubelogger] upstream ${r.status} for ${url}`);
+      return res.status(502).json({ configured: true, error: 'upstream_error', status: r.status });
+    }
+    list = await r.json();
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      return res.status(504).json({ configured: true, error: 'timeout' });
+    }
+    console.error('[lubelogger] proxy error', err.message);
+    return res.status(502).json({ configured: true, error: 'network_error' });
+  } finally {
+    clearTimeout(timeout);
+  }
+
+  if (!Array.isArray(list)) {
+    return res.status(502).json({ configured: true, error: 'invalid_response' });
+  }
+  const targetId = String(vehicleId);
+  const match = list.find(v => String(v?.vehicleData?.id) === targetId);
+  if (!match) {
+    return res.status(404).json({ configured: true, error: 'vehicle_not_found' });
+  }
+
+  const breakdown = {
+    service: match.serviceRecordCost || 0,
+    repair: match.repairRecordCost || 0,
+    upgrade: match.upgradeRecordCost || 0,
+    tax: match.taxRecordCost || 0,
+    gas: match.gasRecordCost || 0,
+  };
+  const total = Object.values(breakdown).reduce((a, b) => a + b, 0);
+  const vd = match.vehicleData || {};
+
+  res.json({
+    configured: true,
+    total,
+    breakdown,
+    vehicle: { year: vd.year, make: vd.make, model: vd.model, licensePlate: vd.licensePlate },
+    lastReportedOdometer: match.lastReportedOdometer ?? null,
+  });
+});
+
 // ── Version ───────────────────────────────────────────────
 app.get('/api/version', (req, res) => res.json({ version: pkg.version }));
 
@@ -978,6 +1048,7 @@ const SETTINGS_ALLOWLIST = new Set([
   'inv_name', 'inv_address', 'inv_nif', 'inv_email', 'inv_phone', 'inv_note',
   'next_invoice_number',
   'next_quote_number',
+  'lubelogger_url', 'lubelogger_api_key', 'lubelogger_vehicle_id',
 ]);
 
 app.get('/api/settings', (req, res) => {
