@@ -397,10 +397,16 @@ app.get('/api/tiles/:z/:x/:y', async (req, res) => {
 // always narrow the response to one vehicle, so we fetch the array and
 // find the matching entry ourselves.
 app.get('/api/lubelogger/cost', async (req, res) => {
-  const row = key => db.prepare('SELECT value FROM settings WHERE key = ?').get(key)?.value;
-  const rawUrl = row('lubelogger_url');
-  const apiKey = row('lubelogger_api_key');
-  const vehicleId = row('lubelogger_vehicle_id');
+  const cfgRows = db
+    .prepare(
+      `SELECT key, value FROM settings WHERE key IN ('lubelogger_url', 'lubelogger_api_key', 'lubelogger_vehicle_id')`
+    )
+    .all();
+  const cfg = {};
+  for (const r of cfgRows) cfg[r.key] = r.value;
+  const rawUrl = (cfg.lubelogger_url || '').trim();
+  const apiKey = (cfg.lubelogger_api_key || '').trim();
+  const vehicleId = (cfg.lubelogger_vehicle_id || '').trim();
 
   if (!rawUrl || !apiKey || !vehicleId) {
     return res.json({ configured: false });
@@ -441,12 +447,13 @@ app.get('/api/lubelogger/cost', async (req, res) => {
     return res.status(404).json({ configured: true, error: 'vehicle_not_found' });
   }
 
+  const num = v => (Number.isFinite(v) ? v : Number(v) || 0);
   const breakdown = {
-    service: match.serviceRecordCost || 0,
-    repair: match.repairRecordCost || 0,
-    upgrade: match.upgradeRecordCost || 0,
-    tax: match.taxRecordCost || 0,
-    gas: match.gasRecordCost || 0,
+    service: num(match.serviceRecordCost),
+    repair: num(match.repairRecordCost),
+    upgrade: num(match.upgradeRecordCost),
+    tax: num(match.taxRecordCost),
+    gas: num(match.gasRecordCost),
   };
   const total = Object.values(breakdown).reduce((a, b) => a + b, 0);
   const vd = match.vehicleData || {};
@@ -1240,10 +1247,17 @@ const SETTINGS_ALLOWLIST = new Set([
   'lubelogger_vehicle_id',
 ]);
 
+// Secrets are never sent back to the browser in plaintext — the settings
+// form only needs to know a value is set, not what it is.
+const MASKED_SETTINGS = new Set(['lubelogger_api_key']);
+const SETTINGS_MASK = '••••••••';
+
 app.get('/api/settings', (req, res) => {
   const rows = db.prepare('SELECT key, value FROM settings').all();
   const result = {};
-  for (const row of rows) result[row.key] = row.value;
+  for (const row of rows) {
+    result[row.key] = MASKED_SETTINGS.has(row.key) && row.value ? SETTINGS_MASK : row.value;
+  }
   res.json(result);
 });
 

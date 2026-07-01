@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.11.0] - 2026-07-01
+
+### Added
+- **LubeLogger integration**: connect ServiLog to a self-hosted [LubeLogger](https://github.com/hargata/lubelog) instance under Settings → "LubeLogger Integration" (server address, API key, vehicle ID). The dashboard now shows an all-time **Machine Total Cost** card pulled live from LubeLogger's vehicle records (service + repair + upgrade + tax + gas costs), with graceful handling when it's not configured or the server is unreachable. The API key is only ever used server-side, via a new proxy endpoint (`GET /api/lubelogger/cost`) — it never reaches the browser as an outbound request.
+- **Prettier + `.editorconfig`**: added Prettier (matched to the codebase's existing conventions) and an `.editorconfig`, plus `npm run format` / `npm run format:check` scripts, to keep formatting consistent going forward.
+
+### Fixed
+- **XSS in the LubeLogger dashboard card**: vehicle year/make/model returned by the configured LubeLogger server were rendered without escaping (unlike the license plate right next to them). All fields are now consistently escaped.
+- **LubeLogger API key no longer exposed to the browser**: `GET /api/settings` previously returned the raw key; it now returns a masked placeholder once a key is set, closing a path where the key was readable from the page's DOM/JS state.
+- **Undefined CSS variable**: `.fab-menu-item` referenced a nonexistent `--text1` custom property (typo for `--text`), leaving its label with no explicit color.
+- Hardened the LubeLogger proxy: settings values are trimmed before use, upstream cost fields are coerced to numbers defensively (in case of a malformed response), and the 3 settings reads were consolidated into a single query.
+- **Bumped `express` to 4.22.2**, resolving a moderate DoS advisory in its `qs` dependency. `nodemailer` also has a known high-severity advisory range (fixed in 9.x); left unbumped for now since it's a breaking major-version change — tracked as a follow-up.
+
 ## [1.10.6] - 2026-07-01
 
 ### Fixed
