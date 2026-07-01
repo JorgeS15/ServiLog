@@ -2427,11 +2427,8 @@ async function init() {
     }
   });
 
-  // Modal close
+  // Modal close (only via the explicit close button, not by clicking the backdrop)
   document.getElementById('modal-close').addEventListener('click', closeModal);
-  document.getElementById('modal-overlay').addEventListener('click', e => {
-    if (e.target === document.getElementById('modal-overlay')) closeModal();
-  });
 
   // Register SW
   if ('serviceWorker' in navigator) {
