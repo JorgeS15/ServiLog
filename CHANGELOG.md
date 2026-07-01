@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.10.1] - 2026-07-01
+
+### Fixed
+- **Quote PDF is now client-ready**: removed the browser's print header/footer (the date + document title line and the `about:blank` URL) via `@page { margin: 0 }`, so the printed/saved quote contains only the document itself.
+- **Work description keeps its line breaks**: the job description now renders with the exact line breaks entered in the editor (`white-space: pre-wrap`), instead of collapsing onto one line.
+- **Long issuer names fit**: reduced the "ORÇAMENTO" title size and constrained the header layout so long issuer names wrap cleanly instead of overflowing.
+
+### Changed
+- Settings → Statistics now shows a **Total de orçamentos / Total quotes** count. Quotes are stored in the main SQLite database and are therefore already included in the `.slb` full backup (and restored with it).
+
+### Docs
+- Corrected the version number in the README header (was left at 1.9.4).
+
 ## [1.10.0] - 2026-07-01
 
 ### Added
