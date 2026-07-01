@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.10.4] - 2026-07-01
+
+### Fixed
+- **Container reported "unhealthy" (`wget: can't connect to remote host: Connection refused`)**: the Docker healthcheck now targets `127.0.0.1` instead of `localhost` (which can resolve to IPv6 `::1` while the server listens on IPv4) and honours the runtime `PORT` env, and the server now binds explicitly to `0.0.0.0`.
+
+### Added
+- **Running version in the logs**: startup now logs `[ServiLog] starting vX.Y.Z (node …)` and the listen line includes the version.
+- **Total discounts stat**: the Summary's additional statistics now include **Descontos Totais / Total Discounts**.
+
 ## [1.10.3] - 2026-07-01
 
 ### Changed
