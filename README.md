@@ -2,7 +2,7 @@
 
 > Self-hosted service log for machines and agricultural equipment — v1.11.0
 
-<img width="677" height="486" alt="image" src="https://github.com/user-attachments/assets/40974a8e-a146-46a2-940a-817de2516ae3" />
+<img width="692" height="685" alt="image" src="https://github.com/user-attachments/assets/d133ef71-538b-41e7-8b5c-efefdd013235" />
 
 Installable PWA with a mobile-first dark UI. Runs entirely in Docker, no cloud required.
 
