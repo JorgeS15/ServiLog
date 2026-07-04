@@ -172,8 +172,6 @@ const TRANSLATIONS = {
     invoice_subtotal: 'Subtotal',
     invoice_total: 'Total',
     invoice_tip: 'Valor adicional',
-    invoice_status_paid: 'PAGO',
-    invoice_status_pending: 'PENDENTE',
     invoice_print: 'Imprimir / Guardar PDF',
     invoice_no_issuer: 'Configure os dados da fatura nas Definições antes de gerar uma fatura.',
     form_vat: 'IVA',
@@ -458,8 +456,6 @@ const TRANSLATIONS = {
     invoice_subtotal: 'Subtotal',
     invoice_total: 'Total',
     invoice_tip: 'Additional',
-    invoice_status_paid: 'PAID',
-    invoice_status_pending: 'PENDING',
     invoice_print: 'Print / Save as PDF',
     invoice_no_issuer: 'Please configure your invoice details in Settings before generating an invoice.',
     form_vat: 'VAT',
@@ -1642,11 +1638,6 @@ window.generateInvoice = async function (serviceId) {
   const vatRate = s.vat_rate != null ? parseFloat(s.vat_rate) : null;
   const vatAmt = vatRate != null && valueAmt != null ? (valueAmt * vatRate) / 100 : 0;
   const grandTotal = valueAmt != null ? valueAmt + vatAmt + tipAmt : null;
-  const isPaid = !!s.paid;
-
-  const statusLabel = isPaid ? t('invoice_status_paid') : t('invoice_status_pending');
-  const statusBg = isPaid ? 'rgba(46,204,113,0.12)' : 'rgba(231,76,60,0.10)';
-  const statusColor = isPaid ? '#1a8a4a' : '#c0392b';
 
   const descMain = s.description ? `<div class="td-main">${esc(s.description)}</div>` : '';
   const descSub = s.start_time
@@ -1676,35 +1667,40 @@ body{font-family:'Helvetica Neue',Arial,sans-serif;font-size:13px;color:#1a1e2e;
 .topbar-ref{font-size:12px;opacity:.6}
 .print-btn{background:#e8a020;color:#000;border:none;border-radius:6px;font-size:13px;font-weight:700;padding:8px 20px;cursor:pointer;letter-spacing:.02em}
 .page{max-width:800px;margin:24px auto 48px;background:#fff;padding:52px;box-shadow:0 4px 24px rgba(0,0,0,.12)}
-.inv-header{display:flex;justify-content:space-between;align-items:flex-start;gap:24px;margin-bottom:40px;padding-bottom:24px;border-bottom:3px solid #1a1e2e}
+.inv-header{display:flex;justify-content:space-between;align-items:flex-start;gap:28px;margin-bottom:40px;padding-bottom:24px;border-bottom:3px solid #1a1e2e}
 .inv-header>div:first-child{flex:1;min-width:0}
-.inv-header>.inv-right{flex-shrink:0}
-.issuer-name{font-size:19px;font-weight:800;margin-bottom:6px;overflow-wrap:anywhere;word-break:break-word}
+.inv-header>.inv-right{flex-shrink:0;max-width:40%}
+.issuer-name{font-size:18px;font-weight:800;margin-bottom:6px;overflow-wrap:anywhere;word-break:break-word}
 .issuer-detail{font-size:12px;color:#555c7a;line-height:1.9;overflow-wrap:anywhere}
 .inv-right{text-align:right}
-.inv-title{font-size:38px;font-weight:900;letter-spacing:.06em;line-height:1;margin-bottom:10px}
+.inv-title{font-size:23px;font-weight:900;letter-spacing:.04em;line-height:1.1;margin-bottom:10px}
 .inv-meta{font-size:12px;color:#555c7a;line-height:1.9}
 .inv-meta strong{color:#1a1e2e}
 .sec-label{font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#9098b0;margin-bottom:8px}
 .bill-to{margin-bottom:32px}
-.bill-name{font-size:16px;font-weight:700;margin-bottom:4px}
+.bill-name{font-size:16px;font-weight:700;margin-bottom:4px;overflow-wrap:anywhere}
 .bill-detail{font-size:12px;color:#555c7a;line-height:1.9}
 table{width:100%;border-collapse:collapse;margin-bottom:24px}
 th{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#9098b0;padding:8px 10px;text-align:left;border-bottom:2px solid #d0d4de}
 th.r,td.r{text-align:right}
 td{padding:13px 10px;font-size:13px;border-bottom:1px solid #ebedf0;vertical-align:top}
-.td-main{font-weight:600}
+.td-main{font-weight:600;white-space:pre-wrap;overflow-wrap:anywhere}
 .td-sub{font-size:11px;color:#9098b0;margin-top:3px}
 .totals{display:flex;justify-content:flex-end;margin-bottom:28px}
 .totals-inner{width:250px}
 .tot-row{display:flex;justify-content:space-between;padding:5px 0;font-size:13px;color:#555c7a;border-bottom:1px solid #ebedf0}
 .tot-row.grand{font-size:16px;font-weight:800;color:#1a1e2e;padding-top:10px;border-top:2px solid #1a1e2e;border-bottom:none;margin-top:6px}
-.status-badge{display:inline-block;font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;padding:5px 16px;border-radius:20px;background:${statusBg};color:${statusColor};border:1.5px solid ${statusColor};margin-bottom:32px}
-.footer{border-top:1px solid #d0d4de;padding-top:14px;display:flex;justify-content:space-between;align-items:flex-end;font-size:11px;color:#9098b0;margin-top:40px}
+/* Remove the browser's print header/footer (date, document title, about:blank URL) */
+@page{margin:0;size:A4}
+/* Fill an A4 sheet: the flexible spacer pushes the totals to the bottom */
+.page{display:flex;flex-direction:column;min-height:297mm}
+.spacer{flex:1 1 auto;min-height:24px}
+.notes-block{margin-bottom:8px}
+.notes-body{font-size:12px;color:#555c7a;line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere}
 @media print{
   body{background:#fff}
   .topbar{display:none}
-  .page{margin:0;padding:36px;box-shadow:none;max-width:100%}
+  .page{margin:0;padding:46px 52px;box-shadow:none;max-width:100%}
 }
 </style>
 </head>
@@ -1787,6 +1783,17 @@ td{padding:13px 10px;font-size:13px;border-bottom:1px solid #ebedf0;vertical-ali
     </tbody>
   </table>
 
+  ${
+    footerNote
+      ? `<div class="notes-block">
+    <div class="sec-label" style="margin-bottom:6px">${t('quote_notes')}</div>
+    <div class="notes-body">${escNl(footerNote)}</div>
+  </div>`
+      : ''
+  }
+
+  <div class="spacer"></div>
+
   <div class="totals">
     <div class="totals-inner">
       ${valueAmt != null ? `<div class="tot-row"><span>${t('invoice_subtotal')}</span><span>${fmt(valueAmt)}</span></div>` : ''}
@@ -1794,13 +1801,6 @@ td{padding:13px 10px;font-size:13px;border-bottom:1px solid #ebedf0;vertical-ali
       ${tipAmt ? `<div class="tot-row"><span>${t('invoice_tip')}</span><span>+${fmt(tipAmt)}</span></div>` : ''}
       <div class="tot-row grand"><span>${t('invoice_total')}</span><span>${fmt(grandTotal)}</span></div>
     </div>
-  </div>
-
-  <div class="status-badge">${statusLabel}</div>
-
-  <div class="footer">
-    <div>${footerNote ? escNl(footerNote) : ''}</div>
-    <div>${esc(issuerName)}</div>
   </div>
 </div>
 </body>
