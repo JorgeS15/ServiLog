@@ -172,8 +172,6 @@ const TRANSLATIONS = {
     invoice_subtotal: 'Subtotal',
     invoice_total: 'Total',
     invoice_tip: 'Valor adicional',
-    invoice_status_paid: 'PAGO',
-    invoice_status_pending: 'PENDENTE',
     invoice_print: 'Imprimir / Guardar PDF',
     invoice_no_issuer: 'Configure os dados da fatura nas Definições antes de gerar uma fatura.',
     form_vat: 'IVA',
@@ -458,8 +456,6 @@ const TRANSLATIONS = {
     invoice_subtotal: 'Subtotal',
     invoice_total: 'Total',
     invoice_tip: 'Additional',
-    invoice_status_paid: 'PAID',
-    invoice_status_pending: 'PENDING',
     invoice_print: 'Print / Save as PDF',
     invoice_no_issuer: 'Please configure your invoice details in Settings before generating an invoice.',
     form_vat: 'VAT',
@@ -1642,11 +1638,6 @@ window.generateInvoice = async function (serviceId) {
   const vatRate = s.vat_rate != null ? parseFloat(s.vat_rate) : null;
   const vatAmt = vatRate != null && valueAmt != null ? (valueAmt * vatRate) / 100 : 0;
   const grandTotal = valueAmt != null ? valueAmt + vatAmt + tipAmt : null;
-  const isPaid = !!s.paid;
-
-  const statusLabel = isPaid ? t('invoice_status_paid') : t('invoice_status_pending');
-  const statusBg = isPaid ? 'rgba(46,204,113,0.12)' : 'rgba(231,76,60,0.10)';
-  const statusColor = isPaid ? '#1a8a4a' : '#c0392b';
 
   const descMain = s.description ? `<div class="td-main">${esc(s.description)}</div>` : '';
   const descSub = s.start_time
@@ -1699,7 +1690,6 @@ td{padding:13px 10px;font-size:13px;border-bottom:1px solid #ebedf0;vertical-ali
 .totals-inner{width:250px}
 .tot-row{display:flex;justify-content:space-between;padding:5px 0;font-size:13px;color:#555c7a;border-bottom:1px solid #ebedf0}
 .tot-row.grand{font-size:16px;font-weight:800;color:#1a1e2e;padding-top:10px;border-top:2px solid #1a1e2e;border-bottom:none;margin-top:6px}
-.status-badge{display:inline-block;font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;padding:5px 16px;border-radius:20px;background:${statusBg};color:${statusColor};border:1.5px solid ${statusColor}}
 /* Remove the browser's print header/footer (date, document title, about:blank URL) */
 @page{margin:0;size:A4}
 /* Fill an A4 sheet: the flexible spacer pushes the totals to the bottom */
@@ -1812,8 +1802,6 @@ td{padding:13px 10px;font-size:13px;border-bottom:1px solid #ebedf0;vertical-ali
       <div class="tot-row grand"><span>${t('invoice_total')}</span><span>${fmt(grandTotal)}</span></div>
     </div>
   </div>
-
-  <div class="status-badge">${statusLabel}</div>
 </div>
 </body>
 </html>`;
