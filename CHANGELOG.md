@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.11.2] - 2026-07-04
+
+### Changed
+- **Invoice PDF now matches the quote's format**: same header sizing, A4-filling layout with the totals pushed to the bottom, and the footer note shown as a labeled "Notas / Condições" section above the totals instead of a small footer line. Also fixes the invoice missing the `@page` print rule the quote already had, which removed the browser's date/title/URL header-footer when printing or saving as PDF.
+- **Removed the paid/pending status badge from the invoice PDF**, for full layout parity with the quote (which has no equivalent). Payment status is still tracked and shown everywhere else in the app (service list, dashboard).
+
 ## [1.11.0] - 2026-07-01
 
 ### Added
