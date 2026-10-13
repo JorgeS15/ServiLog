@@ -205,8 +205,31 @@ function runMigrations() {
       created_at TEXT DEFAULT (datetime('now','localtime'))
     );
   `);
+
+  // v1.12.0 — service notes (formerly "invoices"), official invoice reference,
+  // invoice PDF attachments and the quote price-per-hour display option
+  tryAlter(`ALTER TABLE services ADD COLUMN note_ref TEXT DEFAULT NULL`);
+  tryAlter(`ALTER TABLE services ADD COLUMN invoice_number TEXT DEFAULT NULL`);
+  tryAlter(`ALTER TABLE service_attachments ADD COLUMN kind TEXT DEFAULT NULL`);
+  tryAlter(`ALTER TABLE quotes ADD COLUMN show_rate INTEGER DEFAULT 1`);
 }
 runMigrations();
+
+// Local (server timezone) YYYY-MM-DD — toISOString() is UTC and gives the
+// wrong day between midnight and the UTC offset.
+function localISODate(d = new Date()) {
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function escapeHtml(str) {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
 // ── Request logging middleware ────────────────────────────
 app.use((req, res, next) => {
@@ -509,7 +532,17 @@ app.put('/api/clients/:id', (req, res) => {
 });
 
 app.delete('/api/clients/:id', (req, res) => {
-  db.prepare('DELETE FROM clients WHERE id = ?').run(req.params.id);
+  // services/quotes reference clients with foreign keys enabled, so detach them
+  // first — otherwise deleting a client with history fails with a constraint error.
+  // Quotes keep their client_name snapshot.
+  db.transaction(id => {
+    db.prepare('UPDATE services SET client_id = NULL WHERE client_id = ?').run(id);
+    db.prepare(
+      `UPDATE quotes SET client_name = COALESCE(client_name, (SELECT name FROM clients WHERE id = ?)), client_id = NULL
+       WHERE client_id = ?`
+    ).run(id, id);
+    db.prepare('DELETE FROM clients WHERE id = ?').run(id);
+  })(req.params.id);
   res.json({ ok: true });
 });
 
@@ -519,7 +552,8 @@ app.get('/api/services', (req, res) => {
   let query = `
     SELECT s.*, c.name as client_name,
            COUNT(a.id) as attachment_count,
-           (SELECT id FROM service_attachments WHERE service_id = s.id AND mime_type LIKE 'image/%' ORDER BY created_at LIMIT 1) as first_image_id
+           (SELECT id FROM service_attachments WHERE service_id = s.id AND mime_type LIKE 'image/%' ORDER BY created_at LIMIT 1) as first_image_id,
+           (SELECT id FROM service_attachments WHERE service_id = s.id AND kind = 'invoice' ORDER BY created_at DESC LIMIT 1) as invoice_attachment_id
     FROM services s
     LEFT JOIN clients c ON s.client_id = c.id
     LEFT JOIN service_attachments a ON a.service_id = s.id
@@ -528,7 +562,7 @@ app.get('/api/services', (req, res) => {
   const params = [];
   if (month && year) {
     query += ` AND strftime('%Y-%m', s.date) = ?`;
-    params.push(`${year}-${month.padStart(2, '0')}`);
+    params.push(`${year}-${String(month).padStart(2, '0')}`);
   }
   if (client_id) {
     query += ` AND s.client_id = ?`;
@@ -544,7 +578,7 @@ app.get('/api/services', (req, res) => {
 });
 
 app.get('/api/appointments/upcoming', (req, res) => {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localISODate();
   const rows = db
     .prepare(
       `
@@ -594,6 +628,13 @@ function calcDuration(start_time, end_time, duration_hours, discount_hours) {
   return parseFloat(duration.toFixed(4));
 }
 
+// Official (AT-certified) invoice reference typed by the user, e.g. "FR 2026/12".
+function cleanInvoiceNumber(v) {
+  if (v == null) return null;
+  const s = String(v).trim().slice(0, 60);
+  return s || null;
+}
+
 function calcValueAuto(duration, operator_rate, machine_rate, travel_fee, discount) {
   const totalRate = (parseFloat(operator_rate) || 0) + (parseFloat(machine_rate) || 0);
   if (!totalRate || !duration) return null;
@@ -623,6 +664,7 @@ app.post('/api/services', (req, res) => {
     tip,
     vat_rate,
     status,
+    invoice_number,
   } = req.body;
 
   if (!date) return res.status(400).json({ error: 'Date is required' });
@@ -643,8 +685,8 @@ app.post('/api/services', (req, res) => {
     INSERT INTO services
       (date, start_time, end_time, duration_hours, discount_hours, client_id, description, value,
        hourmeter_start, hourmeter_end, hourmeter_delta,
-       operator_rate, machine_rate, travel_fee, discount, paid, tip, vat_rate, status)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+       operator_rate, machine_rate, travel_fee, discount, paid, tip, vat_rate, status, invoice_number)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
   `
     )
     .run(
@@ -666,7 +708,8 @@ app.post('/api/services', (req, res) => {
       paid ? 1 : 0,
       parseNonNeg(tip) ?? 0,
       vat_rate != null && vat_rate !== '' ? parseFloat(vat_rate) : null,
-      status === 'scheduled' ? 'scheduled' : 'completed'
+      status === 'scheduled' ? 'scheduled' : 'completed',
+      cleanInvoiceNumber(invoice_number)
     );
 
   res.json({ id: result.lastInsertRowid });
@@ -692,7 +735,10 @@ app.put('/api/services/:id', (req, res) => {
     tip,
     vat_rate,
     status,
+    invoice_number,
   } = req.body;
+
+  if (!date) return res.status(400).json({ error: 'Date is required' });
 
   let delta = null;
   if (hourmeter_start != null && hourmeter_end != null) {
@@ -710,7 +756,8 @@ app.put('/api/services/:id', (req, res) => {
       date=?, start_time=?, end_time=?, duration_hours=?, discount_hours=?,
       client_id=?, description=?, value=?,
       hourmeter_start=?, hourmeter_end=?, hourmeter_delta=?,
-      operator_rate=?, machine_rate=?, travel_fee=?, discount=?, paid=?, tip=?, vat_rate=?, status=?
+      operator_rate=?, machine_rate=?, travel_fee=?, discount=?, paid=?, tip=?, vat_rate=?, status=?,
+      invoice_number=?
     WHERE id=?
   `
   ).run(
@@ -733,10 +780,32 @@ app.put('/api/services/:id', (req, res) => {
     parseNonNeg(tip) ?? 0,
     vat_rate != null && vat_rate !== '' ? parseFloat(vat_rate) : null,
     status === 'scheduled' ? 'scheduled' : 'completed',
+    cleanInvoiceNumber(invoice_number),
     req.params.id
   );
 
   res.json({ ok: true });
+});
+
+// Service note (not a legal invoice). The number is assigned once per service,
+// server-side, so re-opening the same note never consumes a new number.
+app.post('/api/services/:id/note', (req, res) => {
+  const result = db.transaction(id => {
+    const svc = db.prepare('SELECT id, note_ref FROM services WHERE id = ?').get(id);
+    if (!svc) return null;
+    if (svc.note_ref) return { note_ref: svc.note_ref, created: false };
+    const number =
+      parseInt(db.prepare(`SELECT value FROM settings WHERE key='next_invoice_number'`).get()?.value || '1', 10) || 1;
+    const noteRef = `NS ${new Date().getFullYear()}/${String(number).padStart(4, '0')}`;
+    db.prepare('UPDATE services SET note_ref = ? WHERE id = ?').run(noteRef, id);
+    db.prepare(
+      `INSERT INTO settings (key, value) VALUES ('next_invoice_number', ?)
+       ON CONFLICT(key) DO UPDATE SET value=excluded.value`
+    ).run(String(number + 1));
+    return { note_ref: noteRef, created: true, next_number: number + 1 };
+  })(req.params.id);
+  if (!result) return res.status(404).json({ error: 'Not found' });
+  res.json(result);
 });
 
 app.delete('/api/services/:id', (req, res) => {
@@ -771,6 +840,7 @@ function quoteFieldsFromBody(body) {
     vat_rate: body.vat_rate != null && body.vat_rate !== '' ? parseFloat(body.vat_rate) : null,
     notes: body.notes?.trim() || null,
     status: QUOTE_STATUSES.has(body.status) ? body.status : 'pending',
+    show_rate: body.show_rate === 0 || body.show_rate === '0' || body.show_rate === false ? 0 : 1,
   };
 }
 
@@ -815,9 +885,10 @@ app.post('/api/quotes', (req, res) => {
       `
     INSERT INTO quotes
       (number, ref, client_id, client_name, client_address, client_phone, description,
-       date, valid_until, hours, operator_rate, machine_rate, travel_fee, discount, vat_rate, notes, status)
+       date, valid_until, hours, operator_rate, machine_rate, travel_fee, discount, vat_rate, notes, status, show_rate)
     VALUES (@number, @ref, @client_id, @client_name, @client_address, @client_phone, @description,
-       @date, @valid_until, @hours, @operator_rate, @machine_rate, @travel_fee, @discount, @vat_rate, @notes, @status)
+       @date, @valid_until, @hours, @operator_rate, @machine_rate, @travel_fee, @discount, @vat_rate, @notes, @status,
+       @show_rate)
   `
     )
     .run({ ...f, number, ref });
@@ -841,7 +912,7 @@ app.put('/api/quotes/:id', (req, res) => {
       client_id=@client_id, client_name=@client_name, client_address=@client_address,
       client_phone=@client_phone, description=@description, date=@date, valid_until=@valid_until,
       hours=@hours, operator_rate=@operator_rate, machine_rate=@machine_rate, travel_fee=@travel_fee,
-      discount=@discount, vat_rate=@vat_rate, notes=@notes, status=@status
+      discount=@discount, vat_rate=@vat_rate, notes=@notes, status=@status, show_rate=@show_rate
     WHERE id=@id
   `
   ).run({ ...f, id: req.params.id });
@@ -857,7 +928,7 @@ app.delete('/api/quotes/:id', (req, res) => {
 app.get('/api/services/:id/attachments', (req, res) => {
   const rows = db
     .prepare(
-      'SELECT id, original_name, mime_type, size, created_at FROM service_attachments WHERE service_id = ? ORDER BY created_at'
+      'SELECT id, original_name, mime_type, size, kind, created_at FROM service_attachments WHERE service_id = ? ORDER BY created_at'
     )
     .all(req.params.id);
   res.json(rows);
@@ -886,11 +957,16 @@ app.post('/api/services/:id/attachments', express.raw({ type: '*/*', limit: '100
   if (!service) return res.status(404).json({ error: 'Service not found' });
   if (!Buffer.isBuffer(req.body) || req.body.length === 0) return res.status(400).json({ error: 'Empty file' });
 
-  const originalName = req.query.name ? decodeURIComponent(req.query.name) : 'file';
+  // Express already URL-decodes query params; decoding again threw on names containing "%".
+  const originalName = typeof req.query.name === 'string' && req.query.name ? req.query.name.slice(0, 255) : 'file';
   const mimeType = (req.headers['content-type'] || 'application/octet-stream').split(';')[0].trim().toLowerCase();
+  const kind = req.query.kind === 'invoice' ? 'invoice' : null;
 
   if (!ALLOWED_MIME_TYPES[mimeType]) {
     return res.status(400).json({ error: 'File type not allowed' });
+  }
+  if (kind === 'invoice' && mimeType !== 'application/pdf') {
+    return res.status(400).json({ error: 'Invoice must be a PDF' });
   }
 
   const ext = ALLOWED_MIME_TYPES[mimeType];
@@ -900,9 +976,9 @@ app.post('/api/services/:id/attachments', express.raw({ type: '*/*', limit: '100
 
   const result = db
     .prepare(
-      'INSERT INTO service_attachments (service_id, filename, original_name, mime_type, size) VALUES (?,?,?,?,?)'
+      'INSERT INTO service_attachments (service_id, filename, original_name, mime_type, size, kind) VALUES (?,?,?,?,?,?)'
     )
-    .run(req.params.id, filename, originalName, mimeType, req.body.length);
+    .run(req.params.id, filename, originalName, mimeType, req.body.length, kind);
 
   res.json({ id: result.lastInsertRowid });
 });
@@ -939,7 +1015,7 @@ app.get('/api/summary', (req, res) => {
   const params = [];
   if (month && year) {
     where = `strftime('%Y-%m', date) = ? AND (status = 'completed' OR status IS NULL)`;
-    params.push(`${year}-${month.padStart(2, '0')}`);
+    params.push(`${year}-${String(month).padStart(2, '0')}`);
   }
 
   const stats = db
@@ -1008,7 +1084,8 @@ app.get('/api/export/csv', (req, res) => {
            ROUND(s.tip,2) as tip,
            s.hourmeter_start, s.hourmeter_end,
            ROUND(s.hourmeter_delta,2) as hourmeter_delta,
-           COALESCE(s.status,'completed') as status
+           COALESCE(s.status,'completed') as status,
+           s.note_ref, s.invoice_number
     FROM services s
     LEFT JOIN clients c ON s.client_id = c.id
     ORDER BY s.date DESC
@@ -1017,7 +1094,7 @@ app.get('/api/export/csv', (req, res) => {
     .all();
 
   const header =
-    'Date,Start,End,Discount(h),Duration(h),Client,Description,Operator/h,Machine/h,Travel,Discount(€),Value(€),Paid,Tip(€),Hourmeter.Start,Hourmeter.End,Hourmeter.Delta,Status\n';
+    'Date,Start,End,Discount(h),Duration(h),Client,Description,Operator/h,Machine/h,Travel,Discount(€),Value(€),Paid,Tip(€),Hourmeter.Start,Hourmeter.End,Hourmeter.Delta,Status,Service.Note,Invoice.Number\n';
   const csv =
     header +
     rows
@@ -1041,6 +1118,8 @@ app.get('/api/export/csv', (req, res) => {
           r.hourmeter_end || '',
           r.hourmeter_delta || '',
           r.status,
+          r.note_ref || '',
+          r.invoice_number || '',
         ]
           .map(csvCell)
           .join(',')
@@ -1242,6 +1321,7 @@ const SETTINGS_ALLOWLIST = new Set([
   'inv_note',
   'next_invoice_number',
   'next_quote_number',
+  'quote_show_rate',
   'lubelogger_url',
   'lubelogger_api_key',
   'lubelogger_vehicle_id',
@@ -1338,7 +1418,7 @@ function createMailTransport() {
 function dateOffsetISO(days) {
   const d = new Date();
   d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
+  return localISODate(d);
 }
 
 function fmtDate(iso) {
@@ -1355,7 +1435,7 @@ async function sendServiceReminder(service, daysUntil) {
   const labelEn = daysUntil === 1 ? 'tomorrow' : `in ${daysUntil} days`;
   const client = service.client_name || '—';
   const dateStr = fmtDate(service.date);
-  const timeStr = service.start_time ? ` às ${service.start_time}` : '';
+  const timeStr = service.start_time ? ` às ${escapeHtml(service.start_time)}` : '';
   const desc = service.description || '';
 
   const html = `
@@ -1370,8 +1450,8 @@ async function sendServiceReminder(service, daysUntil) {
       <p style="font-size:16px;margin:0 0 18px">Tens um serviço agendado <strong>${label}</strong>:</p>
       <table style="width:100%;border-collapse:collapse;font-size:14px">
         <tr><td style="padding:8px 0;color:#666;width:110px">Data</td><td style="padding:8px 0;font-weight:600">${dateStr}${timeStr}</td></tr>
-        <tr><td style="padding:8px 0;color:#666">Cliente</td><td style="padding:8px 0;font-weight:600">${client}</td></tr>
-        ${desc ? `<tr><td style="padding:8px 0;color:#666">Descrição</td><td style="padding:8px 0">${desc}</td></tr>` : ''}
+        <tr><td style="padding:8px 0;color:#666">Cliente</td><td style="padding:8px 0;font-weight:600">${escapeHtml(client)}</td></tr>
+        ${desc ? `<tr><td style="padding:8px 0;color:#666">Descrição</td><td style="padding:8px 0">${escapeHtml(desc)}</td></tr>` : ''}
       </table>
       <p style="margin:20px 0 0;font-size:12px;color:#999">— ServiLog v${pkg.version}</p>
     </div>

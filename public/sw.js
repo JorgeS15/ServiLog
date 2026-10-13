@@ -13,18 +13,10 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
-  // API requests: network first
-  if (url.pathname.startsWith('/api/')) {
-    e.respondWith(
-      fetch(e.request).catch(
-        () =>
-          new Response(JSON.stringify({ error: 'No connection' }), {
-            headers: { 'Content-Type': 'application/json' },
-          })
-      )
-    );
-    return;
-  }
+  // API requests: never cached — let the browser handle them so a network
+  // failure surfaces as a real fetch error (the app's offline write queue
+  // relies on that; a synthetic 200 response used to hide it).
+  if (url.pathname.startsWith('/api/')) return;
   // Static: cache first
   e.respondWith(caches.match(e.request).then(r => r || fetch(e.request)));
 });
