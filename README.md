@@ -27,10 +27,11 @@ Installable PWA with a mobile-first dark UI. Runs entirely in Docker, no cloud r
 | Summaries | Monthly and all-time, per client, net and gross; operator and machine cost breakdown |
 | LubeLogger integration | Optional: shows the machine's all-time maintenance/fuel cost on the dashboard, pulled from a self-hosted [LubeLogger](https://github.com/hargata/lubelog) instance |
 | Additional statistics | Optional toggle (Settings) to show extra stats on the Summary — currently mean time per service |
-| Invoices | Printable invoice generated from any service |
-| Quotes (Orçamentos) | Build printable quotes, saved in a dedicated tab — edit, duplicate, set status (pending/accepted/rejected), convert to a service, or re-open the PDF |
+| Service notes | Printable service note (Nota de Serviço) generated from any service — numbered once per service. **Not a legal invoice**: in Portugal invoices must be issued through AT-certified software or the Portal das Finanças |
+| Official invoice | Record the official invoice number on each service and attach the invoice PDF |
+| Quotes (Orçamentos) | Build printable quotes, saved in a dedicated tab — edit, duplicate, set status (pending/accepted/rejected), convert to a service, or re-open the PDF. Choose per quote whether to show hours and rate/h or only the total |
 | Export | CSV download |
-| Settings | Full backup/restore (DB + files), language, theme, invoice details, storage stats |
+| Settings | Full backup/restore (DB + files), language, theme, issuer details, storage stats |
 | PWA | Installable on Android & iOS, works offline |
 
 ---
