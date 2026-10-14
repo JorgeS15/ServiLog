@@ -143,7 +143,7 @@ const TRANSLATIONS = {
     settings_total_attachments: 'Total de anexos',
     settings_uploads_size: 'Tamanho dos ficheiros',
     settings_total_size: 'Tamanho total',
-    settings_invoice: 'Dados para Faturas',
+    settings_invoice: 'Dados do Emitente',
     invoice_issuer_name: 'Nome / Empresa',
     invoice_issuer_name_placeholder: 'ex: João Silva - Serviços Agrícolas',
     invoice_issuer_address: 'Morada',
@@ -156,11 +156,13 @@ const TRANSLATIONS = {
     invoice_issuer_phone_placeholder: 'ex: 912 345 678',
     invoice_footer_note: 'Nota de rodapé',
     invoice_footer_note_placeholder: 'ex: Pagamento a 30 dias',
-    invoice_btn: '📄 Fatura',
-    invoice_title: 'FATURA',
+    invoice_btn: '📄 Nota de Serviço',
+    invoice_title: 'NOTA DE SERVIÇO',
+    note_disclaimer: 'Este documento não serve de fatura.',
+    note_official_invoice: 'Fatura n.º',
     invoice_ref: 'Ref.',
     invoice_date: 'Data',
-    invoice_issued_to: 'Faturado a',
+    invoice_issued_to: 'Cliente',
     invoice_services: 'Serviços',
     invoice_col_date: 'Data',
     invoice_col_desc: 'Descrição',
@@ -172,10 +174,8 @@ const TRANSLATIONS = {
     invoice_subtotal: 'Subtotal',
     invoice_total: 'Total',
     invoice_tip: 'Valor adicional',
-    invoice_status_paid: 'PAGO',
-    invoice_status_pending: 'PENDENTE',
     invoice_print: 'Imprimir / Guardar PDF',
-    invoice_no_issuer: 'Configure os dados da fatura nas Definições antes de gerar uma fatura.',
+    invoice_no_issuer: 'Configure os dados do emitente nas Definições antes de gerar uma nota de serviço.',
     form_vat: 'IVA',
     form_vat_none: 'Sem IVA',
     form_vat_include: 'Com IVA',
@@ -232,7 +232,7 @@ const TRANSLATIONS = {
     settings_diag_smtp_ok: 'Email enviado para',
     settings_diag_smtp_fail: 'Falha no envio do email',
     settings_diag_smtp_not_configured: 'SMTP não configurado no servidor',
-    settings_invoice_number: 'Número da próxima fatura',
+    settings_invoice_number: 'Número da próxima nota de serviço',
     nav_quote: 'Orçamento',
     quote_title: 'ORÇAMENTO',
     quote_new: 'Novo Orçamento',
@@ -254,7 +254,24 @@ const TRANSLATIONS = {
     quote_total: 'Total',
     quote_vat: 'IVA',
     quote_print: 'Imprimir / Guardar PDF',
-    quote_no_issuer: 'Configure os dados da fatura nas Definições antes de gerar um orçamento.',
+    quote_no_issuer: 'Configure os dados do emitente nas Definições antes de gerar um orçamento.',
+    quote_show_rate: 'Mostrar no orçamento',
+    quote_show_rate_yes: 'Horas e preço/hora',
+    quote_show_rate_no: 'Só o total',
+    settings_quote_show_rate: 'Por defeito, mostrar no orçamento',
+    form_invoice_section: 'Fatura oficial',
+    form_invoice_hint: 'Emita a fatura no Portal das Finanças ou num programa certificado e registe-a aqui.',
+    form_invoice_number: 'N.º da fatura',
+    form_invoice_number_placeholder: 'ex: FR 2026/12',
+    form_invoice_attach: '🧾 Anexar PDF da fatura',
+    form_invoice_view: '🧾 Ver fatura',
+    form_invoice_save_first: 'Guarde o serviço para poder anexar o PDF da fatura.',
+    tag_invoice: 'Fatura',
+    toast_invoice_uploaded: 'Fatura anexada ✓',
+    toast_invoice_pdf_only: 'A fatura tem de ser um ficheiro PDF',
+    toast_saved_offline: 'Guardado offline — sincroniza quando houver ligação',
+    toast_synced: 'alterações sincronizadas',
+    toast_popup_blocked: 'Pop-up bloqueado — permita pop-ups para este site',
     settings_quote: 'Dados para Orçamentos',
     settings_quote_number: 'Número do próximo orçamento',
     settings_lubelogger: 'Integração LubeLogger',
@@ -429,7 +446,7 @@ const TRANSLATIONS = {
     settings_total_attachments: 'Total attachments',
     settings_uploads_size: 'Files size',
     settings_total_size: 'Total size',
-    settings_invoice: 'Invoice Details',
+    settings_invoice: 'Issuer Details',
     invoice_issuer_name: 'Name / Business',
     invoice_issuer_name_placeholder: 'e.g. John Smith - Farm Services',
     invoice_issuer_address: 'Address',
@@ -442,11 +459,13 @@ const TRANSLATIONS = {
     invoice_issuer_phone_placeholder: 'e.g. +351 912 345 678',
     invoice_footer_note: 'Footer note',
     invoice_footer_note_placeholder: 'e.g. Payment due in 30 days',
-    invoice_btn: '📄 Invoice',
-    invoice_title: 'INVOICE',
+    invoice_btn: '📄 Service Note',
+    invoice_title: 'SERVICE NOTE',
+    note_disclaimer: 'This document is not an invoice.',
+    note_official_invoice: 'Invoice no.',
     invoice_ref: 'Ref.',
     invoice_date: 'Date',
-    invoice_issued_to: 'Bill to',
+    invoice_issued_to: 'Client',
     invoice_services: 'Services',
     invoice_col_date: 'Date',
     invoice_col_desc: 'Description',
@@ -458,10 +477,8 @@ const TRANSLATIONS = {
     invoice_subtotal: 'Subtotal',
     invoice_total: 'Total',
     invoice_tip: 'Additional',
-    invoice_status_paid: 'PAID',
-    invoice_status_pending: 'PENDING',
     invoice_print: 'Print / Save as PDF',
-    invoice_no_issuer: 'Please configure your invoice details in Settings before generating an invoice.',
+    invoice_no_issuer: 'Please configure your issuer details in Settings before generating a service note.',
     form_vat: 'VAT',
     form_vat_none: 'No VAT',
     form_vat_include: 'Include VAT',
@@ -518,7 +535,7 @@ const TRANSLATIONS = {
     settings_diag_smtp_ok: 'Email sent to',
     settings_diag_smtp_fail: 'Failed to send email',
     settings_diag_smtp_not_configured: 'SMTP not configured on the server',
-    settings_invoice_number: 'Next invoice number',
+    settings_invoice_number: 'Next service note number',
     nav_quote: 'Quote',
     quote_title: 'QUOTATION',
     quote_new: 'New Quote',
@@ -540,7 +557,24 @@ const TRANSLATIONS = {
     quote_total: 'Total',
     quote_vat: 'VAT',
     quote_print: 'Print / Save PDF',
-    quote_no_issuer: 'Configure invoice details in Settings before generating a quote.',
+    quote_no_issuer: 'Configure issuer details in Settings before generating a quote.',
+    quote_show_rate: 'Show on quote',
+    quote_show_rate_yes: 'Hours and rate/h',
+    quote_show_rate_no: 'Total only',
+    settings_quote_show_rate: 'Default display on quotes',
+    form_invoice_section: 'Official invoice',
+    form_invoice_hint: 'Issue the invoice in your certified invoicing software and record it here.',
+    form_invoice_number: 'Invoice no.',
+    form_invoice_number_placeholder: 'e.g. FR 2026/12',
+    form_invoice_attach: '🧾 Attach invoice PDF',
+    form_invoice_view: '🧾 View invoice',
+    form_invoice_save_first: 'Save the service first to attach the invoice PDF.',
+    tag_invoice: 'Invoice',
+    toast_invoice_uploaded: 'Invoice attached ✓',
+    toast_invoice_pdf_only: 'The invoice must be a PDF file',
+    toast_saved_offline: 'Saved offline — will sync when connected',
+    toast_synced: 'changes synced',
+    toast_popup_blocked: 'Popup blocked — allow popups for this site',
     settings_quote: 'Quote Settings',
     settings_quote_number: 'Next quote number',
     settings_lubelogger: 'LubeLogger Integration',
@@ -664,7 +698,7 @@ const api = {
     } catch (e) {
       if (e instanceof TypeError && isOfflineWritePath(path)) {
         offlineQueue.push({ method: 'POST', path, body });
-        toast('Saved offline — will sync when connected', 'warn');
+        toast(t('toast_saved_offline'), 'warn');
         return {};
       }
       throw e;
@@ -680,7 +714,7 @@ const api = {
     } catch (e) {
       if (e instanceof TypeError && isOfflineWritePath(path)) {
         offlineQueue.push({ method: 'PUT', path, body });
-        toast('Saved offline — will sync when connected', 'warn');
+        toast(t('toast_saved_offline'), 'warn');
         return {};
       }
       throw e;
@@ -692,7 +726,7 @@ const api = {
     } catch (e) {
       if (e instanceof TypeError && isOfflineWritePath(path)) {
         offlineQueue.push({ method: 'DELETE', path, body: null });
-        toast('Saved offline — will sync when connected', 'warn');
+        toast(t('toast_saved_offline'), 'warn');
         return {};
       }
       throw e;
@@ -1080,6 +1114,9 @@ function serviceCard(s) {
       `<span class="chip billing" style="color:var(--accent)">+${parseFloat(s.tip).toFixed(2)}${cur} ${t('tip_badge')}</span>`
     );
   }
+  if (s.invoice_number) {
+    chips.push(`<span class="chip billing">🧾 ${escapeHtml(s.invoice_number)}</span>`);
+  }
   if (s.attachment_count > 0) {
     chips.push(`<span class="chip">📷 ${s.attachment_count}</span>`);
   }
@@ -1125,6 +1162,13 @@ function formatDate(d) {
   return `${day}/${m}/${y}`;
 }
 
+// Local YYYY-MM-DD — toISOString() is UTC and returns yesterday's date
+// between midnight and the UTC offset (e.g. 00:00–01:00 in Portuguese summer time).
+function localISODate(d = new Date()) {
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
 function escapeHtml(str) {
   return String(str)
     .replace(/&/g, '&amp;')
@@ -1136,7 +1180,7 @@ function escapeHtml(str) {
 
 // ── Service form ──────────────────────────────────────────
 function serviceFormHtml(s = {}) {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localISODate();
   const clientOptions = state.clients
     .map(c => `<option value="${c.id}" ${s.client_id == c.id ? 'selected' : ''}>${escapeHtml(c.name)}</option>`)
     .join('');
@@ -1301,9 +1345,31 @@ function serviceFormHtml(s = {}) {
         </div>
       </div>
 
+      <hr class="divider">
+      <div class="section-title">${t('form_invoice_section')}</div>
+      <div style="font-size:11px;color:var(--text3);margin:-4px 0 4px">${t('form_invoice_hint')}</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">${t('form_invoice_number')}</label>
+          <input type="text" class="form-control" id="f-invoice-number" maxlength="60"
+                 placeholder="${t('form_invoice_number_placeholder')}" value="${escapeHtml(s.invoice_number || '')}">
+        </div>
+        <div class="form-group" style="justify-content:flex-end">
+          ${
+            s.id
+              ? `<div id="invoice-pdf-slot"></div>
+          <label class="btn btn-secondary btn-sm" style="cursor:pointer;width:fit-content">
+            ${t('form_invoice_attach')}
+            <input type="file" accept="application/pdf,.pdf" style="display:none" onchange="uploadInvoicePdf(this, ${s.id})">
+          </label>`
+              : `<div style="font-size:11px;color:var(--text3)">${t('form_invoice_save_first')}</div>`
+          }
+        </div>
+      </div>
+
       <div class="form-group">
         <label class="form-label">${t('form_description')}</label>
-        <textarea class="form-control" id="f-description" placeholder="${t('form_desc_placeholder')}">${s.description || ''}</textarea>
+        <textarea class="form-control" id="f-description" placeholder="${t('form_desc_placeholder')}">${escapeHtml(s.description || '')}</textarea>
       </div>
 
       ${
@@ -1324,7 +1390,7 @@ function serviceFormHtml(s = {}) {
 
       <div class="actions">
         ${s.id ? `<button class="btn btn-danger btn-sm" onclick="deleteService(${s.id})">${t('form_delete')}</button>` : ''}
-        ${s.id ? `<button class="btn btn-ghost btn-sm" onclick="generateInvoice(${s.id})">${t('invoice_btn')}</button>` : ''}
+        ${s.id ? `<button class="btn btn-ghost btn-sm" onclick="generateServiceNote(${s.id})">${t('invoice_btn')}</button>` : ''}
         <div style="flex:1"></div>
         <button class="btn btn-secondary" onclick="closeModal()">${t('form_cancel')}</button>
         <button class="btn btn-primary" onclick="saveService(${s.id || 0})">
@@ -1482,6 +1548,7 @@ function getFormData() {
         ? parseFloat(document.getElementById('f-vat-rate').value) || 23
         : null,
     status: document.getElementById('f-status')?.value || 'completed',
+    invoice_number: document.getElementById('f-invoice-number')?.value.trim() || null,
   };
 }
 
@@ -1544,6 +1611,13 @@ window.loadPictures = async function (serviceId) {
   const grid = document.getElementById('pictures-grid');
   if (!grid) return;
   const attachments = await api.get(`/api/services/${serviceId}/attachments`);
+  const invoicePdf = [...attachments].reverse().find(a => a.kind === 'invoice');
+  const slot = document.getElementById('invoice-pdf-slot');
+  if (slot) {
+    slot.innerHTML = invoicePdf
+      ? `<button type="button" class="btn btn-ghost btn-sm" style="margin-bottom:6px" onclick="viewPicture(${invoicePdf.id})">${t('form_invoice_view')}</button>`
+      : '';
+  }
   if (attachments.length === 0) {
     grid.innerHTML = `<span class="pictures-empty">${t('form_pictures_empty')}</span>`;
     return;
@@ -1554,8 +1628,9 @@ window.loadPictures = async function (serviceId) {
       const isImage = mime.startsWith('image/');
       const isVideo = mime.startsWith('video/');
       const isPdf = mime === 'application/pdf';
-      const icon = isVideo ? '🎬' : isPdf ? '📄' : '📎';
-      const name = escapeHtml(a.original_name || 'file');
+      const isInvoice = a.kind === 'invoice';
+      const icon = isInvoice ? '🧾' : isVideo ? '🎬' : isPdf ? '📄' : '📎';
+      const name = escapeHtml((isInvoice ? t('tag_invoice') + ' · ' : '') + (a.original_name || 'file'));
       const inner = isImage
         ? `<img src="/api/attachments/${a.id}" alt="${name}" loading="lazy">`
         : `<div class="file-thumb-icon">${icon}<span class="file-thumb-name">${name}</span></div>`;
@@ -1599,6 +1674,28 @@ window.uploadPictures = async function (input, serviceId) {
   loadPictures(serviceId);
 };
 
+window.uploadInvoicePdf = async function (input, serviceId) {
+  const file = input.files[0];
+  input.value = '';
+  if (!file) return;
+  if (file.type !== 'application/pdf' && !/\.pdf$/i.test(file.name)) {
+    toast(t('toast_invoice_pdf_only'), 'error');
+    return;
+  }
+  try {
+    const r = await fetch(`/api/services/${serviceId}/attachments?kind=invoice&name=${encodeURIComponent(file.name)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/pdf' },
+      body: file,
+    });
+    await api._handle(r);
+    toast(t('toast_invoice_uploaded'));
+    loadPictures(serviceId);
+  } catch (e) {
+    toast(e.message || t('toast_save_error'), 'error');
+  }
+};
+
 window.deletePicture = async function (id, serviceId) {
   if (!confirm(t('confirm_delete_picture'))) return;
   await api.del(`/api/attachments/${id}`);
@@ -1610,15 +1707,29 @@ window.viewPicture = function (id) {
   window.open(`/api/attachments/${id}`, '_blank');
 };
 
-// ── Invoice generator ─────────────────────────────────────
-window.generateInvoice = async function (serviceId) {
+// ── Service note generator ────────────────────────────────
+// Not a legal invoice: Portuguese invoices must come from AT-certified software.
+// The note number is assigned once per service on the server.
+window.generateServiceNote = async function (serviceId) {
   const issuerName = (settings['inv_name'] || '').trim();
   if (!issuerName) {
     toast(t('invoice_no_issuer'), 'error');
     return;
   }
 
-  const s = await api.get(`/api/services/${serviceId}`);
+  let s, note;
+  try {
+    note = await api.post(`/api/services/${serviceId}/note`, {});
+    if (!note.note_ref) throw new Error(t('toast_save_error'));
+    s = await api.get(`/api/services/${serviceId}`);
+  } catch (e) {
+    toast(e.message || t('toast_save_error'), 'error');
+    return;
+  }
+  if (note.next_number != null) {
+    settings['next_invoice_number'] = String(note.next_number);
+    localStorage.setItem('next_invoice_number', settings['next_invoice_number']);
+  }
   const cur = getCurrency();
 
   const issuerAddress = (settings['inv_address'] || '').trim();
@@ -1627,8 +1738,7 @@ window.generateInvoice = async function (serviceId) {
   const issuerPhone = (settings['inv_phone'] || '').trim();
   const footerNote = (settings['inv_note'] || '').trim();
 
-  const invNum = settings['next_invoice_number'] || '1';
-  const ref = `F ${new Date().getFullYear()}/${String(parseInt(invNum)).padStart(4, '0')}`;
+  const ref = escapeHtml(note.note_ref);
   const today = new Date().toLocaleDateString(state.lang === 'pt' ? 'pt-PT' : 'en-GB');
 
   const esc = str => (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -1642,11 +1752,6 @@ window.generateInvoice = async function (serviceId) {
   const vatRate = s.vat_rate != null ? parseFloat(s.vat_rate) : null;
   const vatAmt = vatRate != null && valueAmt != null ? (valueAmt * vatRate) / 100 : 0;
   const grandTotal = valueAmt != null ? valueAmt + vatAmt + tipAmt : null;
-  const isPaid = !!s.paid;
-
-  const statusLabel = isPaid ? t('invoice_status_paid') : t('invoice_status_pending');
-  const statusBg = isPaid ? 'rgba(46,204,113,0.12)' : 'rgba(231,76,60,0.10)';
-  const statusColor = isPaid ? '#1a8a4a' : '#c0392b';
 
   const descMain = s.description ? `<div class="td-main">${esc(s.description)}</div>` : '';
   const descSub = s.start_time
@@ -1676,35 +1781,42 @@ body{font-family:'Helvetica Neue',Arial,sans-serif;font-size:13px;color:#1a1e2e;
 .topbar-ref{font-size:12px;opacity:.6}
 .print-btn{background:#e8a020;color:#000;border:none;border-radius:6px;font-size:13px;font-weight:700;padding:8px 20px;cursor:pointer;letter-spacing:.02em}
 .page{max-width:800px;margin:24px auto 48px;background:#fff;padding:52px;box-shadow:0 4px 24px rgba(0,0,0,.12)}
-.inv-header{display:flex;justify-content:space-between;align-items:flex-start;gap:24px;margin-bottom:40px;padding-bottom:24px;border-bottom:3px solid #1a1e2e}
+.inv-header{display:flex;justify-content:space-between;align-items:flex-start;gap:28px;margin-bottom:40px;padding-bottom:24px;border-bottom:3px solid #1a1e2e}
 .inv-header>div:first-child{flex:1;min-width:0}
-.inv-header>.inv-right{flex-shrink:0}
-.issuer-name{font-size:19px;font-weight:800;margin-bottom:6px;overflow-wrap:anywhere;word-break:break-word}
+.inv-header>.inv-right{flex-shrink:0;max-width:40%}
+.issuer-name{font-size:18px;font-weight:800;margin-bottom:6px;overflow-wrap:anywhere;word-break:break-word}
 .issuer-detail{font-size:12px;color:#555c7a;line-height:1.9;overflow-wrap:anywhere}
 .inv-right{text-align:right}
-.inv-title{font-size:38px;font-weight:900;letter-spacing:.06em;line-height:1;margin-bottom:10px}
+.inv-title{font-size:23px;font-weight:900;letter-spacing:.04em;line-height:1.1;margin-bottom:10px}
 .inv-meta{font-size:12px;color:#555c7a;line-height:1.9}
 .inv-meta strong{color:#1a1e2e}
 .sec-label{font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#9098b0;margin-bottom:8px}
 .bill-to{margin-bottom:32px}
-.bill-name{font-size:16px;font-weight:700;margin-bottom:4px}
+.bill-name{font-size:16px;font-weight:700;margin-bottom:4px;overflow-wrap:anywhere}
 .bill-detail{font-size:12px;color:#555c7a;line-height:1.9}
 table{width:100%;border-collapse:collapse;margin-bottom:24px}
 th{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#9098b0;padding:8px 10px;text-align:left;border-bottom:2px solid #d0d4de}
 th.r,td.r{text-align:right}
 td{padding:13px 10px;font-size:13px;border-bottom:1px solid #ebedf0;vertical-align:top}
-.td-main{font-weight:600}
+.td-main{font-weight:600;white-space:pre-wrap;overflow-wrap:anywhere}
 .td-sub{font-size:11px;color:#9098b0;margin-top:3px}
 .totals{display:flex;justify-content:flex-end;margin-bottom:28px}
 .totals-inner{width:250px}
 .tot-row{display:flex;justify-content:space-between;padding:5px 0;font-size:13px;color:#555c7a;border-bottom:1px solid #ebedf0}
 .tot-row.grand{font-size:16px;font-weight:800;color:#1a1e2e;padding-top:10px;border-top:2px solid #1a1e2e;border-bottom:none;margin-top:6px}
-.status-badge{display:inline-block;font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;padding:5px 16px;border-radius:20px;background:${statusBg};color:${statusColor};border:1.5px solid ${statusColor};margin-bottom:32px}
-.footer{border-top:1px solid #d0d4de;padding-top:14px;display:flex;justify-content:space-between;align-items:flex-end;font-size:11px;color:#9098b0;margin-top:40px}
+/* Remove the browser's print header/footer (date, document title, about:blank URL) */
+@page{margin:0;size:A4}
+/* Fill an A4 sheet: the flexible spacer pushes the totals to the bottom */
+.page{display:flex;flex-direction:column;min-height:297mm}
+.spacer{flex:1 1 auto;min-height:24px}
+.notes-block{margin-bottom:8px}
+.notes-body{font-size:12px;color:#555c7a;line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere}
+.note-disclaimer{margin-top:8px;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#9098b0}
+.footer-disclaimer{margin-top:4px;text-align:center;font-size:10px;color:#9098b0}
 @media print{
   body{background:#fff}
   .topbar{display:none}
-  .page{margin:0;padding:36px;box-shadow:none;max-width:100%}
+  .page{margin:0;padding:46px 52px;box-shadow:none;max-width:100%}
 }
 </style>
 </head>
@@ -1729,7 +1841,9 @@ td{padding:13px 10px;font-size:13px;border-bottom:1px solid #ebedf0;vertical-ali
       <div class="inv-meta">
         <strong>${t('invoice_ref')}:</strong> ${ref}<br>
         <strong>${t('invoice_date')}:</strong> ${today}
+        ${s.invoice_number ? `<br><strong>${t('note_official_invoice')}:</strong> ${esc(s.invoice_number)}` : ''}
       </div>
+      <div class="note-disclaimer">${t('note_disclaimer')}</div>
     </div>
   </div>
 
@@ -1787,6 +1901,17 @@ td{padding:13px 10px;font-size:13px;border-bottom:1px solid #ebedf0;vertical-ali
     </tbody>
   </table>
 
+  ${
+    footerNote
+      ? `<div class="notes-block">
+    <div class="sec-label" style="margin-bottom:6px">${t('quote_notes')}</div>
+    <div class="notes-body">${escNl(footerNote)}</div>
+  </div>`
+      : ''
+  }
+
+  <div class="spacer"></div>
+
   <div class="totals">
     <div class="totals-inner">
       ${valueAmt != null ? `<div class="tot-row"><span>${t('invoice_subtotal')}</span><span>${fmt(valueAmt)}</span></div>` : ''}
@@ -1795,35 +1920,25 @@ td{padding:13px 10px;font-size:13px;border-bottom:1px solid #ebedf0;vertical-ali
       <div class="tot-row grand"><span>${t('invoice_total')}</span><span>${fmt(grandTotal)}</span></div>
     </div>
   </div>
-
-  <div class="status-badge">${statusLabel}</div>
-
-  <div class="footer">
-    <div>${footerNote ? escNl(footerNote) : ''}</div>
-    <div>${esc(issuerName)}</div>
-  </div>
+  <div class="footer-disclaimer">${t('note_disclaimer')}</div>
 </div>
 </body>
 </html>`;
 
   const w = window.open('', '_blank');
   if (!w) {
-    toast('Popup blocked — allow popups for this site', 'error');
+    toast(t('toast_popup_blocked'), 'error');
     return;
   }
   w.document.write(html);
   w.document.close();
-  // Bump invoice number
-  saveSetting('next_invoice_number', String(parseInt(settings['next_invoice_number'] || '1') + 1));
 };
 
 // ── Quote view ────────────────────────────────────────────
 function quoteFormHtml(q = {}) {
   const has = k => q[k] != null && q[k] !== '';
-  const today = has('date') ? q.date : new Date().toISOString().slice(0, 10);
-  const validUntil = has('valid_until')
-    ? q.valid_until
-    : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const today = has('date') ? q.date : localISODate();
+  const validUntil = has('valid_until') ? q.valid_until : localISODate(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000));
 
   const selClientId = q.client_id != null ? String(q.client_id) : '';
   // A custom (free-text) client is one with a name but no linked client_id.
@@ -1848,6 +1963,8 @@ function quoteFormHtml(q = {}) {
     q.id != null || isCustomClient || has('description') ? '' : settings['default_travel_fee'] || ''
   );
   const vatSel = has('vat_rate') ? String(parseFloat(q.vat_rate)) : '';
+  // Show hours + rate/h on the PDF, or only the total. New quotes use the default from Settings.
+  const showRate = has('show_rate') ? String(q.show_rate) !== '0' : settings['quote_show_rate'] !== '0';
   const saveLabel = q.id != null ? t('quote_generate') : t('quote_save');
   const editId = q.id != null ? q.id : '';
   const editRef = q.ref ? escapeHtml(q.ref) : '';
@@ -1941,7 +2058,13 @@ function quoteFormHtml(q = {}) {
             <option value="23"${vatSel === '23' ? ' selected' : ''}>23%</option>
           </select>
         </div>
-        <div class="form-group"></div>
+        <div class="form-group">
+          <label class="form-label">${t('quote_show_rate')}</label>
+          <select class="form-control" id="q-show-rate">
+            <option value="1"${showRate ? ' selected' : ''}>${t('quote_show_rate_yes')}</option>
+            <option value="0"${!showRate ? ' selected' : ''}>${t('quote_show_rate_no')}</option>
+          </select>
+        </div>
       </div>
 
       <div class="form-group">
@@ -2088,7 +2211,7 @@ function readQuoteForm() {
     client_address: client_address || null,
     client_phone: client_phone || null,
     description: document.getElementById('q-description')?.value || '',
-    date: document.getElementById('q-date')?.value || new Date().toISOString().slice(0, 10),
+    date: document.getElementById('q-date')?.value || localISODate(),
     valid_until: document.getElementById('q-valid-until')?.value || '',
     hours: parseFloat(document.getElementById('q-hours')?.value) || 0,
     operator_rate: parseFloat(document.getElementById('q-operator-rate')?.value) || 0,
@@ -2097,6 +2220,7 @@ function readQuoteForm() {
     discount: parseFloat(document.getElementById('q-discount')?.value) || 0,
     vat_rate: parseFloat(document.getElementById('q-vat')?.value) || 0,
     notes: document.getElementById('q-notes')?.value || '',
+    show_rate: document.getElementById('q-show-rate')?.value === '0' ? 0 : 1,
   };
 }
 
@@ -2146,9 +2270,13 @@ function buildQuoteHtml(data) {
   const vatAmt = (subtotal * vatRate) / 100;
   const grandTotal = subtotal + vatAmt;
 
-  const showRate = totalRate > 0;
-  const showTravel = travel > 0;
-  const showDiscount = discount > 0;
+  // "Total only" mode hides hours and rate/h and folds travel/discount into a single line.
+  const totalOnly = String(data.show_rate) === '0';
+  const showRate = !totalOnly && totalRate > 0;
+  const showHours = !totalOnly;
+  const showTravel = !totalOnly && travel > 0;
+  const showDiscount = !totalOnly && discount > 0;
+  const lineAmt = totalOnly ? subtotal : workAmt;
 
   const locale = state.lang === 'pt' ? 'pt-PT' : 'en-GB';
   // Top-right date = when the quote was created (created_at), falling back to today for a brand-new quote.
@@ -2249,15 +2377,15 @@ td{padding:13px 10px;font-size:13px;border-bottom:1px solid #ebedf0;vertical-ali
   <table>
     <thead><tr>
       <th>${t('quote_col_desc')}</th>
-      <th class="r">${t('quote_col_hours')}</th>
+      ${showHours ? `<th class="r">${t('quote_col_hours')}</th>` : ''}
       ${showRate ? `<th class="r">${t('quote_col_rate')}</th>` : ''}
       <th class="r">${t('quote_col_total')}</th>
     </tr></thead>
     <tbody><tr>
       <td>${description ? `<div class="td-main">${esc(description)}</div>` : '<span>—</span>'}</td>
-      <td class="r">${hours > 0 ? hours + ' h' : '—'}</td>
+      ${showHours ? `<td class="r">${hours > 0 ? hours + ' h' : '—'}</td>` : ''}
       ${showRate ? `<td class="r">${fmt(totalRate)}</td>` : ''}
-      <td class="r"><strong>${fmt(workAmt)}</strong></td>
+      <td class="r"><strong>${fmt(lineAmt)}</strong></td>
     </tr>
       ${
         showTravel
@@ -2310,7 +2438,7 @@ td{padding:13px 10px;font-size:13px;border-bottom:1px solid #ebedf0;vertical-ali
 function openQuotePdf(data) {
   const w = window.open('', '_blank');
   if (!w) {
-    toast('Popup blocked — allow popups for this site', 'error');
+    toast(t('toast_popup_blocked'), 'error');
     return false;
   }
   w.document.write(buildQuoteHtml(data));
@@ -2333,7 +2461,7 @@ window.saveQuote = async function () {
   let ref;
   // Top-right date on the PDF = when the quote was created. On edit keep the
   // original created_at; on a new quote it is being created right now.
-  let created = new Date().toISOString().slice(0, 10);
+  let created = localISODate();
   try {
     if (editId) {
       await api.put(`/api/quotes/${editId}`, payload);
@@ -2470,7 +2598,7 @@ function newService() {
 
 window.onDateChange = function (isNew) {
   if (!isNew) return;
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = localISODate();
   const dateVal = document.getElementById('f-date')?.value;
   const statusEl = document.getElementById('f-status');
   if (!dateVal || !statusEl) return;
@@ -2549,7 +2677,7 @@ async function renderAgenda() {
 function renderCalendarGrid(year, month, byDay, selectedDay) {
   const firstDay = new Date(year, month - 1, 1);
   const daysInMonth = new Date(year, month, 0).getDate();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localISODate();
 
   // Mon-first offset: JS getDay() is 0=Sun,1=Mon..6=Sat → (day+6)%7 → Mon=0
   const startOffset = (firstDay.getDay() + 6) % 7;
@@ -2666,7 +2794,7 @@ function renderUpcomingList(upcoming) {
 }
 
 window.scheduleNew = function () {
-  const date = state.calendarSelectedDay || new Date().toISOString().slice(0, 10);
+  const date = state.calendarSelectedDay || localISODate();
   openModal(t('form_new_service'), serviceFormHtml({ date, status: 'scheduled' }));
 };
 
@@ -3154,12 +3282,41 @@ window.addEventListener('online', async () => {
   }
   isReplaying = false;
   if (synced > 0) {
-    toast(`Synced ${synced} pending change${synced > 1 ? 's' : ''}`);
+    toast(`${synced} ${t('toast_synced')}`);
     renderView(state.view);
   }
 });
 
 window.addEventListener('offline', updateOfflineBadge);
+
+// Settings cached in localStorage and pushed to the server when missing there.
+const SYNCED_SETTING_KEYS = [
+  'lang',
+  'theme',
+  'currency',
+  'extra_stats',
+  'default_operator_rate',
+  'default_machine_rate',
+  'default_travel_fee',
+  'default_paid',
+  'base_address',
+  'base_lat',
+  'base_lng',
+  'travel_price_per_km',
+  'travel_fee_step',
+  'travel_min_fee',
+  'inv_name',
+  'inv_address',
+  'inv_nif',
+  'inv_email',
+  'inv_phone',
+  'inv_note',
+  'next_invoice_number',
+  'lubelogger_url',
+  'lubelogger_api_key',
+  'lubelogger_vehicle_id',
+  'quote_show_rate',
+];
 
 // ── Init ──────────────────────────────────────────────────
 async function init() {
@@ -3193,32 +3350,7 @@ async function init() {
       localStorage.setItem(k, v);
     }
     // Push any localStorage keys not on server up to the server
-    const keysToSync = [
-      'lang',
-      'theme',
-      'currency',
-      'extra_stats',
-      'default_operator_rate',
-      'default_machine_rate',
-      'default_travel_fee',
-      'default_paid',
-      'base_address',
-      'base_lat',
-      'base_lng',
-      'travel_price_per_km',
-      'travel_fee_step',
-      'travel_min_fee',
-      'inv_name',
-      'inv_address',
-      'inv_nif',
-      'inv_email',
-      'inv_phone',
-      'inv_note',
-      'next_invoice_number',
-      'lubelogger_url',
-      'lubelogger_api_key',
-      'lubelogger_vehicle_id',
-    ];
+    const keysToSync = SYNCED_SETTING_KEYS;
     const toSync = {};
     for (const k of keysToSync) {
       if (serverSettings[k] == null && localStorage.getItem(k) != null) {
@@ -3231,32 +3363,7 @@ async function init() {
     }
   } catch (_) {
     // Offline or server error — fall back to localStorage
-    const keysToLoad = [
-      'lang',
-      'theme',
-      'currency',
-      'extra_stats',
-      'default_operator_rate',
-      'default_machine_rate',
-      'default_travel_fee',
-      'default_paid',
-      'base_address',
-      'base_lat',
-      'base_lng',
-      'travel_price_per_km',
-      'travel_fee_step',
-      'travel_min_fee',
-      'inv_name',
-      'inv_address',
-      'inv_nif',
-      'inv_email',
-      'inv_phone',
-      'inv_note',
-      'next_invoice_number',
-      'lubelogger_url',
-      'lubelogger_api_key',
-      'lubelogger_vehicle_id',
-    ];
+    const keysToLoad = SYNCED_SETTING_KEYS;
     for (const k of keysToLoad) {
       if (localStorage.getItem(k) != null) settings[k] = localStorage.getItem(k);
     }
@@ -3519,6 +3626,13 @@ async function renderSettings() {
         <label class="form-label">${t('settings_quote_number')}</label>
         <input type="number" class="form-control" min="1" value="${escapeHtml(settings['next_quote_number'] || '1')}"
                oninput="saveSetting('next_quote_number', this.value)">
+      </div>
+      <div class="form-group">
+        <label class="form-label">${t('settings_quote_show_rate')}</label>
+        <select class="form-control" onchange="saveSetting('quote_show_rate', this.value)">
+          <option value="1"${settings['quote_show_rate'] !== '0' ? ' selected' : ''}>${t('quote_show_rate_yes')}</option>
+          <option value="0"${settings['quote_show_rate'] === '0' ? ' selected' : ''}>${t('quote_show_rate_no')}</option>
+        </select>
       </div>
     </div>
 
