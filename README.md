@@ -1,8 +1,8 @@
 # ServiLog
 
-> Self-hosted service log for machines and agricultural equipment — v1.11.2
+> Self-hosted service log for machines and agricultural equipment — v1.12.0
 
-<img width="677" height="486" alt="image" src="https://github.com/user-attachments/assets/40974a8e-a146-46a2-940a-817de2516ae3" />
+<img width="692" height="685" alt="image" src="https://github.com/user-attachments/assets/d133ef71-538b-41e7-8b5c-efefdd013235" />
 
 Installable PWA with a mobile-first dark UI. Runs entirely in Docker, no cloud required.
 
@@ -68,6 +68,17 @@ Settings → **Download Backup** exports a single `.slb` file containing the SQL
 Restore by selecting the `.slb` file (or a legacy `.db` file) in Settings → **Load Backup**.
 
 Manual backup: copy `./data/` — restore by replacing the folder and restarting the container.
+
+---
+
+## Invoicing (Portugal) & Quotes
+
+ServiLog is **not certified invoicing software**. In Portugal, legal invoices must be issued through software certified by the Autoridade Tributária (AT) or through the Portal das Finanças (Faturas-Recibo). ServiLog keeps your service records and works alongside whichever of those you use:
+
+1. **Service note (Nota de Serviço)** — from any service, tap **📄 Nota de Serviço** to get a printable summary for the client (hours, rates, travel fee, discount, VAT, total). It is clearly marked *"Este documento não serve de fatura"*. Each service gets its number (`NS 2026/0001`, …) once, the first time the note is generated; re-opening it reuses the same number. Set the starting number under Settings → "Dados do Emitente".
+2. **Official invoice** — issue the real invoice in your certified software or on the Portal das Finanças, then record it on the service under **Fatura oficial**: type the invoice number (e.g. `FR 2026/12`) and attach its PDF. The number shows as a 🧾 chip on the service card, the PDF opens from **Ver fatura**, and both the note and invoice numbers are included in the CSV export.
+
+**Quotes (Orçamentos)** can show either the **hours and price per hour** or **only the total** (travel fee and discount folded into a single line). Choose per quote in the quote form; the default for new quotes is set under Settings → "Dados para Orçamentos".
 
 ---
 

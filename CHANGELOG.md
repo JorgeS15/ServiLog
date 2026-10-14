@@ -20,6 +20,9 @@
 - Client name/description are now HTML-escaped in reminder emails.
 - Remaining hard-coded English toasts (offline save/sync, popup blocked) are now translated.
 
+### Docs
+- **README**: new "Invoicing (Portugal) & Quotes" section explaining the service note vs. the official (AT-certified) invoice workflow and the quote rate/total option; feature table and version updated to v1.12.0.
+
 ## [1.11.2] - 2026-07-04
 
 ### Changed
